@@ -54,6 +54,7 @@ function panel(id, name, state, badgeState, badgeText, options) {
 const stateWord = (state, text) => `<span class="j2ha-wv-state"><span class="j2ha-state-word j2ha-state-${state}">${text}</span></span>`;
 const treeEq = (id, name, state, text) => `<li class="j2ha-wv-eq" data-eq-id="${id}"><div class="j2ha-wv-row">${stateWord(state, text)}<span class="j2ha-wv-name j2ha-free-name">${name}</span></div></li>`;
 
+// Front v3 (Lot 1) : la configuration s'ouvre par l'icône ⚙ de la barre d'état (plus de tuile « Gestion / Configuration »).
 function html(withDiagnosticAction, titlePrefix = '', options = {}) {
   const room25 = `<div class="j2ha-wv-roomhead"><h2 class="j2ha-wv-title" tabindex="-1">${titlePrefix}<span class="j2ha-free-name">Pièce 25</span></h2>
     <div class="j2ha-room-actions"><button class="j2ha-room-republish">Republier</button><span class="j2ha-menu-wrap"><ul class="j2ha-menu"><li><button class="j2ha-room-recreate">Supprimer de Home Assistant…</button></li></ul></span></div></div>
@@ -62,9 +63,8 @@ function html(withDiagnosticAction, titlePrefix = '', options = {}) {
     <div class="j2ha-wv-kpis">${counters([['published', '1 publié']])}</div>`;
   const panels = { 579: panel(579, 'Eq-579', 'j2ha-diag-ready', 'published', 'Publié', options), 514: panel(514, 'Eq', 'j2ha-diag-disabled', 'disabled', 'Désactivé'), 7: panel(7, 'Sans', 'j2ha-diag-ready', 'published', 'Publié') };
   return `<body><div class="row"><div class="eqLogicThumbnailDisplay">
-    <div class="eqLogicThumbnailContainer"><div class="eqLogicAction" data-action="gotoPluginConf">Configuration</div>
-    ${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
-    <div id="div_bridgeHealthBanner">Démon</div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
+    <div class="eqLogicThumbnailContainer">${withDiagnosticAction ? '<div class="eqLogicAction" data-action="diagnostic">Diagnostic</div>' : ''}</div>
+    <div id="div_bridgeHealthBanner">Démon<button class="eqLogicAction" data-action="gotoPluginConf" aria-label="Configuration"></button></div><button id="bt_exportDiagnostic">Télécharger le diagnostic support</button>
     <div id="j2ha_mainView"><div id="j2ha_roomCards"><div class="j2ha-room-card" data-object_id="0"><span class="name">Sans pièce</span><span class="text-muted"> (1)</span></div>
     <div class="j2ha-room-card" data-object_id="25" id="piece-25"><span class="name j2ha-free-name">Pièce 25</span><span class="text-muted"> (2)</span></div></div></div>
     <div id="j2ha_workView" class="j2ha-wv" style="display:none"><div class="j2ha-wv-bar"><button class="j2ha-wv-back">Toutes les pièces</button></div>
@@ -161,7 +161,7 @@ test('20.3 gate simulé — une lecture de synthèse ou de diagnostic au chargem
 
 test('20.3 gate simulé — une chaîne interdite dans la page fait échouer le parcours', async (t) => {
   const parcours = await import(gate('parcours', 'decouverte-piece-25-eq-579.mjs'));
-  await withPage(t, html(false).replace('Configuration</div>', 'Mes templates</div>'), [], async (page, helpers) => {
+  await withPage(t, html(false).replace('<div id="div_bridgeHealthBanner">Démon', '<div id="div_bridgeHealthBanner">Mes templates'), [], async (page, helpers) => {
     await assert.rejects(() => parcours.run(page, { helpers }), /chaine-interdite-page/);
   });
 });
@@ -250,7 +250,10 @@ const INITIAL_BADGE = 'Bloqué';
 const READY_BADGE = 'À appliquer';
 
 function html380(journal, { sensorOffered = false } = {}) {
-  const options = `<option value="">auto</option>${sensorOffered ? '<option value="sensor">sensor</option><option value="binary_sensor">binary_sensor</option>' : ''}<option value="cover">cover</option>`;
+  // Front v2 (Lot 5) : panneau « Corriger le type » (radios ; types refusés grisés) au lieu du sélecteur de la cellule.
+  const radio = (type, value, disabled) => `<label class="j2ha-v2-radio"><input type="radio" name="t2971" value="${value}" data-type="${type}"${disabled ? ' disabled' : ''}>${type}</label>`;
+  const options = radio('auto', '', false) + radio('sensor', 'sensor', !sensorOffered) + radio('binary_sensor', 'binary_sensor', !sensorOffered)
+    + radio('cover', 'cover', false);
   // Story 25.4 : vue de travail C — l'équipement 380 est une ligne de l'arbre ; son détail s'affiche à la sélection.
   const detail = `<div class="j2ha-eq-panel j2ha-eq-open" data-eq-id="380"><div class="j2ha-eq-head"><span class="j2ha-eq-name">Eq</span>
       <span class="j2ha-eq-publish-badge j2ha-badge">${INITIAL_BADGE}</span></div>
@@ -288,16 +291,22 @@ function html380(journal, { sensorOffered = false } = {}) {
         };
       }
       function wire() {
-        // Le sélecteur n'existe qu'après un clic sur le lien « auto » de la colonne « Type HA ».
+        // Front v2 (Lot 5) : le lien « auto » ouvre le panneau sous la ligne ; choix → aperçu ; « Enregistrer et publier ».
         document.getElementById('link2971').onclick = function () {
-          var select = document.createElement('select');
-          select.id = 'sel2971';
-          select.innerHTML = ${JSON.stringify(options)};
-          select.onchange = function () {
-            window.__push('previewMappingOverride', 'apercu-simule'); window.__push('saveMappingOverride', 'simulee');
-            window.__push('getMappingOverrides', 'lecture-derivee'); setReady(true);
+          var row = document.createElement('tr');
+          row.className = 'j2ha-v2-type-row';
+          row.setAttribute('data-type-panel-for', '2971');
+          row.innerHTML = '<td colspan="4"><div class="j2ha-v2-type-panel">' + ${JSON.stringify(options)}
+            + '<button type="button" class="j2ha-v2-type-save" disabled>Enregistrer et publier</button></div></td>';
+          document.querySelector('tr[data-cmd-id="2971"]').after(row);
+          var save = row.querySelector('.j2ha-v2-type-save');
+          row.querySelectorAll('input').forEach(function (input) {
+            input.onchange = function () { window.__push('previewMappingOverride', 'apercu-simule'); save.disabled = false; };
+          });
+          save.onclick = function () {
+            window.__push('saveMappingOverride', 'simulee'); window.__push('executeHaAction', 'simulee');
+            window.__push('getMappingOverrides', 'lecture-derivee'); row.remove(); setReady(true);
           };
-          document.getElementById('type2971').appendChild(select);
           return false;
         };
       }

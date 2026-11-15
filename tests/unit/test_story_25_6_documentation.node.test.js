@@ -13,26 +13,38 @@ const index = read('docs/fr_FR/index.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const desktop = ['desktop/js', 'desktop/php'].flatMap((dir) => fs.readdirSync(path.join(root, dir)).filter((f) => /\.(js|php)$/.test(f)).map((f) => read(path.join(dir, f))))
   .join('\n').replace(/\{\{|\}\}/g, '');
-const section = index.slice(index.indexOf('### La vue de travail'), index.indexOf('**Le détail d\'une pièce**'));
+// Garde levée (front v3, Lot 5) : la section « La vue de travail » devient « La pièce et la fiche » (doc réécrite par écran).
+const section = index.slice(index.indexOf('### La pièce et la fiche'), index.indexOf('**La fiche d\'un équipement**'));
 
-describe('25.6 / AC14 — documentation de la portée', () => {
-  it('index.md décrit : pièce seule depuis une carte, « Toutes les pièces », « Page principale », ouverture en portée toutes, seule:1, « Précédent »', () => {
-    assert.match(section, /\*\*La portée\.\*\*/);
-    assert.match(section, /Depuis \*\*une carte de pièce\*\*, l'arbre n'affiche que \*\*cette pièce\*\*/);
-    assert.match(section, /\*\*« Toutes les pièces »\*\*/);
-    assert.match(section, /« Page principale »/);
-    assert.match(section, /Depuis une puce, un segment de la jauge ou une ligne de la liste filtrée, la vue s'ouvre directement sur \*\*toutes les pièces\*\*/);
+// Garde levée (front v3, Lot 2) : la portée « pièce seule », la bascule « Cette pièce | Toute la maison » et « Page principale »
+// sont supprimées. index.md décrit l'arbre unique, le fil d'Ariane et le sort des anciens liens `seule:1` ; chaque libellé cité
+// existe dans desktop/. L'entrée historique de 25.6 reste dans changelog_beta.md, suivie de celle du front v3.
+describe('25.6 / AC14 — documentation de la portée (front v3 : un seul arbre)', () => {
+  it('index.md décrit : un seul arbre, la carte qui ouvre sa pièce, le fil d’Ariane « Maison », les anciens liens seule:1, « Précédent »', () => {
+    assert.match(section, /\*\*Un seul arbre\.\*\*/);
+    assert.match(section, /L'arbre contient toujours \*\*toute la maison\*\*/);
+    assert.match(section, /`Maison › Niveau › Pièce`/);
+    assert.match(section, /\*\*« Maison »\*\*/);
     assert.match(section, /`seule:1`/);
     assert.match(section, /« Précédent »/);
-    assert.doesNotMatch(section, /« Toutes les pièces » \(ou le bouton « Précédent »/, 'plus le libellé du retour');
+    assert.doesNotMatch(section, /Cette pièce \| Toute la maison|« Page principale »|Dans les autres pièces/, 'plus de bascule ni d’ancien retour');
     assert.doesNotMatch(index, /fenêtre/i);
   });
 
   it('chaque libellé cité existe verbatim dans desktop/', () => {
-    for (const label of ['Toutes les pièces', 'Page principale', 'Pièces']) {
+    for (const label of ['Maison', 'Rechercher', 'Aucun résultat']) {
       assert.ok(section.includes(`« ${label} »`), `« ${label} » cité dans index.md`);
-      assert.ok(desktop.includes(label), `« ${label} » absent de desktop/`);
+      assert.ok(desktop.includes(`{{${label}}}`.replace(/\{\{|\}\}/g, '')), `« ${label} » absent de desktop/`);
     }
+  });
+
+  it('changelog_beta.md : l’entrée du front v3 annonce l’arbre unique et le fil d’Ariane, sans nom réel', () => {
+    const entry = changelog.split('---').find((part) => /Vue de travail : un seul arbre/.test(part));
+    assert.ok(entry, 'entrée présente');
+    assert.match(entry, /« Cette pièce \| Toute la maison » disparaît/);
+    assert.match(entry, /`Maison › Niveau › Pièce`/);
+    assert.match(entry, /Aucune requête de plus/);
+    assert.doesNotMatch(entry, /\b(salon|cuisine|chambre|garage|Alexandre|Dupont)\b/i);
   });
 
   it('changelog_beta.md : une entrée annonce la pièce seule, sans nom réel', () => {

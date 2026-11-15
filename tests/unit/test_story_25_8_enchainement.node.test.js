@@ -99,7 +99,8 @@ describe('25.8 / AC9 — enchaînement écriture → relecture → lecture des �
     assert.deepEqual(json(chained.data), json(reference.data));
     assert.deepEqual(json(chained.data), { action: 'scanTopology' });
     ui.respond('scanTopology', SCAN_OK);
-    assert.ok(alertTexts(ui).includes('Synchronisation terminée.'), 'message de « Relire Jeedom »');
+    // Garde levée (front v2, Lot 1) : glossaire 3.2 — le message du démon « Synchronisation terminée. » est affiché « Relecture terminée. ».
+    assert.ok(alertTexts(ui).includes('Relecture terminée.'), 'message de « Relire Jeedom »');
   });
 
   maybe('les drapeaux « pièce exclue » sont remplacés pour TOUTES les pièces depuis excluded_objects, sans recharger la page', () => {
@@ -187,7 +188,7 @@ describe('25.8 / AC10 — échecs', () => {
     confirmExclusion(daemon, 2);
     daemon.respond('saveRoomExclusion', SAVE_OK([2]));
     daemon.respond('scanTopology', { state: 'ok', result: { status: 'ok', operation_result: 'echec', operation_message: 'Synchronisation échouée.' } });
-    assert.ok(alertTexts(daemon).includes('Synchronisation échouée.'));
+    assert.ok(alertTexts(daemon).includes('Relecture échouée.'), 'glossaire 3.2 (front v2, Lot 1)');
     assert.ok(alertTexts(daemon).includes('Relancez « Relire Jeedom » pour retirer les entités.'));
   });
 

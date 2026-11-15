@@ -18,18 +18,26 @@ describe('20.3 / Q2b=A — boutons globaux sans nombre', () => {
     assert.doesNotMatch(home, /data-scope-count|data-scope-publies|_readHaActionCount/);
   });
 
-  it('textes décidés : « Republier tous les équipements inclus ? » et « Supprimer de Home Assistant tout le parc publié ? » avec la mise en garde forte', () => {
-    assert.match(home, /\{\{Republier tous les équipements inclus \?\}\}/);
+  // Garde levée (front v2, Lot 6, spec E9) : les confirmations globales sont CHIFFRÉES depuis la copie des états déjà en mémoire
+  // (`page.snapshot()`, aucune requête de plus) ; les textes vivent dans jeedom2ha_exclusions.js (« Republier tout »,
+  // « Supprimer tout de Home Assistant », bouton « Supprimer N entités »). La mise en garde forte et la promesse de 22.2
+  // (« Rien n'est recréé… », « Republier tout » remet) sont conservées ; un repli sans nombre reste dans le gestionnaire.
+  it('textes E9 : « Republier tout » et « Supprimer tout de Home Assistant » chiffrés, avec la mise en garde forte', () => {
+    const excl = fs.readFileSync('desktop/js/jeedom2ha_exclusions.js', 'utf8');
+    assert.match(home, /republishAllDialog\(j2haPageSnapshot\(\)\)/);
     const del = home.match(/\$\('\.j2ha-ha-action\[data-ha-action="supprimer-recreer"\]'\)[\s\S]*?\n  \}\);/);
     assert.ok(del, 'gestionnaire global supprimer absent');
-    assert.match(del[0], /\{\{Supprimer de Home Assistant tout le parc publié \?\}\}/);
-    for (const word of ['Attention', 'historique', 'dashboards', 'automatisations', 'entity_id']) {
-      assert.ok(del[0].includes(word), word);
+    assert.match(del[0], /deleteAllDialog\(j2haPageSnapshot\(\)\)/);
+    const dialog = excl.slice(excl.indexOf('function deleteAllDialog'), excl.indexOf('function republishAllDialog'));
+    for (const text of [del[0], dialog]) {
+      for (const word of ['historique', 'tableaux de bord', 'automatisations', 'Supprimer tout de Home Assistant']) {
+        assert.ok(text.includes(word), word);
+      }
+      // Story 22.2 (Q5 A, CC-55) : le libellé promet ce que fait l'action ; « Republier tout » remet.
+      assert.match(text, /Rien n\\'est recréé automatiquement/);
+      assert.match(text, /« Republier tout »/);
+      assert.doesNotMatch(text, /recréer/);
     }
-    // Story 22.2 (Q5 A, CC-55) : le libellé promet ce que fait l'action ; « Republier » remet.
-    assert.match(del[0], /Rien n\\'est recréé automatiquement/);
-    assert.match(del[0], /« Republier »/);
-    assert.doesNotMatch(del[0], /recréer/);
     assert.match(del[0], /triggerSupprimerAction\(\$button, 'global', \['all'\], reservation\)/);
     assert.match(home, /triggerPublierAction\(\$button, 'global', \['all'\], reservation\)/);
   });

@@ -121,12 +121,17 @@ describe('25.8 / AC7 — détail de pièce', () => {
 });
 
 describe('25.8 / AC12 — carte et ligne d\'arbre « Pièce exclue »', () => {
-  maybe('la carte remplace le ratio par « Pièce exclue » (icône, mot visible), conserve jauge et repères ; le nom accessible commence par « Nom, pièce exclue »', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : « une pièce exclue a l'opacité réduite et l'icône ⊘ à la place du ratio » —
+  // le mot « Pièce exclue » passe en info-bulle et en texte pour les lecteurs d'écran (plus de mot visible) ; la tuile d'une
+  // pièce non exclue écrit « n/t » ; « N pas encore retirés » devient une marque chiffrée (sans « · »).
+  maybe('la tuile remplace le ratio par l’icône ⊘ (« Pièce exclue » en info-bulle et pour les lecteurs d’écran), conserve liseré et repères ; le nom accessible commence par « Nom, pièce exclue »', () => {
     const ui = start();
     const card = ui.$(CARD(3));
     const line = card.find('.j2ha-room-excluded-line');
     assert.equal(line.length, 1);
     assert.equal(plain(line.text()).trim(), 'Pièce exclue');
+    assert.equal(plain(line.attr('title')), 'Pièce exclue');
+    assert.ok(line.find('.j2ha-room-ratio').hasClass('j2ha-v3-sr'), 'le mot est lu, l’icône est vue');
     assert.equal(line.find('.fa-eye-slash').length, 1);
     assert.equal(card.find('.j2ha-room-ratio').length, 1, 'une seule ligne de ratio : elle est remplacée');
     assert.ok(!/ \/ /.test(plain(card.find('.j2ha-room-ratio').text())), 'plus de « n / t publiés »');
@@ -134,17 +139,17 @@ describe('25.8 / AC12 — carte et ligne d\'arbre « Pièce exclue »', () => {
     assert.ok(plain(card.find('.j2ha-room-marks').text()).includes('1 exclu'), 'repère « N exclus » conservé');
     assert.ok(plain(card.attr('aria-label')).startsWith('Pièce fictive B, pièce exclue'));
     assert.ok(card.hasClass('j2ha-room-excluded'));
-    assert.equal(plain(ui.$(CARD(2)).find('.j2ha-room-ratio').text()), '2 / 2 publiés', 'une pièce non exclue garde son ratio');
+    assert.equal(plain(ui.$(CARD(2)).find('.j2ha-room-ratio').text()), '2/2', 'une pièce non exclue garde son ratio');
   });
 
   maybe('« N pas encore retirés » tant que la copie des états montre des équipements non exclus ; disparaît à la relecture', () => {
     const ui = start({ equipments: Object.assign({}, EQUIPMENTS, { 301: published(301) }) });
-    assert.equal(plain(ui.$(`${CARD(3)} .j2ha-room-notyet`).text()).trim(), '· 1 pas encore retiré');
+    assert.equal(plain(ui.$(`${CARD(3)} .j2ha-room-notyet`).text()).trim(), '1 pas encore retiré');
     ui.page.reader.load();
     ui.respond('getEquipmentStates', { state: 'ok', result: { status: 'ok', payload: { schema_version: 1, available: true, meta: { action_in_progress: false }, equipments: EQUIPMENTS, unread: [] } } });
     assert.equal(ui.$(`${CARD(3)} .j2ha-room-notyet`).length, 0, 'plus aucun équipement à retirer');
     const plural = start({ scene: Object.assign({}, SCENE, { config: { excludedObjects: '2' } }) });
-    assert.equal(plain(plural.$(`${CARD(2)} .j2ha-room-notyet`).text()).trim(), '· 2 pas encore retirés');
+    assert.equal(plain(plural.$(`${CARD(2)} .j2ha-room-notyet`).text()).trim(), '2 pas encore retirés');
   });
 
   maybe('la carte dit « Pièce exclue » même si les états ne sont pas lus (écriture déjà enregistrée)', () => {

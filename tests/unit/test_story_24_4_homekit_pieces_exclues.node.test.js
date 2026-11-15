@@ -47,14 +47,15 @@ describe('24.4 R1 — carte d\'une pièce exclue', () => {
   maybe('un équipement relevé : aucun « pas encore retiré », mention « 1 gardé (HomeKit) »', () => {
     const ui = startWorkview({ scene: SCENE, equipments: EQUIPMENTS, pluginNames: { plugin_alpha: 'Alpha' } });
     assert.equal(ui.$(`${CARD} .j2ha-room-notyet`).length, 0, 'pas de faux « pas encore retiré »');
-    assert.equal(plain(ui.$(`${CARD} .j2ha-room-homekit-kept`).text()).trim(), '· 1 gardé (HomeKit)');
+    // Garde levée (front v3, Lot 1) : marque chiffrée de la tuile (icône + nombre, le mot pour les lecteurs d'écran).
+    assert.equal(plain(ui.$(`${CARD} .j2ha-room-homekit-kept`).text()).trim(), '1 gardé (HomeKit)');
     assert.ok(!/pas encore retir/.test(plain(ui.$(CARD).text())));
   });
 
   maybe('sans équipement relevé : « pas encore retiré » inchangé, aucune mention HomeKit', () => {
     const eq = { 301: published(301), 302: removed(302) };
     const ui = startWorkview({ scene: SCENE, equipments: eq, pluginNames: { plugin_alpha: 'Alpha' } });
-    assert.equal(plain(ui.$(`${CARD} .j2ha-room-notyet`).text()).trim(), '· 1 pas encore retiré');
+    assert.equal(plain(ui.$(`${CARD} .j2ha-room-notyet`).text()).trim(), '1 pas encore retiré');
     assert.equal(ui.$(`${CARD} .j2ha-room-homekit-kept`).length, 0);
   });
 });

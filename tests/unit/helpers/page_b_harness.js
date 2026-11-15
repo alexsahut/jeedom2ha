@@ -85,12 +85,14 @@ function startPage(options) {
   const page = O.createPage({
     $: dom.$, document: dom.document, bootbox: dom.bootbox, rooms,
     readStates: O.ajaxFetch(dom.$),
-    now: () => now,
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
     clearTimeout: () => {},
     openRoom: (id) => opened.push(id),
     // Story 25.8 : demandes d'exclusion de pièce émises par le menu « ⋯ » des cartes (aucun réseau).
     excludeRoom: (...args) => excludeCalls.push(args),
+    // Front v3 (Lot 1) : état du démon lu par la barre d'état (Appliquer, verdict, onglet Scénarios) ; absent = null.
+    bridgeStatus: () => (typeof opts.bridgeStatus === 'function' ? opts.bridgeStatus() : (opts.bridgeStatus || null)),
+    now: () => now,
   });
   page.init();
   const ui = {

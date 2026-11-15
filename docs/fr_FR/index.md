@@ -1,50 +1,105 @@
 # Jeedom2HA — Documentation
 
-**Plugin de pont Jeedom → Home Assistant via MQTT Discovery**
+**jeedom2ha publie vos équipements Jeedom dans Home Assistant.** Jeedom reste la source : rien n'y est modifié.
 
-Ce plugin affiche vos équipements Jeedom dans Home Assistant comme des appareils natifs, sans les reconfigurer à la main. Jeedom reste le moteur : c'est lui qui exécute les ordres et qui garde la configuration d'origine.
+> **Vous découvrez le plugin ?** Commencez par **[Premiers pas](premiers-pas.md)** : une page, de l'installation à votre premier équipement dans Home Assistant.
 
-Cette documentation décrit l'écran du plugin tel que vous le voyez, avec les mots que l'écran emploie.
+L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleur, à son icône et à son mot, et chaque bouton a son info-bulle. Pour lire une aide, cliquez (ou touchez) **ⓘ**, une pastille ou une marque : la bulle s'ouvre, avec « En savoir plus » vers la section concernée ; un second clic, Échap ou un clic ailleurs la ferme. Cette documentation est le « En savoir plus » : une section par écran, avec les mots de l'écran.
 
 ---
 
-## Table des matières
+## Sommaire
 
-- [Présentation](#présentation)
-- [Prérequis et installation](#prérequis-et-installation)
-- [Installer depuis GitHub (beta)](installation-github.md)
-- [Configuration](#configuration)
-- [Première synchronisation](#première-synchronisation)
-- [La page principale](#la-page-principale)
-- [La configuration par pièce](#la-configuration-par-pièce)
-- [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
-- [Les états et les compteurs de la vue de travail](compteurs.md)
-- [Dépannage](#dépannage)
-- [Annexes](#annexes)
-  - [Noms et identifiants dans Home Assistant](#annexe--noms-et-identifiants-dans-home-assistant)
-- [Changelog](changelog.md)
+1. [Premiers pas](premiers-pas.md) — une page pour démarrer.
+2. [Présentation et mots du plugin](#présentation) — dont [À savoir avant tout](#à-savoir-avant-tout).
+3. [Glossaire des états](#glossaire-des-états) — couleur, icône, mot.
+4. [Prérequis et installation](#prérequis-et-installation) — et [Installer depuis GitHub (beta)](installation-github.md).
+5. [Les écrans](#les-écrans), un par section :
+   - [La barre d'état](#la-barre-détat) · [La page maison et les puces](#la-page-maison-et-les-puces) · [À faire](#à-faire)
+   - [La pièce et la fiche](#la-pièce-et-la-fiche) · [Corriger le type](#corriger-le-type) · [Choisir ce qui est publié](#choisir-ce-qui-est-publié) ([Exclure une pièce](#exclure-une-pièce))
+   - [Les scénarios](#les-scénarios) · [Configuration](#configuration) · [Vérifier l'installation](#vérifier-linstallation) · [Le guide de démarrage](#le-guide-de-démarrage)
+6. [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
+   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures)
+   - [Les causes de blocage](#les-causes-de-blocage) · [Les conseils](#les-conseils)
+7. [Les états et les compteurs](compteurs.md) — le détail des chiffres (page séparée).
+8. [Dépannage](#dépannage)
+9. [Annexes](#annexes)
+   - [Pièces dans Home Assistant](#annexe--pièces-dans-home-assistant-zone-suggérée) · [Noms et identifiants](#annexe--noms-et-identifiants-dans-home-assistant) · [Nommage des équipements](#annexe--nommage-des-équipements)
+   - [Durée des actions](#annexe--durée-des-actions) · [Changelog](changelog.md)
 
 ---
 
 ## Présentation
 
-jeedom2ha fonctionne comme un pont local. Un petit programme tournant en arrière-plan (le **démon**) lit votre installation Jeedom, décide quels équipements peuvent exister dans Home Assistant, puis les y publie par l'intermédiaire d'un **broker MQTT** (le « facteur » par lequel passent les messages entre Jeedom et Home Assistant). Home Assistant les découvre alors automatiquement : c'est le principe du *MQTT Discovery*.
+Un petit programme du plugin, le **démon**, tourne en arrière-plan : il lit votre installation Jeedom, décide quels équipements peuvent exister dans Home Assistant, puis les y publie par l'intermédiaire du **broker MQTT** (le serveur de messages que Home Assistant écoute aussi). Home Assistant les découvre alors tout seul : c'est la découverte MQTT (*MQTT Discovery*).
 
-Quelques repères de vocabulaire, utilisés partout dans cette documentation :
+Les mots du plugin, un mot par chose, utilisés partout dans l'écran et dans cette documentation :
 
 | Mot | Ce que cela désigne |
 |---|---|
-| **Pièce** | Un objet de votre arborescence Jeedom. Les équipements qui n'ont pas de pièce sont regroupés sous « Sans pièce ». |
-| **Équipement** | Un équipement Jeedom (lampe, prise, volet, capteur…). |
-| **Commande** | Une commande ou une information d'un équipement Jeedom (allumer, état, température…). |
-| **Type Jeedom** | Le type générique que Jeedom attribue à une commande (colonne « Type Jeedom »). C'est lui qui permet au plugin de comprendre à quoi sert la commande. |
-| **Entité Home Assistant** | Ce qui apparaît dans Home Assistant. Un équipement Jeedom peut donner une ou plusieurs entités (par exemple une prise et la mesure de sa consommation). |
-| **Publier** | Rendre une entité visible et utilisable dans Home Assistant. |
-| **Réglage** | Un choix manuel que vous posez et que le plugin conserve : le « Type HA » d'une commande, ou la publication d'un équipement ou d'une entité (« Automatique », « Toujours » ou « Jamais »). Il remplace le choix automatique du plugin. |
-| **État** | Ce que dit le badge d'un équipement : Publié, À appliquer, Bloqué, Exclu, Désactivé ou Rien à publier. Un équipement n'a toujours qu'un seul état (voir [Les états et les compteurs](compteurs.md)). |
-| **Démon** | Le programme du plugin qui tourne en arrière-plan. Son indicateur se lit dans la barre de santé de la page principale. |
+| **Publier** / **Publié** | Rendre un équipement visible et utilisable dans Home Assistant. |
+| **Relire Jeedom** | Relire toute la configuration Jeedom, puis mettre Home Assistant à jour. L'heure « Relu HH:MM » de la barre d'état en donne la date. |
+| **Republier** | Renvoyer à Home Assistant ce qui est déjà publié, sans relire Jeedom (« Republier tout », « Republier la pièce », « Republier »). |
+| **Appliquer** | Envoyer à Home Assistant un réglage enregistré qui attend. |
+| **Exclure** / **Exclu** | Ne pas publier, par choix : un plugin, une pièce ou un équipement. Le retour se dit « Ne plus exclure ». |
+| **Automatique**, **Toujours**, **Jamais** | Le réglage de publication d'un équipement ou d'une entité : le plugin décide, publier même si le plugin hésite, ne jamais publier. |
+| **Réglage** | Un choix que vous posez et que le plugin conserve : le type Home Assistant d'une commande, ou « Automatique », « Toujours » ou « Jamais ». Un type choisi par vous s'affiche « Personnalisé ». |
+| **Type générique** | Le rôle d'une commande dans Jeedom (par exemple « Lumière État », « Lumière Bouton On »), colonne « Rôle dans Jeedom ». C'est lui qui permet au plugin de comprendre à quoi sert la commande. Le plugin ne le modifie jamais. |
+| **Type HA** | Ce que devient la commande dans Home Assistant, toujours écrit en français avec le terme technique entre parenthèses : « Lumière (light) ». |
+| **Entité** | Une ligne pilotable ou lisible dans Home Assistant. Un équipement Jeedom peut en donner plusieurs (par exemple une prise et la mesure de sa consommation). Son identifiant ressemble à `light.jeedom2ha_142`. |
+| **Pilotable** / **Lecture seule** | Home Assistant peut agir sur l'entité (allumer, éteindre, régler…), ou seulement afficher son état. |
+| **Conseil** | Un équipement publié qui pourrait faire mieux (en lecture seule alors que des ordres existent, par exemple). Ce n'est pas un état. |
+| **État** | Ce que dit le badge d'un équipement : Publié, À appliquer, Bloqué, Exclu, Désactivé ou Rien à publier. Un équipement n'a toujours qu'un seul état (voir le [glossaire des états](#glossaire-des-états)). |
+| **Pièce** | Un objet de votre arborescence Jeedom (« objet » dans Jeedom, « zone » dans Home Assistant). Les équipements qui n'ont pas de pièce sont regroupés sous « Sans pièce ». |
+| **Maison** | Toute votre installation. |
+| **Démon** | Le programme du plugin qui tourne en arrière-plan. Son indicateur se lit dans la barre d'état de la page du plugin. |
+| **Barre d'état** | Le bandeau en haut de la page du plugin : les pastilles Démon, MQTT et Home Assistant, « Relu HH:MM », et les boutons « Appliquer (n) », « Relire Jeedom », ?, ⚙ et « ⋯ » (« Autres actions »). |
 
-Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom. Si vous utilisez aussi le plugin Homebridge, rien ne change pour lui : l'écran du plugin le rappelle par le message « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
+Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom : le type natif Jeedom (le type générique, partagé avec Homebridge) reste tel quel, et si vous utilisez aussi ce plugin, rien ne change pour lui. L'écran le rappelle par le message « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
+
+### À savoir avant tout
+
+Quatre règles qui surprennent :
+
+- **Une seule installation jeedom2ha par broker MQTT.** Une deuxième installation branchée sur le même broker (box de test, sauvegarde restaurée ailleurs) retire les boutons de scénario de la première, et inversement. Voir [Connexion au broker MQTT](#connexion-au-broker-mqtt).
+- **Certains mots du nom d'un équipement écartent un type** (« garage », « eau », « portail » ou « prise » écartent le type Lumière, par exemple) : l'équipement est alors **Bloqué**. Voir [Nommage des équipements](#annexe--nommage-des-équipements).
+- **La pièce dans Home Assistant est fixée à la création** de l'appareil : déplacer ensuite l'équipement dans Jeedom ne le déplace pas dans Home Assistant. Voir [Pièces dans Home Assistant](#annexe--pièces-dans-home-assistant-zone-suggérée).
+- **Un scénario Jeedom n'est publié comme bouton que si vous l'avez choisi.** Ceux déjà publiés avant la mise à jour le restent ; un nouveau scénario arrive non publié, marqué ✱. Voir [Les scénarios](#les-scénarios).
+
+---
+
+## Glossaire des états
+
+Un état se lit toujours avec **une couleur, une icône et un mot**. La couleur ne porte jamais le sens seule ; la définition est dans l'info-bulle.
+
+**L'équipement** (badge de la fiche, icône de l'arbre, puces et marques des tuiles) a un seul état à la fois :
+
+| Mot | Couleur | Icône | Ce que cela veut dire | Que faire |
+|---|---|---|---|---|
+| **Publié** | vert | ✓ dans un rond | L'équipement est présent dans Home Assistant. | Rien. |
+| **À appliquer** | bleu | horloge | Un réglage attend d'être envoyé, ou la publication due n'a pas encore eu lieu. | « Appliquer ». |
+| **Bloqué** | orange | triangle ⚠ | Rien n'est dans Home Assistant et au moins une commande est bloquée par une cause corrigeable. | Lire la bande de cause de sa fiche : voir [Les causes de blocage](#les-causes-de-blocage). |
+| **Exclu** | gris | œil barré | Écarté par choix : « Jamais », sa pièce ou son plugin. La cause est dite à côté du mot. | Rien, c'est un choix. |
+| **Désactivé** | gris, italique | pause | Désactivé dans Jeedom. Il l'emporte sur « Exclu ». | Le réactiver dans Jeedom, si vous le souhaitez. |
+| **Rien à publier** | gris | rond barré d'un trait | Aucune commande n'est publiable ni bloquée. | Rien. |
+
+Sur la page maison, les trois derniers sont regroupés dans la puce **« exclus ou inactifs »** (œil barré). **Non lu** (gris, hachuré dans le liseré) n'est pas un état : le chiffre de cet équipement n'a pas pu être lu.
+
+**Autour des états**, avec la même règle :
+
+| Mot | Couleur | Icône | Où | Ce que cela veut dire |
+|---|---|---|---|---|
+| **Conseil** | bleu | ampoule | « À faire », fiche | Un équipement publié pourrait faire mieux. Ce n'est pas un état. |
+| « 2 bloquées » | orange | triangle ⚠ | fiche, arbre | Des commandes d'un équipement publié sont bloquées. Ce n'est pas un état. |
+| **Actif**, **Connecté**, « Vu à 21:04 » | point vert | — | barre d'état | Le démon, le broker ou Home Assistant répond. |
+| **Non confirmé**, « Inconnu » | point gris, « ? » | — | barre d'état | Pas encore vérifié ; pas une panne. |
+| **Arrêté**, **Déconnecté** | point rouge | — | barre d'état | Panne : les actions vers Home Assistant sont grisées. |
+| **Rien à faire** | vert | ✓ | barre d'état, pièce | Tout est publié et vérifié par une relecture réussie de moins de 24 h. |
+| **Non vérifié** | gris | ? | barre d'état | Le plugin ne peut pas l'affirmer : bouton « Relire ». |
+| **Nouveau** | bleu | ✱ | onglet « Scénarios » | Scénario apparu depuis votre dernier choix, pas encore publié. |
+| **Inactif** | gris | pause | onglet « Scénarios » | Scénario désactivé dans Jeedom ; publié, son bouton est « Indisponible ». |
+
+Le détail des règles (priorités entre états, catégories de commande, chiffres) est dans [Les états et les compteurs](compteurs.md).
 
 ---
 
@@ -62,303 +117,122 @@ Le plugin ne modifie jamais vos équipements, vos commandes ni vos types Jeedom.
 
 1. Installez le plugin depuis le Market Jeedom. Pour une installation hors Market à partir d'une archive GitHub, suivez plutôt [Installer depuis GitHub (beta)](installation-github.md).
 2. Sur la page du plugin, lancez l'installation des dépendances et attendez la fin de l'opération (suivie dans le journal `jeedom2ha`).
-3. Saisissez et sauvegardez la connexion au broker (voir [Configuration](#configuration)), puis démarrez le démon ou, s'il a déjà démarré, redémarrez-le : le démon ne lit les réglages MQTT qu'à son démarrage, et il peut démarrer dès la fin de l'installation, avant que vous ayez saisi le broker.
+3. Ouvrez la page du plugin : le [guide de démarrage](#le-guide-de-démarrage) vous accompagne jusqu'à la première publication.
 
 ---
 
-## Configuration
+## Les écrans
 
-Depuis la page du plugin, cliquez sur la vignette **« Configuration »** (bloc « Gestion »).
-<!-- CAPTURE: page de configuration -->
-![Page de configuration du plugin](images/configuration.png)
+La page du plugin (**Plugins › Communication › jeedom2ha**) contient, de haut en bas : la barre d'état, puis deux onglets, **« Équipements »** (la maison et ses pièces) et **« Scénarios »**. Cliquer sur une pièce ouvre la pièce et la fiche de ses équipements, dans la même page.
 
-### Connexion au broker MQTT
+### La barre d'état
 
-Si MQTT Manager est installé, le plugin le détecte et pré-remplit les champs encore vides : le bandeau affiche alors « MQTT Manager détecté — configuration pré-remplie ». Sans MQTT Manager, le bandeau affiche « Configuration manuelle » quand un hôte est déjà enregistré, et « Aucun broker MQTT détecté. Installez MQTT Manager ou saisissez les paramètres manuellement ci-dessous. » quand rien n'est enregistré.
+<!-- CAPTURE: barre d'état -->
+![Barre d'état : pastilles, « Relu », « Appliquer (1) », « Relire Jeedom », ?, ⚙ et le menu ⋯ ouvert](images/barre-etat.png)
 
-| Champ | Rôle |
+**À gauche, l'état.** Chaque pastille est un point de couleur et un mot ; le détail est dans l'info-bulle.
+
+| Pastille | Point vert | Point gris (« ? ») | Point rouge |
+|---|---|---|---|
+| **Démon** | « Actif » | — | « Arrêté », « Erreur Jeedom », « Erreur de communication » |
+| **MQTT** | « Connecté » (l'adresse du broker en info-bulle) | « Reconnexion... », « Connexion... », « Non configuré », « Inconnu » | « Déconnecté » |
+| **Home Assistant** | « Vu à 21:04 », ou « Confirmé par vous » après « Je l'ai vu » | « Non confirmé » : Home Assistant ne se signale qu'à son démarrage ; s'il tourne déjà, c'est normal | — |
+
+Puis **« Relu 15:58 »** : l'heure de la dernière relecture (« Relu le 12/11 » si ce n'est pas aujourd'hui, « Jamais relu » sinon), son résultat en info-bulle. Une pastille orange n'apparaît que si la dernière opération a échoué (« Relecture échouée », « Publication partielle »…). Enfin, **✓ « Rien à faire »** seulement si tout est publié et qu'une relecture réussie date de moins de 24 heures ; sinon **? « Non vérifié »** avec le bouton **« Relire »**.
+
+**À droite, les actions.**
+
+| Bouton | Ce qu'il fait |
 |---|---|
-| **Hôte MQTT** | Adresse IP ou nom d'hôte du broker. |
-| **Port MQTT** | 1883 par défaut, 8883 pour une connexion chiffrée (TLS). |
-| **Utilisateur MQTT** | Identifiant du broker, si une authentification est requise. |
-| **Mot de passe MQTT** | Laisser vide pour conserver le mot de passe actuel. Le message « Mot de passe déjà configuré » indique qu'un mot de passe est enregistré. |
-| **Activer TLS** | Active le chiffrement de la connexion au broker. |
-| **Vérifier le certificat** | Contrôle le certificat du broker. À décocher pour un certificat auto-signé. |
+| **« Appliquer »** suivi du nombre n (bleu) | Visible seulement quand n équipements sont « À appliquer » : envoie leurs réglages à Home Assistant, après une confirmation chiffrée. Jeedom n'est pas relu. |
+| **« Relire Jeedom »** | Relit tout Jeedom, puis met Home Assistant à jour et applique les réglages en attente. |
+| **?** (« Aide ») | Ouvre cette documentation. |
+| **⚙** (« Configuration ») | Ouvre la [configuration](#configuration). |
+| **« ⋯ »** (« Autres actions ») | **« Vérifier l'installation… »**, **« Guide de démarrage »**, **« Republier tout »**, puis, en rouge après un trait, **« Supprimer tout de Home Assistant… »**. |
 
-Trois boutons complètent la section :
+« Supprimer tout de Home Assistant… » demande une confirmation forte et chiffrée (« Supprimer tout de Home Assistant ») : « L'historique, les tableaux de bord et les automatisations qui les utilisent seront touchés. » et « Rien n'est recréé automatiquement : utilisez « Republier tout » pour les remettre. Cette action ne s'annule pas. »
 
-- **« Tester la connexion »** essaie la connexion avec les valeurs saisies à l'écran, même non sauvegardées. Le démon doit être démarré.
-- **« Récupérer depuis MQTT Manager »** réimporte les paramètres de MQTT Manager **et les enregistre aussitôt**, sans attendre « Sauvegarder » (message de réussite : « Configuration importée depuis MQTT Manager »).
-- **« Réinitialiser le formulaire »** (lien) vide les champs de connexion à l'écran, sans rien enregistrer.
+**Boutons grisés.** Les actions vers Home Assistant (« Appliquer (n) », « Relire Jeedom », les « Republier » et « Supprimer de Home Assistant… ») demandent un démon actif **et** MQTT connecté ; sinon elles sont grisées et une ligne dit pourquoi (« Démon arrêté — actions Home Assistant bloquées. », « MQTT déconnecté — actions Home Assistant bloquées. »). Elles le sont aussi pendant une relecture. Le réglage « Automatique | Toujours | Jamais » et le « Type HA » restent actifs.
 
-**Pour que ces réglages soient pris en compte :** cliquez sur le bouton **« Sauvegarder »** de Jeedom (en bas de l'écran de configuration), puis **démarrez ou redémarrez le démon** : il ne lit les réglages MQTT qu'à son démarrage. Le bouton situé sous les réglages de filtrage, plus bas, n'enregistre pas la connexion au broker, seulement ces réglages de filtrage.
+#### Relire Jeedom ou Republier tout ?
 
-### Filtrage et publication
+| J'ai… | Bouton | Ce qui se passe |
+|---|---|---|
+| changé quelque chose dans Jeedom (un équipement, un type générique, un nom, une pièce) | **« Relire Jeedom »** | Le plugin relit Jeedom, publie ou retire ce qui a changé et applique les réglages en attente. |
+| perdu mes appareils dans Home Assistant (broker redémarré sans mémoire, par exemple) | **« Republier tout »** | Le plugin renvoie à Home Assistant ce qui est déjà publié, sans relire Jeedom. |
+| besoin de renvoyer un seul équipement ou une seule pièce | « Republier » ou « Republier la pièce » (menus « ⋯ ») | Comme « Republier tout », pour cette portée. |
 
-| Champ | Rôle |
-|---|---|
-| **Plugins exclus** | Une **liste à cocher** des plugins qui ont au moins un équipement dans Jeedom (le plugin jeedom2ha lui-même n'y figure pas). Chaque case porte le nom du plugin affiché par Jeedom, suivi de son identifiant technique en gris. Cochez les plugins dont les équipements ne doivent pas être publiés dans Home Assistant. Un plugin exclu mais **absent de Jeedom** (désinstallé) reste affiché, coché, avec la mention « (absent de Jeedom) » : décochez-le pour le retirer. L'ordre des cases n'a pas d'importance ; la liste défile si elle est longue. Rien de coché = aucune exclusion de plugin. |
-| **Politique de publication** | « Publier les équipements sûrs et probables (recommandé) » ou « Publier uniquement les équipements sûrs ». |
+« Relire Jeedom » demande une confirmation (« Le plugin relit vos équipements et met Home Assistant à jour. », puis « Rien n'est supprimé sans que vous l'ayez exclu. »). Le résultat s'affiche en une ligne : « Relecture terminée. », « Relecture terminée avec avertissements. » ou « Relecture échouée. ».
 
-**Pièces exclues.** Il n'y a plus de champ de saisie des pièces dans cette page : « Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce). » Un lien ouvre la page du plugin, et le nombre de pièces déjà exclues est rappelé (« 2 pièces exclues », sans leurs noms). Les pièces que vous aviez déjà indiquées dans l'ancien champ sont reprises telles quelles : elles apparaissent « Pièce exclue » sur leur carte. Voir [Exclure une pièce](#exclure-une-pièce). **Pièces exclues : sauf équipements exposés à HomeKit.** Un équipement actif exposé à HomeKit (réglage de Homebridge lu par le plugin) n'est pas écarté par l'exclusion de sa pièce : il reste publié, comme dans Apple Maison. L'exclusion de l'équipement lui-même, l'exclusion de son plugin et un équipement désactivé dans Jeedom restent respectés, ainsi que l'état global « exclure ».
+Vous n'avez rien à relancer quand un scénario ou un équipement est activé ou désactivé, ou quand une exclusion change : toutes les 5 minutes, la tâche cron5 de Jeedom le vérifie et, seulement si quelque chose a changé, relit Jeedom et met Home Assistant à jour.
 
-« Sûr » veut dire que le type Home Assistant se déduit des types Jeedom sans doute ; « probable », qu'il s'en déduit avec un léger doute. La politique « Publier uniquement les équipements sûrs » ne met de côté que les équipements « probables ».
+### La page maison et les puces
 
-Le bouton situé sous ces réglages les enregistre puis relance une lecture complète de Jeedom, comme « Relire Jeedom » sur la page principale. Le bouton « Sauvegarder » de Jeedom enregistre aussi la liste des plugins exclus, au même format. Il affiche l'avancement (sauvegarde, puis lecture), puis le nombre d'équipements publiés.
-
-Les exclusions de cette page sont **distinctes** de celles que vous posez avec le réglage « Jamais » de la configuration par pièce : voir [Ce que le plugin publie…](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi), famille « Exclusions volontaires ».
-
----
-
-## Première synchronisation
-
-1. Configurez le broker MQTT, cliquez sur « Sauvegarder », puis démarrez ou redémarrez le démon. Vérifiez que la barre de santé de la page principale indique MQTT « Connecté » (vous pouvez aussi utiliser « Tester la connexion »).
-2. Ajustez les filtres si nécessaire (plugins exclus, politique de publication ; les pièces s'excluent depuis la page du plugin).
-3. Cliquez sur le bouton situé sous les filtres (page de configuration) ou, depuis la page principale du plugin, sur **« Relire Jeedom »**. Les deux lancent une lecture complète de Jeedom ; voir [Relire Jeedom](#relire-jeedom).
-4. Dans Home Assistant, ouvrez **Paramètres → Appareils et services → MQTT** : vos équipements apparaissent.
-5. Si un équipement manque, ouvrez sa pièce dans la page du plugin : la vue de travail vous dit son état et, s'il est bloqué, pourquoi.
-
-Si, après un redémarrage du broker MQTT, Home Assistant ne retrouve pas ses entités, utilisez **« Republier tout »** sur la page principale.
-
----
-
-## La page principale
-
-La page du plugin contient, de haut en bas : le bloc « Gestion » (vignette « Configuration »), la barre de santé et ses actions, puis la configuration par pièce (une ligne d'aide, le bloc de la maison et les cartes de pièce). Aucun bandeau bleu n'ouvre plus la page.
 <!-- CAPTURE: page principale du plugin -->
-![Page principale du plugin : état, jauge maison et cartes de pièce par étage](images/page-principale.png)
+![Page maison : barre d'état, onglets, chiffre de la maison, puces, « À faire » et tuiles de pièce par niveau](images/page-principale.png)
 
-### La barre de santé
+De haut en bas, sous la barre d'état :
 
-La barre tient sur une ligne (elle se replie sur les petits écrans) : quatre indicateurs, chacun avec un point d'état et un mot, puis les actions à droite. Elle est lue **à l'ouverture de la page**, puis relue après « Republier tout », « Appliquer » et « Supprimer de Home Assistant » (à toutes les portées, **y compris quand l'action échoue**) et après « Relire Jeedom ». Il n'est pas relu après un changement du réglage de publication, et elle ne se rafraîchit pas toute seule : rechargez la page pour l'actualiser. Les quatre indicateurs :
+- **Les onglets** « Équipements » et « Scénarios », chacun avec son nombre (« publiés/total », suivi de ✱ s'il y a des nouveaux).
+- **Le chiffre de la maison** : « n / m publiés » (publiés sur le total), puis **↻** (« Actualiser » les chiffres, l'heure de la dernière lecture en info-bulle).
+- **Le liseré** : un segment par état (publiés en vert, à appliquer en bleu, bloqués en orange, exclus ou inactifs en gris, non lus en hachuré) ; chaque segment donne son compte en info-bulle.
+- **Les puces** : une icône, un nombre et un mot. Les puces à zéro ne sont pas affichées. **Chaque puce (et chaque segment du liseré) est un filtre** : un clic le pose, un second clic ou Échap le retire. « publiés », « à appliquer » et « exclus ou inactifs » filtrent les tuiles ; « bloqués » montre la liste [À faire](#à-faire) seule.
+- **« Choisir ce qui est publié… »**, au bout de la ligne des puces : voir [Choisir ce qui est publié](#choisir-ce-qui-est-publié).
+- **La liste [À faire](#à-faire)**, absente quand il n'y a rien à faire.
+- **Les tuiles de pièce**, regroupées par objet parent.
 
-| Indicateur | Valeurs possibles |
-|---|---|
-| **Démon** | « Actif » (vert) ; « Arrêté » (rouge : le démon ne répond pas) ; « Erreur Jeedom » ou « Erreur de communication » (rouge). |
-| **MQTT** (la liaison avec le broker) | « Connecté » (vert) ; « Reconnexion... » ou « Connexion... » (orange) ; « Déconnecté » (rouge) ; « Non configuré » ; « Inconnu » (démon arrêté ou erreur). L'adresse du broker s'affiche à côté. |
-| **Dernière synchro** | La date et l'heure (jour/mois et heures:minutes:secondes) de la dernière lecture complète, « Jamais » si aucune n'a eu lieu, « Inconnue » si le démon est arrêté. |
-| **Dernière opération** | « Succès » (vert) ; « Partiel » ou « Échec » (orange : c'est un problème de configuration, pas une panne d'infrastructure) ; « Aucune » ; « Inconnue » si le démon est arrêté. Le message de l'opération s'affiche à côté. |
-
-### Les actions de la barre de santé
-
-Deux boutons de poids normal agissent sur **l'ensemble du parc** ; les actions moins courantes sont rangées dans le menu « ⋯ » (« Plus d'actions »), à droite :
-
-| Action | Ce qu'elle fait |
-|---|---|
-| **« Republier tout »** | Après confirmation (« Republier tous les équipements inclus ? »), republie dans Home Assistant les équipements inclus et applique leurs réglages en attente. Les équipements « inclus » sont ceux que le plugin ne met pas d'office de côté (par exemple par une exclusion de la configuration ou parce qu'ils sont désactivés). « Republier tout » travaille sur ce que la dernière lecture complète a lu : il ne relit pas Jeedom. |
-| **« Relire Jeedom »** | Relit tout Jeedom. Voir [Relire Jeedom](#relire-jeedom). |
-| **« Télécharger le diagnostic… »** (menu « ⋯ ») | Ouvre une boîte qui propose le téléchargement du diagnostic support. Voir [Télécharger le diagnostic support](#télécharger-le-diagnostic-support). |
-| **« Supprimer tout de Home Assistant… »** (menu « ⋯ », en rouge, séparé par un trait) | Retire de Home Assistant tout le parc publié, après une confirmation forte. Rien n'est recréé ensuite : « Republier » remet les équipements. Voir [Les actions de publication](#les-actions-de-publication). |
-
-Le menu « ⋯ » s'ouvre au clic ou au clavier, se ferme par Échap ou par un clic à l'extérieur, et rend le focus à son bouton. Aucune action destructrice n'est visible hors de ce menu.
-
-**Quand certains boutons sont grisés.** « Republier tout », « Relire Jeedom » et « Supprimer tout de Home Assistant… », ainsi que « Appliquer » et les entrées « Republier » et « Supprimer de Home Assistant… » des menus « ⋯ » (de la pièce et de chaque équipement), ne sont utilisables que si le démon tourne **et** que MQTT est connecté. Sinon, ils sont grisés et une ligne d'explication s'affiche :
-
-- « Démon arrêté — actions Home Assistant bloquées. » (le démon est arrêté) ;
-- « MQTT déconnecté — actions Home Assistant bloquées. » ;
-- « Démon ou MQTT indisponible — actions Home Assistant bloquées. » (état impossible à lire).
-
-Pendant une relecture de Jeedom, ces mêmes boutons sont aussi grisés. Le réglage de publication (« Automatique », « Toujours », « Jamais ») et le « Type HA » des commandes ne sont **pas** concernés : ils restent actifs, mais si le démon ne répond pas, leur action échoue avec un message d'erreur.
-
-### Relire Jeedom
-
-« Relire Jeedom » ouvre d'abord une confirmation : « Une relecture complète peut publier ou retirer des entités Home Assistant et applique les réglages enregistrés. Confirmer ? » (bouton « Relire »).
-
-- **Ce qu'il fait** : relit tous les équipements de Jeedom, publie ou retire des entités Home Assistant en conséquence, et **applique d'un coup tous les réglages en attente** (types Home Assistant choisis, publication « Toujours » ou « Jamais ») de tous les équipements.
-- **Ce qu'il ne fait pas** : il ne modifie rien dans Jeedom.
-- **Scénarios** : chaque scénario Jeedom a son bouton dans Home Assistant, qu'il soit actif ou non. Un scénario **désactivé** garde son bouton, **grisé** (« indisponible ») : l'appui est refusé et rien n'est lancé dans Jeedom ; le bouton redevient utilisable dès que le scénario est réactivé. L'entité, son identifiant et ses réglages dans Home Assistant ne changent pas, et les automatisations qui la citent restent valides. Seul un scénario **supprimé** de Jeedom voit son bouton retiré. **Une seule installation jeedom2ha par broker MQTT** : le plugin considère le broker comme la référence des boutons de scénario, donc une deuxième instance (box de test, clone restauré) qui y serait connectée verrait ses boutons de scénario retirés par l'autre, et inversement.
-- **Réévaluation automatique** : vous n'avez pas besoin de relire Jeedom quand un scénario est activé ou désactivé, quand un équipement est activé ou désactivé, ou quand une exclusion change (par exemple par un agenda, un mode ou un autre scénario). Toutes les 5 minutes, le plugin vérifie si cet état a changé et, seulement dans ce cas, relit Jeedom et met Home Assistant à jour (bouton de scénario grisé ou non, équipement publié ou retiré, raison affichée). Rien n'est relu si rien n'a changé, si le démon n'est pas démarré ou si une autre opération est en cours (nouvel essai 5 minutes plus tard). Comme une relecture, cette réévaluation applique aussi les réglages en attente (voir [Réglages en attente](#réglages-en-attente-et-appliquer)). Cette tâche apparaît dans la page du plugin (« Fonctionnalités », `cron5`) et peut y être désactivée.
-- **Pendant l'opération** : le bouton affiche « Relecture en cours… » et les autres boutons d'action sont grisés.
-- **Résultat** : un message « Synchronisation terminée. » (vert), « Synchronisation terminée avec avertissements. » (orange) ou « Synchronisation échouée. » (rouge) — remplacé par le message précis du démon quand il en fournit un. « Une opération est déjà en cours ou la relecture a échoué. » n'est qu'un message de repli : le démon renvoie le plus souvent son propre message, affiché à la place ; « Erreur de communication : relire Dernière synchro avant de relancer. » indique que la réponse n'est pas arrivée. La barre de santé est ensuite relue.
-
-### Exclure une pièce
-
-Une pièce entière peut être exclue de Home Assistant **depuis sa carte** (menu « ⋯ » en haut à droite de la carte, entrée **« Exclure la pièce… »**) ou **depuis le détail de la pièce** dans la vue de travail (même entrée dans le menu « ⋯ », avant « Supprimer de Home Assistant… »). Ouvrir ce menu n'ouvre pas la pièce. La carte « Sans pièce » n'a pas de menu : elle ne peut pas être exclue.
-
-- **La confirmation est chiffrée.** « Exclure la pièce « Nom » de Home Assistant ? » annonce le nombre d'entités concernées : « 5 entités seront retirées de Home Assistant. », « 1 entité sera retirée… » ou « Aucune entité n'est publiée dans cette pièce. » Si la lecture des états n'est pas disponible, la confirmation le dit (« Nombre d'entités inconnu : la lecture des états n'est pas disponible. ») et reste possible. Si des réglages attendent d'être appliqués, elle ajoute « La relecture appliquera aussi les M réglages en attente de la maison. » Le bouton « Exclure la pièce » est rouge, car il retire des entités de Home Assistant ; « Annuler », la croix et la touche Échap ferment sans rien écrire.
-- **L'effet est immédiat.** Après la confirmation, le plugin enregistre l'exclusion puis lance **une relecture complète de Jeedom** (celle de « Relire Jeedom », sans seconde confirmation), puis relit les chiffres. Pendant ce temps, « Relire Jeedom » et les entrées d'exclusion de toutes les pièces sont grisés (« Une opération est déjà en cours. »). Si l'enregistrement échoue, rien n'est relu ni changé. Si la relecture échoue, l'exclusion reste enregistrée et le message est suivi de « Relancez « Relire Jeedom » pour retirer les entités. » Exclure une pièce déjà exclue ne change rien mais relance quand même la relecture.
-- **La carte** affiche **« Pièce exclue »** (icône œil barré) à la place de « n / t publiés » ; la jauge et les repères restent, et « N pas encore retirés » s'affiche tant que la relecture n'a pas retiré tous les équipements. Dans la vue de travail, la ligne de la pièce porte la même mention, et le détail de la pièce affiche « Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant. » avec le bouton **« Ne plus exclure la pièce… »**.
-- **« Ne plus exclure la pièce… »** demande une confirmation sans nombre (« Ses équipements seront relus et publiés s'ils sont publiables. ») ; le bouton « Ne plus exclure » n'est pas rouge, car rien n'est retiré.
-- **La pièce prime sur « Toujours ».** Sauf équipements exposés à HomeKit (actifs), qui ne sont pas écartés par la pièce, un équipement réglé « Toujours » dans une pièce exclue n'est pas publié : « Toujours » reste affiché comme réglage posé, mais les positions grisées disent « Pièce exclue : elle prime sur ce réglage. »
-- **Pas de cascade.** Seule la pièce choisie est exclue, pas ses sous-pièces : excluez-les aussi, une à une.
-
-### Télécharger le diagnostic support
-
-Le menu « ⋯ » de la barre de santé propose **« Télécharger le diagnostic… »**. Une boîte s'ouvre ; son bouton **« Télécharger le diagnostic support »** produit un fichier `jeedom2ha-diagnostic-AAAA-MM-JJ.json` à joindre à une demande d'aide. Fermer la boîte n'envoie rien.
-
-- La case **« Pseudonymiser les noms d'équipements »** remplace les noms d'équipements par « Équipement_N », les noms de pièces par « Pièce_M » et les noms de commandes par « Cmd_ » suivi de leur numéro, et masque l'adresse du broker.
-- Messages : « Export en cours... », puis « Diagnostic téléchargé » ; en cas de problème, « Erreur export » ou « Erreur de communication », ou le message du démon (par exemple « Démon indisponible ou timeout — relancez le démon et réessayez. »).
-
-Ce fichier est un outil d'assistance. Pour comprendre l'état d'un équipement, utilisez la configuration par pièce.
-
----
-
-## La configuration par pièce
-
-Sous la barre de santé, la section **« Configuration Home Assistant par pièce »** commence par une ligne d'aide discrète, avec un lien **« Aide »** vers cette documentation. Le type natif Jeedom (partagé avec Homebridge) n'est jamais modifié par le plugin.
-
-### Le bloc de la maison
-
-Le bloc de la maison donne, dès le premier écran, le chiffre qui compte : un grand nombre suivi de « publiés sur » le total des équipements Jeedom, avec le nombre de pièces. Dessous, une **jauge** segmentée (publiés en vert, à appliquer en bleu, bloqués en orange, exclus et autres en gris, non lus en hachuré) et une **légende en puces**.
-
-- **Chaque puce (et chaque segment de la jauge) est un filtre** qui s'applique à toutes les pièces : un clic ouvre la [vue de travail](#la-vue-de-travail) avec ce filtre actif (l'arbre ne montre que les équipements dans cet état). Au retour sur la page principale, le filtre est conservé : la liste des équipements dans cet état s'affiche sous le bloc, avec leur pièce, et les cartes de pièce sans équipement concerné sont atténuées (jamais masquées). Un clic sur une ligne de cette liste ouvre la vue de travail sur l'équipement. Un second clic sur la puce, la touche Échap ou « Tout afficher » retire le filtre. Un filtre ne fait aucune requête : il lit les chiffres déjà affichés.
-- Les puces à zéro restent affichées mais sont grisées. La puce « exclus et autres » regroupe les équipements exclus, désactivés et sans rien à publier ; chaque ligne garde son propre mot d'état.
-- **« Actualiser »** relit les chiffres en contournant la mémoire du démon, et « Chiffres relus à HH:MM » indique l'heure de la dernière lecture. Les chiffres sont relus à l'ouverture de la page, après chaque action (« Republier tout », « Relire Jeedom », « Supprimer tout de Home Assistant… », et chaque action de la vue de travail, qu'elle réussisse ou échoue) et quand vous revenez sur l'onglet du navigateur après plus d'une minute. Il n'y a pas de relecture périodique.
-- Pendant une opération du plugin, une mention « Opération en cours : ces chiffres peuvent changer » s'affiche ; le plugin relit alors trois fois au plus, puis laisse la mention en place. Avant la première synchronisation, la page indique « Aucune synchronisation n'a encore eu lieu » ; si la lecture échoue, « Chiffres indisponibles » (les derniers chiffres valides restent affichés, atténués).
-
-Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-jauge-de-la-maison).
-
-### Les cartes de pièce
-
-Chaque pièce qui contient au moins un équipement a une carte portant l'icône et la couleur choisies dans Jeedom pour l'objet, son nom, « n / t publiés », une petite jauge segmentée et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange), « N à appliquer » (bleu), « N non lus » (gris) et « N exclus » (gris, après les autres : l'infobulle et le nom accessible de la carte donnent la ventilation par cause, comme dans le détail de la pièce). Une carte qui contient au moins un équipement bloqué porte un liseré orange. Les cartes sont **regroupées par objet parent** (sous-titre du groupe, ordre de Jeedom conservé). La carte **« Sans pièce »** rassemble les équipements qui n'ont pas de pièce, en dernier. Les équipements **désactivés dans Jeedom sont comptés et listés**. Les équipements du plugin jeedom2ha lui-même sont écartés. Chaque carte (sauf « Sans pièce ») a un menu « ⋯ » pour exclure la pièce ou ne plus l'exclure (voir [Exclure une pièce](#exclure-une-pièce)) ; une pièce exclue affiche « Pièce exclue » à la place de « n / t publiés ». S'il n'y a aucune pièce avec équipement, la page affiche « Aucune pièce avec équipement trouvée. »
-
-Les cartes sont opérables au clavier (Entrée ou Espace ouvre la vue de travail sur la pièce, seule dans l'arbre). Un équipement dont la lecture a échoué, ou que le démon ne connaît pas encore, est compté **« non lu »** : il n'est jamais compté publié, bloqué, exclu ni désactivé.
 <!-- CAPTURE: cartes de pièce -->
-![Cartes de pièce groupées par étage](images/cartes-de-piece.png)
+![Tuiles de pièce : icône, nom, « n/t », marques non nulles et liseré](images/cartes-de-piece.png)
 
-### La vue de travail
+**Une tuile de pièce** porte l'icône et le nom de la pièce, « n/t » (publiés sur le total), et seulement s'ils ne sont pas nuls des **marques** : une icône et un nombre (bloqués, à appliquer, désactivés, rien à publier, non lus, exclus), le mot dans l'info-bulle. Un liseré de 4 px, en bas, reprend les couleurs de la maison. Un clic ouvre [la pièce](#la-pièce-et-la-fiche). Le menu « ⋯ », au survol, propose « Choisir ce qui est publié… », « Republier la pièce » et, après un trait, « Exclure la pièce… » (une pièce exclue affiche l'œil barré à la place de « n/t »). La tuile « Sans pièce » rassemble les équipements qui n'ont pas de pièce ; elle n'a pas de menu.
 
-Cliquer sur une carte de pièce, sur une puce ou un segment de la jauge de la maison, ou sur une ligne de la liste filtrée ouvre la **vue de travail**, dans la page du plugin, **sans ouvrir de boîte de dialogue** : la barre de santé reste affichée au-dessus, le bloc de la maison, la liste filtrée et les cartes sont masqués (ils retrouvent leur état au retour). La vue occupe la hauteur de l'écran : à gauche l'arbre des pièces et de leurs équipements, à droite le détail de ce que vous avez choisi ; chaque colonne défile seule.
+Les chiffres sont relus à l'ouverture de la page, après chaque action et au retour sur l'onglet du navigateur ; jamais en boucle. Pendant une opération, « Opération en cours : ces chiffres peuvent changer » ; avant la première relecture, « Aucune synchronisation n'a encore eu lieu » ; si la lecture échoue, « Chiffres indisponibles ». Un équipement dont le chiffre n'a pas pu être lu est compté « non lu ». Sans pièce avec équipement, la page dit « Aucune pièce avec équipement trouvée. » Le détail des chiffres est dans [Les états et les compteurs](compteurs.md#la-jauge-de-la-maison).
 
-- **La portée.** Depuis **une carte de pièce**, l'arbre n'affiche que **cette pièce** (dépliée et choisie) : elle est tout de suite visible, même dans une maison de plus de vingt pièces. Le bouton **« Toutes les pièces »**, en tête de l'arbre (dans le tiroir « Pièces » sur tablette), élargit à toute la maison : le choix est conservé, la ligne choisie reste visible et reçoit le focus, et le bouton disparaît. Depuis une puce, un segment de la jauge ou une ligne de la liste filtrée, la vue s'ouvre directement sur **toutes les pièces**, pour garder le contexte du filtre. Dans la pièce seule, la recherche et les filtres ne portent que sur cette pièce.
-- **Le retour.** « Page principale » (ou le bouton « Précédent » du navigateur) revient à la page principale telle que vous l'avez laissée (filtre, position de défilement), sans rien relire. La touche Échap ne quitte pas la vue : elle ferme d'abord un menu ou une confirmation ouverts.
-- **L'adresse de la page** garde votre sélection (elle se termine par `#j2ha-vue=…`) : copiée dans un autre onglet, elle rouvre la même pièce et le même équipement. Une adresse qui se termine par `seule:1` rouvre la pièce seule ; sans `seule:1`, elle rouvre toutes les pièces. Élargir remplace l'entrée de l'historique au lieu d'en ajouter une : « Précédent » remonte d'un niveau (équipement, puis pièce, puis page principale) et rouvre chaque niveau avec la portée qu'il avait. La recherche n'est pas mémorisée.
-- **L'arbre** reprend, en portée « toutes », toutes les pièces, regroupées comme les cartes (sous-titre du groupe, ordre de Jeedom conservé), « Sans pièce » comprise. Chaque pièce porte l'icône et la couleur choisies dans Jeedom, son nom, « n / t » et, seulement s'ils ne sont pas nuls, les repères « N bloqués » (orange) et « N à appliquer » (bleu). Déplier une pièce montre ses équipements : l'état avant le nom (le même mot que partout), la mention « (désactivé dans Jeedom) » le cas échéant, « N bloquées » pour un équipement publié qui en comporte, et « non lu » pour un équipement dont les chiffres n'ont pas pu être lus. La pièce choisie est dépliée ; les autres sont repliées. L'arbre se parcourt au clavier : flèches haut et bas, flèches droite et gauche pour déplier ou replier, Entrée ou Espace pour choisir, Début et Fin.
-- **La cause d'exclusion** d'un équipement « Exclu » est une mention grise après son nom (« par le plugin X », « par la pièce », « individuelle »), tronquée avant le nom si la place manque. Le détail d'une pièce affiche, sous ses compteurs, la ligne « Exclus : » avec la ventilation par cause.
-- **La recherche** (« Rechercher une pièce ou un équipement ») porte sur les noms de pièce et d'équipement seulement, sans tenir compte de la casse ni des accents ; « Aucun résultat » s'affiche quand rien ne correspond. Une pièce dont le nom correspond montre tous ses équipements. Elle ne fait aucune requête.
-- **Les filtres** sont les mêmes puces que sur la page principale, avec les mêmes libellés ; les effectifs sont ceux de la maison, ou ceux de la pièce quand la vue est limitée à une pièce (le nombre de lignes de l'arbre est toujours égal au chiffre de la puce). Le filtre est **partagé** avec la page principale : celui que vous avez choisi y est repris, et un changement fait dans la vue se retrouve au retour. Une puce à zéro est grisée. Choisir un filtre ne fait aucune requête et ne désélectionne rien : l'équipement affiché reste affiché même s'il sort du filtre.
+### À faire
 
-**Le détail d'une pièce** montre : le fil d'Ariane (parent puis pièce), le nom, le bouton **« Republier la pièce »** et le menu « ⋯ » (**« Exclure la pièce… »** ou **« Ne plus exclure la pièce… »**, puis **« Supprimer de Home Assistant… »**, en rouge, dans le menu seulement ; une pièce exclue affiche aussi l'encart « Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant. »), les **compteurs de la pièce** (un chiffre et un mot court par état d'équipement : publié, à appliquer, bloqué, exclu, désactivé, rien à publier ; les états à zéro sont masqués ; un clic sur un compteur filtre l'arbre — voir [Les états et les compteurs](compteurs.md)), une zone de résultat, et la liste **« À traiter dans cette pièce »** : une ligne par équipement bloqué ou à appliquer, avec son état, son nom, le nombre de commandes concernées et la cause dite une seule fois. L'action de la ligne est unique : **« Ouvrir les types génériques »** quand le blocage se corrige dans Jeedom, **« Appliquer »** pour un équipement à appliquer (le résultat s'affiche dans la zone de résultat). Un clic sur le reste de la ligne affiche l'équipement. Quand il n'y a rien à faire, la vue dit « Rien à traiter dans cette pièce » et rappelle combien d'équipements n'appellent aucune action. Pour « Sans pièce », il n'y a ni « Republier la pièce » ni menu : la vue indique « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. » Le résultat de la dernière action s'affiche dans la zone de résultat (vert : succès ; orange : succès partiel ; rouge : échec).
+<!-- CAPTURE: à faire -->
+![Puce « bloqués » active : la liste « À faire » seule](images/a-faire.png)
 
-**Le détail d'un équipement** s'affiche quand vous choisissez un équipement dans l'arbre ou dans la liste « À traiter dans cette pièce ». Le plugin ne lit la configuration **que de cet équipement** et seulement à ce moment (« Chargement… » s'affiche) ; choisir de nouveau le même équipement la relit. Si la lecture échoue, le détail indique « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). » et n'offre aucune action. Un seul équipement est affiché à la fois ; son en-tête (nom, badge, réglage de publication, « Appliquer » et menu « ⋯ ») reste collé en haut pendant que vous faites défiler le tableau, sans autre barre de défilement dans le détail. Son contenu est décrit ci-dessous.
+La liste **« À faire »** rassemble ce qui a besoin de vous, une ligne par équipement : d'abord les **bloqués** (triangle ⚠, liseré orange), puis ceux qui ont un **conseil** (ampoule, liseré bleu). Chaque ligne donne le nom, la pièce, la cause en quatre mots au plus (la phrase entière en info-bulle) et une seule action : « Types génériques » (« Ouvrir les types génériques »), « Corriger le type… », « Publier quand même », « Ouvrir l'équipement dans Jeedom » ou « Voir ». Le nom ouvre la fiche de l'équipement. Au-delà de cinq lignes, « Tout afficher » déplie le reste. La puce « bloqués » montre cette liste seule.
 
-**Sur tablette et petit écran** (en dessous de 980 pixels de large), l'arbre devient un **tiroir** : le bouton **« Pièces »** l'ouvre au-dessus du détail, un autre clic ou le choix d'une pièce ou d'un équipement le referme ; le tiroir est ouvert tant que rien n'est choisi. Le détail occupe toute la largeur, sans défilement horizontal. Tourner la tablette ne perd ni la sélection, ni le filtre, ni la recherche, ni votre position, et ne refait aucune requête. Les lignes, les puces et les boutons sont assez grands pour le doigt.
+### La pièce et la fiche
+
 <!-- CAPTURE: vue de travail -->
-![Vue de travail filtrée sur une pièce, un équipement sélectionné](images/vue-de-travail.png)
+![Une pièce : fil d'Ariane, arbre de toute la maison avec recherche, fiche d'un équipement publié](images/vue-de-travail.png)
 
-### Le détail d'un équipement
+**Le fil d'Ariane** `Maison › Niveau › Pièce`, en haut : chaque niveau est cliquable. **« Maison »** (ou « Précédent » du navigateur) revient à la page maison telle que vous l'avez laissée. L'adresse de la page garde la pièce et l'équipement choisis ; une ancienne adresse qui se termine par `seule:1` s'ouvre de la même façon.
 
-L'en-tête de l'équipement affiché, qui reste visible, comporte :
+**Un seul arbre.** L'arbre contient toujours **toute la maison**, à gauche, avec une recherche (« Rechercher », sans tenir compte des accents) et les mêmes puces que la page maison. Une pièce porte « n / t » et ses repères non nuls ; un équipement porte **l'icône de son état** seule, le mot dans l'info-bulle. En dessous de 980 pixels de large, l'arbre devient un tiroir, ouvert par l'icône « Pièces » à gauche du fil d'Ariane. Pendant une recherche, le volet de droite dit « n résultats » (« Aucun résultat » sinon) ; l'info-bulle d'un équipement ajoute, s'il y a lieu, la cause d'exclusion, « désactivé dans Jeedom » ou « Non lu ». Échap ferme d'abord un menu ou une confirmation ouverts, jamais la pièce.
 
-- **Le badge d'état** (« Publié », « À appliquer », « Bloqué », « Exclu », « Désactivé » ou « Rien à publier »), suivi, quand l'équipement est publié ou à appliquer, de la **mention orange** du nombre de commandes bloquées (« 2 bloquées »).
-- **La cause d'exclusion**, sous le badge, quand l'état est « Exclu » (jamais pour un équipement « Désactivé ») : une phrase grise dit pourquoi et où agir — « Exclu par le plugin X (configuration du plugin, « Plugins exclus ») » avec le bouton « Ouvrir la configuration du plugin » ; « Exclu par la pièce : toute la pièce est exclue » ; « Exclusion individuelle : réglage « Jamais » », « Exclusion individuelle : « Jamais » sur ses entités » ou « Exclusion individuelle : réglage de l'équipement dans Jeedom ». Le bouton n'écrit rien : il ouvre seulement la configuration.
-- **Le réglage « Publication dans Home Assistant »**, un contrôle à trois positions **« Automatique », « Toujours », « Jamais »**. La position courante est toujours montrée : « Jamais » pour un équipement exclu, « Toujours » pour un équipement forcé, « Automatique » sinon. Choisir une position enregistre le réglage (voir [Les actions de publication](#les-actions-de-publication)) ; il n'est pas publié tout de suite. Une position indisponible est grisée et son infobulle dit pourquoi. Au clavier, les flèches déplacent le choix, Espace ou Entrée le valident.
-- **Le bouton « Appliquer »**, affiché **seulement quand l'état est « À appliquer »** (voir [Réglages en attente](#réglages-en-attente-et-appliquer)).
-- **Le menu « ⋯ »** (touche Échap pour le fermer) : « Republier », « Tout remettre en automatique… », puis, séparée par un trait, « Supprimer de Home Assistant… » en rouge.
+**Une pièce choisie** montre son nom, **« Republier la pièce »** et son menu « ⋯ » (« Exclure la pièce… », puis « Supprimer de Home Assistant… » en rouge), ses compteurs, puis **« À traiter dans cette pièce »** (ses bloqués et ses « à appliquer ») et « Conseils dans cette pièce ». Une pièce saine affiche ✓ « Rien à faire ». Pour « Sans pièce » : « Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement. »
 
-Dessous, de haut en bas :
-
-- **La ligne de l'équipement** : son état, puis le détail de ses commandes par catégorie (publiées, à appliquer, bloquées, ignorées, exclues). Voir [Les états et les compteurs](compteurs.md).
-- **Les encarts de cause** : la cause d'un blocage est dite **une seule fois**, avec le nombre de commandes concernées (« 11 commandes bloquées : types génériques non configurés dans Jeedom »). S'il y a plusieurs causes, il y a un encart par cause, jamais un par commande. Quand le blocage se corrige dans les types génériques de Jeedom, l'encart porte le bouton **« Ouvrir les types génériques »**, qui ouvre l'écran des types d'équipement de Jeedom (il n'écrit rien). Le lien **« Voir la première commande bloquée »** fait défiler le tableau jusqu'à elle et la met en évidence quelques secondes ; il n'est pas affiché quand toutes les commandes de l'équipement sont bloquées.
-- **Le tableau des commandes**, regroupé par entité.
-- **Une ligne repliée pour les commandes ignorées** : « 5 commandes ignorées, sans équivalent dans Home Assistant : … ». Elle se déplie au clic ou au clavier. Pour une commande qui n'est pas prise en charge par le plugin, la ligne ajoute « non pris en charge par le plugin ».
-
-Un équipement sans commande affiche « Aucune commande à configurer pour cet équipement. »
 <!-- CAPTURE: détail d'un équipement -->
-![Détail d'un équipement publié et son réglage Automatique / Toujours / Jamais](images/detail-equipement.png)
+![Fiche d'un équipement bloqué : en-tête, bande de cause, « Dans Home Assistant » et commandes](images/detail-equipement.png)
 
-### Le tableau des commandes
+**La fiche d'un équipement** se lit au moment où vous la choisissez, et pour cet équipement seulement (« Chargement… » ; en cas d'échec, « Impossible de lire la configuration de cet équipement. » ou « Impossible de charger la configuration HA (démon indisponible). »). Elle tient en quatre blocs :
 
-Le tableau a **quatre colonnes**, une ligne par commande, dans l'ordre de Jeedom au sein de chaque groupe :
+1. **L'en-tête**, collé en haut quand vous faites défiler, sur deux lignes.
+   - Ligne 1 : le nom, le badge d'état, le réglage **« Automatique | Toujours | Jamais »** (« Le plugin décide », « Publier même si le plugin hésite, maintenant ou plus tard », « Ne jamais publier »), **« Appliquer »** quand l'état est « À appliquer », et le menu « ⋯ » : « Republier », « Tout remettre en automatique… », « Ouvrir l'équipement dans Jeedom », « Détails techniques », puis « Supprimer de Home Assistant… » en rouge. « Toujours » n'est jamais grisé sur un équipement publié : il le protège d'une décision future du plugin.
+   - Ligne 2 : le plugin, le nombre de commandes et leur détail (publiées, bloquées, ignorées), le lien « Jeedom » et, pour un équipement publié, « Home Assistant » (où le trouver, en info-bulle).
+2. **La bande de cause**, une ligne par cause, s'il y en a : un libellé court (« Sans type générique », « Type incertain », « Nom « lampe » ≠ type « prise » »…), ⓘ (ce qui se passe et pourquoi), au plus deux boutons et **« En savoir plus »**, qui mène à [Les causes de blocage](#les-causes-de-blocage). Le bouton principal dit sa conséquence : « Publier en interrupteur » règle l'équipement sur « Toujours » ; sa flèche ▾ propose les autres types possibles. Les autres boutons : « Types génériques », « Changer le type », « Renommer », « Ouvrir dans Jeedom », « Configuration » (« Ouvrir la configuration du plugin ») ou « Republier ». Un [conseil](#les-conseils) se lit de la même façon, en bleu. **La cause d'exclusion** remplace la bande quand l'état est « Exclu » (jamais pour un équipement « Désactivé ») : « Plugin exclu : X », « Exclu par la pièce : toute la pièce est exclue », « Exclusion individuelle : réglage « Jamais » », « Exclusion individuelle : « Jamais » sur ses entités » ou « Exclusion individuelle : réglage de l'équipement dans Jeedom », avec, pour le plugin et la pièce, le bouton « Choisir ce qui est publié ». Une flèche (« Voir la première commande bloquée ») fait défiler le tableau jusqu'à elle, sous la première fiche de cause ; quand chacune de ses commandes est bloquée, il n'y a rien d'autre à montrer et le lien est absent.
+3. **« Dans Home Assistant »** : une ligne par entité — le type en français, son nom, **« Pilotable »** ou **« Lecture seule »**, et son identifiant (`light.jeedom2ha_142`) avec un bouton pour le copier. Au-delà de trois entités, les suivantes sont repliées (« + 2 autres »). Rien de publié : **« Rien »** ; pour un équipement bloqué, une ligne « (aperçu) » montre ce que publierait le bouton « Publier en ».
+4. **Le tableau des commandes**, regroupé par entité.
+
+<!-- CAPTURE: tableau des commandes -->
+![Fiche d'une multiprise : conseil, trois entités dans Home Assistant et commandes regroupées par entité](images/tableau-des-commandes.png)
 
 | Colonne | Contenu |
 |---|---|
 | **Commande** | Le nom de la commande. |
-| **Dans Home Assistant** | Ce que devient la commande : « Publiée → Lumière (light) », « À appliquer → Capteur (sensor) » (publiable, pas encore dans Home Assistant), « Bloquée » (la cause est dans l'encart de l'équipement, pas répétée sur chaque ligne), « Exclue », ou « — ». |
-| **Type Jeedom** | Le type générique de la commande dans Jeedom. Lecture seule : il n'est jamais modifié. |
-| **Type HA** | « auto » (le plugin choisit seul) ou « imposé (sensor) » (surligné). Un clic sur ce lien ouvre le sélecteur. Voir [Choisir le type Home Assistant d'une commande](#choisir-le-type-home-assistant-dune-commande). |
+| **Dans Home Assistant** | « Publiée → Lumière (light) », « À appliquer → Capteur (sensor) », « Bloquée » (la cause est dans la bande), « Exclue » ou « — ». |
+| **Rôle dans Jeedom** | Le type générique, en français ; vide, « non renseigné ». Le plugin ne le modifie jamais. |
+| **Type HA** | « Automatique » (le plugin choisit) ou « Personnalisé : Lumière (light) » (votre choix). Le mot ouvre [Corriger le type](#corriger-le-type). |
 
-**Regroupement par entité.** Quand l'équipement a plusieurs entités Home Assistant, chaque entité forme un groupe : une ligne d'en-tête (le domaine en français avec le terme technique en petit, par exemple « Lumière *light* », le nombre de commandes, le contrôle « Automatique | Toujours | Jamais » de **cette entité**), puis ses commandes. Les domaines sont traduits : Lumière (`light`), Interrupteur (`switch`), Capteur (`sensor`), Capteur binaire (`binary_sensor`), Volet (`cover`), Thermostat (`climate`), Bouton (`button`), Alarme (`alarm_control_panel`). Sur un équipement qui n'a qu'une seule entité, il n'y a pas d'en-tête de groupe : le réglage de l'équipement suffit. L'en-tête reste affiché si un réglage a été posé sur la commande de cette seule entité.
+Quand l'équipement a plusieurs entités, chacune a une ligne d'en-tête avec son propre « Automatique | Toujours | Jamais ». Les commandes **ignorées** (sans équivalent dans Home Assistant) ne sont pas des lignes : elles sont repliées sous le tableau.
 
-Les commandes **ignorées** (qu'aucun type Home Assistant ne prend en charge) n'apparaissent pas dans le tableau : elles sont repliées sous lui.
-<!-- CAPTURE: tableau des commandes -->
-![Tableau des commandes et leur projection dans Home Assistant](images/tableau-des-commandes.png)
+**Réglage de publication.** « Jamais » retire l'équipement (ou l'entité) de Home Assistant ; une confirmation le demande s'il était publié. « Toujours » publie même si le plugin hésite, après un aperçu calculé par le démon (« Toujours » serait refusé s'il manque ce qu'il faut). « Automatique » rend la décision au plugin. Dans les trois cas, le réglage est enregistré puis **attend** : l'équipement passe « À appliquer », et « Appliquer » (fiche ou barre d'état), « Republier » ou « Relire Jeedom » l'envoie. « Supprimer de Home Assistant… » retire seulement : « Rien n'est recréé automatiquement : utilisez « Republier » pour remettre dans Home Assistant ce qui a été supprimé. »
 
-### Choisir le type Home Assistant d'une commande
-
-Par défaut le plugin choisit seul le type Home Assistant d'une commande (« auto »). Vous pouvez en imposer un autre :
-
-1. Cliquez sur le lien de la colonne « Type HA » : le sélecteur s'ouvre (Échap le referme). Choisissez un type dans la liste. Après une courte attente (environ 0,4 seconde), le plugin **vérifie** le choix et affiche le résultat dans la colonne « Dans Home Assistant ».
-2. Si le choix est valide (« À appliquer → <type> »), il est **enregistré automatiquement** : il n'y a pas de bouton « Enregistrer ».
-3. Sinon, il est **refusé** (« Bloquée → <cause> ») ; rien n'est enregistré. Choisissez de nouveau l'équipement pour retrouver l'état réellement enregistré.
-4. Un choix enregistré **n'est pas publié tout de suite**. Le signe fiable est l'état « À appliquer » de l'équipement et le bouton « Appliquer ». Cliquez sur « Appliquer » ou lancez « Relire Jeedom ».
-5. Pour annuler le choix d'une commande, sélectionnez « auto » dans la liste, ou cliquez sur l'icône « Retirer le type imposé » à côté du lien. Cette icône ne retire que le choix de **type** de cette commande.
-
-**La liste ne propose que des types qui peuvent aboutir.** Le plugin vérifie, pour chaque type, si Home Assistant pourrait recevoir cette commande sous ce type ; un type qui échouerait toujours (par exemple `sensor` pour la commande d'état d'un volet sans commande d'ouverture) est retiré, car « Toujours » ne peut pas le faire aboutir. Un type valide mais refusé seulement parce que le choix automatique est ambigu reste proposé : c'est le cas où « Toujours » peut aider. Un type déjà choisi pour la commande reste affiché, pour que vous puissiez revenir à « auto ». Pour qu'un type de plus soit proposé, précisez les types génériques de l'équipement dans Jeedom.
-
-Le lien est **grisé avec une infobulle** quand le réglage n'a pas de sens :
-
-- « Commande exclue de Jeedom2HA : son type HA ne peut pas être réglé ici. »
-- « Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici. »
-- « Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici. »
-- « Cette commande est portée par plusieurs entités : le type Home Assistant choisi ne s’appliquerait qu’à l’entité principale de l’équipement. Réglage indisponible ici. » (par exemple une commande d'état publiée par un capteur secondaire alors que l'entité principale est refusée). Si un type avait déjà été choisi pour cette commande, l'icône « Retirer le type imposé » reste disponible.
-- « Aucun type Home Assistant ne peut aboutir pour cette commande en l’état : précisez les types génériques dans Jeedom. » (aucun type n'est valide pour cette commande ; la voie normale est de préciser les types génériques dans Jeedom)
-
-Quand une vérification fait apparaître une commande bloquée, un bandeau d'avertissement rappelle, une fois par ouverture de la vue de travail : « Aucun impact Homebridge : cet écran ne modifie que la sortie Home Assistant de jeedom2ha. »
-
-### Deux familles de réglages : type et publication
-
-Le plugin distingue deux sortes de réglages manuels :
-
-| | Réglage de **type** | Réglage de **publication** |
-|---|---|---|
-| **Ce que c'est** | Le « Type HA » d'une commande (« auto » ou un type imposé). | « Automatique », « Toujours » ou « Jamais » pour une entité ou un équipement. |
-| **Où** | Colonne « Type HA » du tableau des commandes. | Contrôle à trois positions de l'équipement et de chaque groupe d'entité. |
-| **Enregistrement** | Automatique si le choix est valide. | Au clic (avec confirmation dans certains cas). |
-| **Annulation** | « auto » ou l'icône « Retirer le type imposé » (cette commande seulement). | « Automatique » (voir plus bas ce qu'il retire selon la portée). |
-
-Dans les deux cas, le réglage n'est visible dans Home Assistant qu'après avoir été appliqué.
-
-### Réglages en attente et Appliquer
-
-Un réglage enregistré n'est pas publié immédiatement. Tant qu'il attend, l'écran le signale :
-
-- sur l'équipement : le badge passe à **« À appliquer »** (bleu) et le bouton **« Appliquer »** apparaît dans son en-tête ;
-- sur l'entité concernée (équipement à plusieurs entités) : la mention « À appliquer » dans son en-tête de groupe.
-
-Un équipement est aussi « À appliquer » quand sa publication est due mais n'a pas eu lieu (jamais publié alors qu'il le devrait), ou quand le démon est une version plus ancienne qui ne dit pas s'il est présent dans Home Assistant : il n'est alors jamais affiché « Publié ». Voir [Les états et les compteurs](compteurs.md).
-
-Pour l'appliquer à **un équipement**, cliquez sur son bouton **« Appliquer »**. « Republier la pièce » et « Republier tout » appliquent aussi les réglages en attente des équipements concernés. Un [relevé de Jeedom](#relire-jeedom) applique d'un coup ceux de **tous** les équipements, de même que la [réévaluation automatique](#relire-jeedom) quand un scénario ou un équipement change d'état actif ou qu'une exclusion change. « Appliquer » ne demande pas de confirmation ; son résultat s'affiche dans la zone de résultat du détail, et en cas d'échec le bouton reste affiché avec le message d'erreur.
-
-### Les actions de publication
-
-**Le réglage de publication** (contrôle « Automatique | Toujours | Jamais ») existe à la portée de l'**équipement entier** (en-tête de l'équipement) et de **chaque entité** (en-tête de son groupe, quand l'équipement a plusieurs entités). Dans les paragraphes ci-dessous, « Jamais », « Toujours » et « Automatique » désignent ces positions, quelle que soit leur portée.
-
-**Jamais**
-
-- *Ce que ça fait* : l'équipement n'est plus publié dans Home Assistant, ou l'entité n'y est plus publiée.
-- *Confirmation* : seulement si le réglage fait **quitter Home Assistant** une entité publiée selon le diagnostic. La confirmation demande « Régler cet équipement sur « Jamais » (exclu de Home Assistant) ? » (avec la liste « Entités qui quitteront Home Assistant : … ») ou « Régler cette entité sur « Jamais » (exclue de Home Assistant) ? ». Boutons « Annuler » et « Confirmer ». Sinon le réglage est enregistré directement.
-- *Ensuite* : comme tout réglage, il attend d'être appliqué (« Appliquer », « Republier » ou « Relire Jeedom »).
-
-**Toujours**
-
-- *Ce que ça fait* : demande au plugin de publier une entité qu'il aurait refusé de publier.
-- *Confirmation* : toujours précédée d'un **aperçu** calculé par le démon, avant toute écriture. Il indique « Type HA : … », « Projection valide pour ce type. » ou « Projection invalide pour ce type. » (la « projection » est la transformation de l'équipement Jeedom en entité Home Assistant de ce type), « Commandes qui recevront les ordres : … » et « Le forçage publie cette entité dans Home Assistant. ». À la portée équipement, l'aperçu liste « Entités concernées par ce forçage : … » et conclut « Le forçage publie au moins une entité dans Home Assistant. ».
-- *Si le réglage serait refusé* : l'aperçu affiche « Le forçage serait refusé : <raison> » et le bouton « Confirmer » est grisé. Si le démon ne répond pas : « Aperçu indisponible — le démon ne répond pas. »
-
-**Automatique**
-
-- *Équipement* : choisir « Automatique » retire le réglage de publication de l'équipement. Cliquer sur la position déjà courante n'écrit rien. Pour retirer **d'un coup les deux sortes** de réglages de l'équipement (types choisis pour ses commandes, « Jamais » ou « Toujours » de l'équipement et de ses entités), utilisez « Tout remettre en automatique… » du menu « ⋯ » : une confirmation précède le retrait.
-- *Entité* : retire « Jamais » ou « Toujours » de l'entité **et** les types Home Assistant choisis pour ses commandes.
-- Pas de confirmation.
-
-**Republier / Appliquer**
-
-- *Équipement* : « Appliquer » (bouton bleu, seulement quand l'état est « À appliquer ») et « Republier » (menu « ⋯ ») utilisent la même route. Sans confirmation.
-- *Pièce* : « Republier la pièce » demande « <nom de la pièce> — republier les équipements inclus de cette pièce. Confirmer ? » (bouton « Republier »). Elle applique aussi les réglages en attente de la pièce.
-- *Dans tous les cas*, « Republier » ne relit pas Jeedom : il travaille sur ce que la dernière lecture complète a lue.
-- *Parc* : voir [la page principale](#les-actions-de-la-barre-de-santé).
-
-**Supprimer de Home Assistant…**
-
-- *Ce que ça fait* : retire de Home Assistant les entités **publiées** de l'équipement, de la pièce ou du parc. L'entrée est en rouge dans le menu « ⋯ » seulement ; l'ellipse annonce une confirmation.
-- *Ce que ça ne fait pas* : cette action **supprime seulement** ; elle ne republie pas. Pour recréer les entités, utilisez ensuite « Republier » à la même portée, ou lancez « Relire Jeedom ».
-- *Confirmation forte* (bouton rouge), intitulée « Supprimer de Home Assistant ». Son texte annonce ce qui sera supprimé : « Supprimer "<nom>" de Home Assistant. » (équipement), « … de Home Assistant : tous les équipements publiés de cette pièce. » (pièce) ou « Supprimer de Home Assistant tout le parc publié ? » (parc).
-- *Mise en garde* : **« Attention : l'historique, les dashboards, les automatisations et l'entity_id liés à ces entités peuvent être impactés. »** (l'`entity_id` est l'identifiant de l'entité dans Home Assistant). Elle rappelle aussi : **« Rien n'est recréé automatiquement : utilisez « Republier » pour remettre dans Home Assistant ce qui a été supprimé. »** (pour le parc : « … pour remettre les équipements dans Home Assistant. »)
-- *Boutons* : « Supprimer 1 équipement », « Supprimer la pièce » ou « Supprimer ».
-- *Résultat* : un message tel que « 2 équipements supprimés de Home Assistant. » ou « Configuration déjà à jour dans Home Assistant. ».
-
-**Pendant une action**, l'entrée ou le bouton affiche « Confirmation en cours… », puis « En cours... » (publication) ou « Suppression... ». Le message de résultat est précédé du nom de la portée (par exemple « Parc global — … »). Messages d'erreur possibles : « Le démon ne répond pas. », « Erreur de communication avec le backend Home Assistant. », « Réponse backend incomplète pour l'action Home Assistant. ». Les délais d'attente sont décrits en [annexe](#annexe--durée-des-actions).
+Une erreur réseau s'affiche en une ligne : « Erreur de communication avec le démon du plugin. »
 
 #### Quand un bouton est grisé
 
@@ -366,10 +240,10 @@ Un bouton ou une position grisés affichent **leur propre motif** dans une infob
 
 | Bouton | Motifs affichés |
 |---|---|
-| Appliquer, Republier, Supprimer de Home Assistant… (toutes portées) et Relire Jeedom | Voir [les actions de la barre de santé](#les-actions-de-la-barre-de-santé) (démon arrêté, MQTT déconnecté, relecture en cours). Les positions « Automatique », « Toujours » et « Jamais » ne sont pas concernées. |
-| Jamais | « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
-| Toujours | « Déjà publiée : « Toujours » n’aurait pas d’effet. » ; « Aucun type Home Assistant identifié pour cette entité. » ; « Type HA hors périmètre de ce plugin. » ; « Projection invalide pour ce type HA. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » ; « Équipement non éligible : l’action serait sans effet. » |
-| Automatique | « Aucun réglage de publication à retirer. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Aucune commande clé propre à cette entité. » |
+| Appliquer, Republier, Supprimer de Home Assistant… (toutes portées) et Relire Jeedom | Voir [la barre d'état](#la-barre-détat) (démon arrêté, MQTT déconnecté, relecture en cours). Les positions « Automatique », « Toujours » et « Jamais » ne sont pas concernées. |
+| Jamais | « Cette entité ne se règle pas seule : réglez l’équipement entier. » ; « Équipement non éligible : l’action serait sans effet. » |
+| Toujours | « Déjà publiée : « Toujours » n’aurait pas d’effet. » (l'entité est déjà dans Home Assistant) ; « Aucun type Home Assistant identifié pour cette entité. » ; « Type HA hors périmètre de ce plugin. » ; « Ce type Home Assistant est invalide pour cette entité. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Cette entité ne se règle pas seule : réglez l’équipement entier. » ; « Équipement non éligible : l’action serait sans effet. » |
+| Automatique | « Aucun réglage de publication à retirer. » ; « Exclusion posée sur l’équipement : la retirer depuis l’équipement. » ; « Cette entité ne se règle pas seule : réglez l’équipement entier. » |
 | Republier (équipement) | « Équipement désactivé dans Jeedom : rien à republier. » ; « Équipement exclu : rien à republier. » (sauf si un réglage est en attente) |
 | Supprimer de Home Assistant… (équipement) | « Équipement non publié dans Home Assistant : rien à supprimer. » Ce grisé reflète la présence **réelle** dans Home Assistant, pas le badge d'état : un équipement peut afficher « À appliquer » et avoir cette entrée grisée tant qu'il n'a pas été publié. |
 | Republier (pièce) | « Aucun équipement à publier dans cette pièce. » |
@@ -377,7 +251,113 @@ Un bouton ou une position grisés affichent **leur propre motif** dans une infob
 
 Une position déjà choisie reste la position courante du contrôle : elle n'est pas grisée. Un bouton grisé sans motif particulier affiche « Cette action est sans effet dans l’état courant. »
 
-Deux expressions de ces motifs méritent une explication. Une **« commande clé »** est une commande qui n'appartient qu'à une seule entité et qui sert à la désigner ; si toutes les commandes d'une entité sont partagées avec une autre entité, « Automatique », « Toujours » et « Jamais » sont grisés pour elle. La **projection** est la transformation de l'équipement en entité Home Assistant d'un type donné ; elle est « invalide » quand il manque ce dont ce type a besoin.
+« Cette entité ne se règle pas seule » : toutes ses commandes servent aussi à une autre entité ; « Automatique », « Toujours » et « Jamais » sont grisés pour elle, réglez l'équipement entier. « Ce type Home Assistant est invalide pour cette entité » : il manque à l'équipement ce dont ce type a besoin.
+
+### Corriger le type
+
+<!-- CAPTURE: corriger le type -->
+![« Corriger le type » : choix « Lumière (light) », aperçu « Avant » / « Après » et « ID modifié »](images/corriger-le-type.png)
+
+Le plugin choisit seul le type Home Assistant (« Automatique »). Quand il hésite ou se trompe, corrigez de préférence **dans Jeedom** (les types génériques, puis « Relire Jeedom ») ; sinon, ici, pour Home Assistant seulement.
+
+Le panneau s'ouvre **par-dessus la page**, depuis le lien de la colonne « Type HA », le bouton « Corriger le type… » ou la flèche ▾ de « Publier en ». Échap ou « Annuler » le ferme sans rien écrire.
+
+1. Le titre « Type dans Home Assistant de « Lampe Chevet » » ; dessous, « Pour : » liste les commandes de l'entité : **le type choisi vaut pour toute l'entité**. Le lien « Types génériques », dans le coin, mène à la voie durable.
+2. **Les choix**, sous « Dans Home Assistant, cette entité est : » : « Automatique », puis les types possibles (« Lumière (light) », « Interrupteur (switch) »…). Les autres sont repliés sous « Types impossibles pour cet équipement (N) ».
+3. **L'aperçu « Avant » / « Après »**, en entités. **« ID modifié »** (ⓘ) signale un identifiant qui change : les automatisations qui utilisent l'ancien seront à reprendre. Si le plugin hésite sur cet équipement, « Le type seul ne suffit pas » propose « Publier quand même », et le bouton devient « Enregistrer et publier quand même ».
+4. **« Enregistrer et publier »** enregistre le type et publie l'équipement. Un bandeau dit le résultat et propose « Annuler » pendant 10 secondes.
+
+La colonne « Type HA » affiche ensuite « Personnalisé : Lumière (light) ». Pour revenir au choix du plugin, rouvrez le panneau et choisissez « Automatique ».
+
+### Choisir ce qui est publié
+
+<!-- CAPTURE: choisir ce qui est publié -->
+![« Choisir ce qui est publié » : par pièce, une pièce dépliée, un équipement décoché et le pied qui compte](images/choisir-ce-qui-est-publie.png)
+
+Un seul endroit règle ce qui est publié : le bouton **« Choisir ce qui est publié… »**, au bout des puces (aussi par l'étape 3 du guide, le menu « ⋯ » d'une tuile et le lien de la configuration). Rien n'est écrit avant le bouton d'application.
+
+- **L'en-tête** : **« Par pièce | Par plugin »**, la règle en info-bulle (« Un équipement est publié s'il n'est exclu ni lui-même, ni par sa pièce, ni par son plugin. »), puis **« En cas de doute »** : **« Publier | Ne pas publier »** pour les équipements que le plugin reconnaît avec un léger doute. Un nom qui contredit les types n'est pas un doute : il reste bloqué.
+- **Chaque groupe** a une case à trois états (cochée, décochée, mixte) et un compteur `n/m` (non exclus sur le total). **« Non exclu » ne veut pas dire « publié »** : un équipement désactivé dans Jeedom, bloqué ou sans rien à publier reste hors de Home Assistant ; l'info-bulle du compteur le précise (« dont 1 désactivé dans Jeedom »).
+- **Le pied** compte en direct ce qui sera retiré de Home Assistant et ce qui y reviendra. **Le bouton** dit ce qu'il fera : « Appliquer — retirer N entités » (rouge), « Appliquer — publier N équipements » (vert)… « Annuler » ferme sans rien écrire.
+
+Après le clic, le plugin relit Jeedom une seule fois, puis un bandeau propose « Annuler » pendant 10 secondes. Pour un seul équipement, « Jamais » dans sa fiche fait la même chose ; pour une pièce, voir ci-dessous.
+
+#### Exclure une pièce
+
+Une pièce entière s'exclut **depuis sa tuile** (menu « ⋯ », **« Exclure la pièce… »**) ou **depuis la pièce ouverte** (même entrée dans son menu « ⋯ », avant « Supprimer de Home Assistant… »). Ouvrir ce menu n'ouvre pas la pièce. La carte « Sans pièce » n'a pas de menu : elle ne peut pas être exclue.
+
+- **La confirmation est chiffrée.** « Exclure la pièce « Nom » de Home Assistant ? » annonce le nombre d'entités concernées : « 5 entités seront retirées de Home Assistant. », « 1 entité sera retirée… » ou « Aucune entité n'est publiée dans cette pièce. » Si la lecture des états n'est pas disponible, la confirmation le dit (« Nombre d'entités inconnu : la lecture des états n'est pas disponible. ») et reste possible. Si des réglages attendent d'être appliqués, elle ajoute « La relecture appliquera aussi les M réglages en attente de la maison. » Le bouton « Exclure la pièce » est rouge, car il retire des entités de Home Assistant ; « Annuler », la croix et la touche Échap ferment sans rien écrire.
+- **L'effet est immédiat.** Après la confirmation, le plugin enregistre l'exclusion puis lance **une relecture complète de Jeedom** (celle de « Relire Jeedom », sans seconde confirmation), puis relit les chiffres. Pendant ce temps, « Relire Jeedom » et les entrées d'exclusion de toutes les pièces sont grisés (« Une opération est déjà en cours. »). Si l'enregistrement échoue, rien n'est relu ni changé. Si la relecture échoue, l'exclusion reste enregistrée et le message est suivi de « Relancez « Relire Jeedom » pour retirer les entités. » Exclure une pièce déjà exclue ne change rien mais relance quand même la relecture.
+- **La carte** affiche **« Pièce exclue »** (icône œil barré) à la place de « n / t publiés » ; le liseré et les marques restent, et « N pas encore retirés » s'affiche tant que la relecture n'a pas retiré tous les équipements. Dans l'arbre, la ligne de la pièce porte la même mention, et la pièce ouverte affiche « Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant. » avec le bouton **« Ne plus exclure la pièce… »**.
+- **« Ne plus exclure la pièce… »** demande une confirmation sans nombre (« Ses équipements seront relus et publiés s'ils sont publiables. ») ; le bouton « Ne plus exclure » n'est pas rouge, car rien n'est retiré.
+- **La pièce prime sur « Toujours ».** Sauf équipements exposés à HomeKit (actifs), qui ne sont pas écartés par la pièce, un équipement réglé « Toujours » dans une pièce exclue n'est pas publié : « Toujours » reste affiché comme réglage posé, mais les positions grisées disent « Pièce exclue : elle prime sur ce réglage. »
+- **Pas de cascade.** Seule la pièce choisie est exclue, pas ses sous-pièces : excluez-les aussi, une à une.
+
+### Les scénarios
+
+<!-- CAPTURE: scénarios -->
+![Onglet « Scénarios » : puces, filtres, suggestion, tableau et interrupteurs « Publier »](images/scenarios.png)
+
+L'onglet **« Scénarios »** liste les scénarios de Jeedom et dit lesquels ont un bouton dans Home Assistant. **Rien n'est publié sans votre choix** : les scénarios déjà publiés avant la mise à jour le restent, les nouveaux arrivent non publiés, marqués ✱.
+
+- **Puces** : « Publiés », « Non publiés », « Inactifs », ✱ « Nouveaux » (apparus depuis votre dernier choix). Un clic filtre, un second retire le filtre. **Filtres** : « Tous les groupes », « Tous les modes » (« Lancé à la main », « Programmé », « Déclenché ») et « Rechercher ».
+- **Colonnes** : le scénario et son groupe, le mode (« À la main », « Programmé », « Déclenché »), l'état dans « Jeedom » (« Actif » ou « Inactif »), « Dans Home Assistant » (l'identifiant `button.…` avec son bouton copier ; « Indisponible » pour un scénario publié mais inactif ; ◷ « En attente de Home Assistant » tant que le bouton ne suit pas encore votre choix ; « — » s'il n'est pas publié) et l'interrupteur **« Publier »**, utilisable même pour un scénario inactif.
+- **Préparer, puis appliquer** : un interrupteur changé marque la ligne ◷ « À appliquer ». Cochez plusieurs lignes pour « Publier (n) » ou « Ne pas publier (n) ». **« Appliquer (n) »** envoie le tout, puis le plugin relit Jeedom ; « Annuler » oublie les changements. Retirer des boutons demande confirmation : « Retirer n boutons de Home Assistant ? ». Si des boutons n'ont pas pu être mis à jour : « Choix enregistré · n boutons pas encore à jour dans Home Assistant · Réessayer ».
+- **Suggestion** : « n scénarios lancés à la main → Publier ces n » prépare la publication des scénarios lancés à la main ; rien n'est envoyé avant « Appliquer ». Elle ne propose jamais un scénario programmé ou déclenché.
+- **Liste vide** : « Aucun scénario dans Jeedom » ; « Liste indisponible · Relire » si le démon ne fournit pas la liste.
+
+Un scénario publié puis désactivé garde son bouton, grisé dans Home Assistant : l'appui ne lance rien. Seul un scénario supprimé de Jeedom perd son bouton.
+
+### Configuration
+
+<!-- CAPTURE: page de configuration -->
+![Configuration du plugin : connexion au broker MQTT, lien « Choisir ce qui est publié » et « Avancé »](images/configuration.png)
+
+La configuration s'ouvre par **⚙** (« Configuration ») ou, depuis le guide, par « Ouvrir la configuration MQTT ». Elle ne règle que le broker et quelques réglages avancés ; chaque explication est dans l'info-bulle ⓘ. « Retour à la page du plugin », en haut et en bas, ramène à la page.
+
+#### Connexion au broker MQTT
+
+> **Une seule installation jeedom2ha par broker MQTT.** Une deuxième installation branchée sur le même broker (box de test, sauvegarde restaurée ailleurs) retirerait les boutons de scénario de celle-ci, et inversement. Branchez une box de test sur un autre broker.
+
+Indiquez le broker que Home Assistant utilise déjà : « Hôte MQTT » (adresse ou nom), « Port MQTT » (1883 en général, 8883 avec TLS), « Utilisateur MQTT », « Mot de passe MQTT » (vide : l'actuel est conservé, « Mot de passe déjà configuré » le dit), « Activer TLS » et « Vérifier le certificat » (à décocher pour un certificat auto-signé). Un bandeau dit d'où viennent les valeurs (« MQTT Manager détecté — configuration pré-remplie », « Broker déjà configuré : les réglages enregistrés sont affichés ci-dessous. »).
+
+**« Tester, enregistrer et redémarrer le démon »** est le seul bouton principal. Trois coches s'allument l'une après l'autre : « Connexion testée », « Réglages enregistrés », « Démon redémarré ». **Si le test échoue, rien n'est enregistré** et le message dit quoi vérifier (« Ce nom ou cette adresse ne répond pas. », « Identifiant ou mot de passe refusé. »…). « Tester seulement » essaie sans rien enregistrer. « Récupérer depuis MQTT Manager » n'apparaît que si ce plugin est actif. Le bouton « Sauvegarder » de Jeedom enregistre aussi ces champs, mais sans tester ni redémarrer le démon.
+
+#### Ce qui est publié, Avancé
+
+- La configuration ne règle pas ce qui est publié : le lien **« Choisir ce qui est publié »** (↗) ouvre la page du plugin sur le panneau [Choisir ce qui est publié](#choisir-ce-qui-est-publié).
+- **« Avancé »** (replié) contient « Réinitialiser le formulaire », qui vide les champs du broker sans rien enregistrer.
+- « cron5 désactivé : mises à jour manuelles » s'affiche seulement si la tâche cron5 est décochée dans le bloc « Fonctionnalités » de Jeedom : les changements d'activation et d'exclusion attendent alors un « Relire Jeedom ».
+
+### Vérifier l'installation
+
+<!-- CAPTURE: vérifier l'installation -->
+![« Vérifier l'installation » : cinq contrôles, « Pour le support » et « Avancé » déplié](images/verifier-installation.png)
+
+**« Vérifier l'installation… »** (menu « ⋯ » de la barre d'état) passe les contrôles dans l'ordre, une ligne chacun : « Le démon tourne », « Le broker MQTT répond », « Home Assistant sur le broker », « Dernière relecture réussie », puis les équipements bloqués (« Aucun équipement bloqué » ou leur nombre). Chaque ligne porte un mot :
+
+- **« OK »** (vert) : rien à faire ;
+- **« À corriger »** (rouge) : la liste s'arrête là, et le bouton du remède est proposé ;
+- **« À vérifier »** (bleu) : un contrôle à faire vous-même, la liste continue. Pour Home Assistant, regardez s'il voit l'appareil « Jeedom (jeedom2ha) », puis **« Vu »** ; sinon **« Pas vu »** déplie les trois causes habituelles. « Non confirmé » n'est pas une erreur ;
+- **« En attente »** (gris) : pas encore contrôlé, un point « À corriger » le précède.
+
+**« Pour le support »** : **« Diagnostic »** (⬇) télécharge un fichier qui décrit votre installation, à joindre à votre message sur le forum ; la case **« Pseudonymiser »** remplace vos noms par des alias et masque l'adresse du broker. **Avancé** (replié) : « Télécharger l'export de décision » (identifiants seulement, pour une analyse fine par le support) et « Journaux du plugin : » `jeedom2ha`, `jeedom2ha_daemon`, `jeedom2ha_packages`.
+
+### Le guide de démarrage
+
+<!-- CAPTURE: guide de démarrage -->
+![Guide de démarrage : quatre étapes, une ligne chacune, avec leur état](images/guide-demarrage.png)
+
+Tant que rien n'a été publié, la page affiche **« Bienvenue dans jeedom2ha »** et quatre étapes, une ligne chacune (numéro, titre, état, bouton, ⓘ). Une étape n'est **« Fait »** que si son signal a été observé ; sinon **« À vérifier »** avec un bouton, ou « À corriger » avec la cause en info-bulle.
+
+| Étape | Ce qu'on vous demande | « Fait » quand |
+|---|---|---|
+| 1. « Connecter le broker » | « Ouvrir la configuration MQTT », puis « Tester, enregistrer et redémarrer le démon ». | Le démon tourne et le broker est connecté. |
+| 2. « Vérifier Home Assistant » | Dans Home Assistant : Paramètres › Appareils et services › MQTT, l'appareil « Jeedom (jeedom2ha) ». « Je l'ai vu » ou « Je ne le vois pas » (trois causes : intégration MQTT absente, autre broker, découverte désactivée). | Home Assistant s'est signalé, ou vous avez cliqué « Je l'ai vu » (« Fait (vu par vous) »). |
+| 3. « Choisir ce qui est publié » | « Tout publier (recommandé) » ou « Choisir… ». La suggestion « n scénarios lancés à la main → Publier ces n » y apparaît aussi. | Au premier choix. |
+| 4. « Publier les équipements » | « Publier dans Home Assistant ». « Vérifier la publication » si le résultat n'a pas encore été observé (« Vérification en cours »). | La publication est confirmée. |
+
+À la fin, une ligne : « C'est fait : vos équipements sont dans Home Assistant. », avec « Voir ma maison ». « Fermer » cache le guide ; « Ne plus afficher ce guide » l'empêche de revenir. **Une fois les quatre étapes faites, il ne revient plus de lui-même** ; il reste dans le menu « ⋯ », « Guide de démarrage ».
 
 ---
 
@@ -385,22 +365,22 @@ Deux expressions de ces motifs méritent une explication. Une **« commande clé
 
 ### Ce que le plugin sait publier
 
-Le plugin publie neuf types d'entités Home Assistant. Le type est choisi à partir des types Jeedom des commandes de l'équipement.
+Le plugin publie dix types d'entités Home Assistant. Le type est choisi à partir des types génériques des commandes de l'équipement.
 
 | Type Home Assistant | Ce que le plugin en fait |
 |---|---|
-| `light` | Lumières : allumer/éteindre et variation de luminosité, avec l'état réel quand Jeedom le fournit (voir [Limites](#limites--état-réel-des-lumières-et-des-volets)). La couleur n'est pas reprise, et une lumière qui n'a que des commandes de couleur n'est pas prise en charge. |
-| `cover` | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent, avec l'état et la position réels quand Jeedom les fournit. Portails et portes de garage : ouverture et fermeture, avec l'état réel (voir [Portails et portes de garage](#portails-et-portes-de-garage)). |
-| `switch` | Prises et interrupteurs (commandes d'énergie On/Off, familles « interrupteur » et « ventilateur » de Jeedom), ainsi que les équipements de présence actionnables (information de présence + actions pour l'activer et la désactiver). |
-| `sensor` | Informations numériques. |
-| `binary_sensor` | Informations binaires. |
-| `button` | Actions ponctuelles sans valeur, et **scénarios Jeedom** (un bouton par scénario, grisé quand le scénario est désactivé). |
-| `climate` | Thermostats : température, consigne, mode, presets et chauffe en cours ; consigne, arrêt et presets pilotables (voir [Thermostats](#thermostats)). |
-| `alarm_control_panel` | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
-| `valve` | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
-| `lock` | Serrures : verrouiller, déverrouiller et état réel (voir [Serrures](#serrures)). |
+| Lumière (`light`) | Lumières : allumer/éteindre et variation de luminosité, avec l'état réel quand Jeedom le fournit (voir [Limites](#limites--état-réel-des-lumières-et-des-volets)). La couleur n'est pas reprise, et une lumière qui n'a que des commandes de couleur n'est pas prise en charge. |
+| Volet (`cover`) | Volets et stores : ouverture/fermeture, arrêt et position quand ils existent, avec l'état et la position réels quand Jeedom les fournit. Portails et portes de garage : ouverture et fermeture, avec l'état réel (voir [Portails et portes de garage](#portails-et-portes-de-garage)). |
+| Interrupteur (`switch`) | Prises et interrupteurs (commandes d'énergie On/Off, familles « interrupteur » et « ventilateur » de Jeedom), ainsi que les équipements de présence actionnables (information de présence + actions pour l'activer et la désactiver). |
+| Capteur (`sensor`) | Informations numériques. |
+| Capteur binaire (`binary_sensor`) | Informations binaires (ouvert/fermé, présence, fumée…). |
+| Bouton (`button`) | Actions ponctuelles sans valeur, et **scénarios Jeedom** (un bouton par scénario, grisé quand le scénario est désactivé). |
+| Thermostat (`climate`) | Thermostats : température, consigne, mode, presets et chauffe en cours ; consigne, arrêt et presets pilotables (voir [Thermostats](#thermostats)). |
+| Alarme (`alarm_control_panel`) | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
+| Vanne (`valve`) | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
+| Serrure (`lock`) | Serrures : verrouiller, déverrouiller et état réel (voir [Serrures](#serrures)). |
 
-Le plugin ne publie pas les équipements sans type Jeedom reconnu : il l'indique alors dans l'encart de cause de l'équipement.
+Le plugin ne publie pas les équipements sans type générique reconnu : il l'indique alors dans l'encart de cause de l'équipement.
 
 ### Limites : état réel des lumières et des volets
 
@@ -423,7 +403,7 @@ Autres limites à connaître :
 - **Aucune inversion de position.** Le plugin reprend la valeur de Jeedom telle quelle (0 = fermé, 100 = ouvert). Si un plugin Jeedom inverse cette échelle, la position affichée est inversée.
 - **Pas d'état intermédiaire** « en ouverture », « en fermeture » ou « arrêté » : seuls ouvert et fermé sont remontés.
 - **Valeur illisible ou hors de 0 à 100 :** rien n'est publié, Home Assistant garde la dernière valeur connue.
-- **Retrait d'une commande d'information :** le plugin garde la liste des états qu'il a lui-même publiés (fichier du démon). À la synchronisation ou à la republication suivante, il efface l'état mémorisé par le broker pour ce canal, afin que Home Assistant ne le relise pas. Un état publié par une version qui ne tenait pas cette liste ne peut pas être effacé automatiquement.
+- **Retrait d'une commande d'information :** le plugin garde la liste des états qu'il a lui-même publiés (fichier du démon). À la relecture ou à la republication suivante, il efface l'état mémorisé par le broker pour ce canal, afin que Home Assistant ne le relise pas.
 - La couleur d'une lumière et les alarmes ne sont pas concernées par cette remontée d'état. Les thermostats ont leur propre remontée (voir [Thermostats](#thermostats)).
 
 ### Portails et portes de garage
@@ -456,9 +436,9 @@ Limites à connaître :
 - **Sans mouvement après 60 secondes**, le plugin considère que la bascule n'a pas eu d'effet : les ordres restent refusés (raison « sans effet » dans le journal) jusqu'à ce que Jeedom signale un état différent de celui lu à l'envoi, par exemple après une manœuvre depuis Jeedom ou la télécommande. Ce blocage est gardé en mémoire par le démon : un redémarrage du démon le lève.
 - Un refus n'est **pas mis en attente** : quand l'état change ensuite, rien n'est envoyé ; il faut redonner l'ordre depuis Home Assistant.
 - **Commandes retenues ignorées** : un ordre resté mémorisé par le broker MQTT (message « retenu ») n'est jamais exécuté, pour aucun équipement ; le démon l'écrit dans son journal.
-- **Pas d'arrêt** : aucun type Jeedom « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop. **Pas de position.**
+- **Pas d'arrêt** : aucun type générique « arrêt » n'existe pour un portail ; Home Assistant n'affiche pas de bouton Stop. **Pas de position.**
 - Sans état, ou avec un état **binaire** (0/1), l'équipement ne devient pas un ouvrant : il garde son comportement précédent (bouton, ou capteur d'ouverture de classe « porte de garage »).
-- Au passage du bouton à l'ouvrant, le bouton disparaît de Home Assistant et l'ouvrant apparaît avec un nouvel identifiant (`cover.jeedom2ha_<id>` au lieu de `button.jeedom2ha_<id>`) : les automatisations et tableaux de bord qui visaient le bouton sont à reprendre. Imposer le type « button » sur une commande de l'équipement (voir [Choisir le type Home Assistant d'une commande](#choisir-le-type-home-assistant-dune-commande)) permet de garder le bouton.
+- Au passage du bouton à l'ouvrant, le bouton disparaît de Home Assistant et l'ouvrant apparaît avec un nouvel identifiant (`cover.jeedom2ha_<id>` au lieu de `button.jeedom2ha_<id>`) : les automatisations et tableaux de bord qui visaient le bouton sont à reprendre. Choisir le type « Bouton (button) » pour une commande de l'équipement (voir [Corriger le type d'une commande](#corriger-le-type)) permet de garder le bouton.
 
 ### Vannes d'arrosage
 
@@ -492,7 +472,7 @@ Un équipement Jeedom qui porte l'ordre de consigne `THERMOSTAT_SET_SETPOINT` (c
 - **Reprendre la chauffe depuis l'arrêt** : choisir « chauffe » renvoie la consigne courante au thermostat, qui reprend en consigne manuelle. Choisir « chauffe » sur un thermostat qui chauffe déjà n'envoie rien (le mode en cours n'est pas écrasé).
 - **Verrouillage** : l'interrupteur « Verrouillage » (catégorie configuration) affiche l'état du verrou et le pilote. **Un thermostat verrouillé ignore tous les ordres** (consigne, modes, arrêt) sans erreur : si un réglage reste sans effet, vérifiez ce verrou.
 - **Non repris** : la température extérieure (`THERMOSTAT_TEMPERATURE_OUTDOOR`, en général déjà publiée par sa propre sonde) et le statut en texte (`THERMOSTAT_STATE_NAME`).
-- Pas d'état supposé (`optimistic: false`) : Home Assistant affiche ce que Jeedom remonte. Les états sont publiés dès la synchronisation, puis à chaque changement.
+- Pas d'état supposé (`optimistic: false`) : Home Assistant affiche ce que Jeedom remonte. Les états sont publiés dès la relecture, puis à chaque changement.
 - Identifiants : `climate.jeedom2ha_<équipement>` (inchangé) et `switch.jeedom2ha_<équipement>_<commande de verrou>` pour le verrouillage.
 
 ### Serrures
@@ -509,51 +489,29 @@ Un équipement Jeedom qui porte les types « Serrure » du cœur (`LOCK_STATE` p
 - **Assist et commande vocale** : le plugin ne règle jamais l'exposition des entités à Assist. Exposer la serrure à Assist, et donc permettre de la déverrouiller à la voix, est un choix que vous faites dans Home Assistant (Paramètres > Assistants vocaux > Exposer) ; aucune valeur par défaut du plugin ne l'expose.
 - Identifiant de l'entité : `lock.jeedom2ha_<équipement>_<commande d'état>`.
 
-### Les badges de synthèse
-
-Le badge à droite du nom de chaque équipement dit son **état**. Un équipement n'en a qu'un, toujours dit avec le même mot et la même teinte dans l'arbre, le badge du détail et les compteurs de la pièce (le détail des règles est dans [Les états et les compteurs](compteurs.md)).
-
-| État | Teinte | Ce que cela veut dire |
-|---|---|---|
-| **Publié** | vert (discret) | L'équipement est présent dans Home Assistant. |
-| **À appliquer** | bleu | Un réglage attend d'être appliqué, ou la publication due n'a pas encore eu lieu. |
-| **Bloqué** | orange (le plus visible) | Rien n'est dans Home Assistant et au moins une commande est bloquée par une cause corrigeable. |
-| **Exclu** | gris | L'équipement est volontairement écarté. La **cause** est dite à côté du mot : « par le plugin X », « par la pièce » ou « individuelle » (voir [Exclusions volontaires](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)). Ce n'est pas un état de plus. |
-| **Désactivé** | gris, en italique | L'équipement est désactivé dans Jeedom. Il l'emporte sur « Exclu ». |
-| **Rien à publier** | gris | Aucune commande n'est publiable ni bloquée. |
-
-Quand l'équipement est « Publié » ou « À appliquer » et que certaines commandes sont bloquées, le badge est suivi de la **mention orange** du nombre de commandes bloquées (« 1 bloquée », « 2 bloquées ») : ce n'est pas un état, il n'existe pas d'état « partiel ».
-
-Vocabulaire :
-
-- Une commande **publiée** est dans Home Assistant (portée par au moins une entité présente).
-- Une commande **bloquée** devrait pouvoir être publiée mais ne l'est pas ; la cause est dite dans l'encart de l'équipement. Certaines causes se corrigent (voir les familles ci-dessous), d'autres non.
-- Une commande **ignorée** n'a aucun équivalent dans Home Assistant : il n'y a rien à faire, et elle n'est jamais comptée comme un défaut.
-- Une commande **exclue** est écartée par un réglage.
-- Une **entité Home Assistant** est ce qui apparaît dans Home Assistant ; un équipement peut en produire plusieurs.
-- Un équipement **exclu** est volontairement écarté : par vous (« Jamais »), par la configuration du plugin (plugins, pièces) ou par un réglage d'exclusion propre à l'équipement dans Jeedom.
-
-Le badge dit ce qui est dans Home Assistant **maintenant** ou ce qui reste à appliquer ; la présence réelle dépend de l'application des réglages (voir [Réglages en attente](#réglages-en-attente-et-appliquer)).
-
 ### Les causes de blocage
 
-Quand des commandes sont bloquées, l'équipement affiche un encart par cause (« 11 commandes bloquées : types génériques non configurés dans Jeedom »). Les lignes du tableau montrent seulement « Bloquée ». Les causes sont regroupées ici par ce que vous pouvez en faire.
+Quand des commandes sont bloquées, la fiche de l'équipement affiche une bande par cause, avec un libellé court (voir [La pièce et la fiche](#la-pièce-et-la-fiche)) ; son lien « En savoir plus » mène ici. « Détails techniques » (menu « ⋯ ») reprend la cause longue ci-dessous (« 11 commandes bloquées : types génériques non configurés dans Jeedom »). Les lignes du tableau montrent seulement « Bloquée ».
+
+Libellés courts des bandes : « Sans type générique », « Type incertain », « Types incompatibles », « Type en double », « Nom « lampe » ≠ type « prise » » (ou « Nom ≠ type »), « État sans ordre », « Type pas assez sûr », « Aucun type possible », « Appareil non reconnu », « Commandes inutilisables », « Aucun ordre », « Pas d’état », « Envoi échoué ». Une cause que la page ne connaît pas (démon plus récent) s'affiche « Cause inconnue ».
+
+Vocabulaire : une commande **publiée** est portée par au moins une entité présente dans Home Assistant ; **bloquée**, elle devrait pouvoir l'être mais ne l'est pas ; **ignorée**, elle n'a aucun équivalent dans Home Assistant (rien à faire, jamais un défaut) ; **exclue**, elle est écartée par un réglage. Les causes sont regroupées ici par ce que vous pouvez en faire.
 
 **1. Corrections possibles côté Jeedom (types génériques ou nom de l'équipement)**
 
 | Cause affichée | Pour agir |
 |---|---|
-| type Home Assistant ambigu — précisez les types génériques dans Jeedom | Précisez les types génériques des commandes dans Jeedom (bouton « Ouvrir les types génériques »). |
+| type Home Assistant ambigu — précisez les types génériques dans Jeedom | Précisez les types génériques des commandes dans Jeedom (bouton « Ouvrir les types génériques »), ou choisissez le type ici (« Corriger le type… »). |
 | types génériques en conflit — précisez-les dans Jeedom | Idem. |
 | types génériques en double | Deux commandes portent le même type : retirez le doublon. |
-| un mot du nom de l’équipement écarte ce type | Renommez l'équipement (voir [Nommage des équipements](#annexe--nommage-des-équipements)). |
-| état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Dans la colonne « Type HA » de cette commande, choisissez `binary_sensor`, puis réglez la publication sur « Toujours ». |
+| un mot du nom de l’équipement écarte ce type | La fiche le dit en clair (« le nom dit « lampe », les types Jeedom disent « prise » »), puis : « Ce n’est pas un doute mais une contradiction : le réglage « En cas de doute » ne s’y applique pas, et le plugin ne publie pas cet équipement de lui-même. » Action principale **« Publier quand même »** (réglage « Toujours », puis « Appliquer ») ; action secondaire **« Renommer l’équipement dans Jeedom, puis Relire Jeedom »** (voir [Nommage des équipements](#annexe--nommage-des-équipements)). Corriger le type ne suffit pas pour cette cause. |
+| état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours » | L'équipement n'a qu'une commande d'état, sans commandes On/Off : il n'y a rien à piloter. Avec « Corriger le type… », choisissez « Capteur binaire (binary_sensor) » pour cette commande (l'aperçu dit s'il sera publié ; sinon, réglez aussi la publication sur « Toujours »), ou ajoutez les ordres dans Jeedom. |
 
 **2. Blocages tels que l'équipement est configuré**
 
 | Cause affichée | Signification |
 |---|---|
-| types génériques non configurés dans Jeedom | Aucune commande n'a de type Jeedom (bouton « Ouvrir les types génériques »). |
+| types génériques non configurés dans Jeedom | Aucune commande n'a de type générique (bouton « Ouvrir les types génériques »). |
 | aucune commande Info/Action exploitable | L'équipement n'a pas de commande utilisable. |
 
 **3. Publication impossible : il manque une capacité**
@@ -563,12 +521,12 @@ Quand des commandes sont bloquées, l'équipement affiche un encart par cause (�
 | commande non pilotable (pas d’ordre On/Off) | Home Assistant ne pourrait pas envoyer d'ordre. |
 | pas de retour d’état exploitable | Home Assistant ne pourrait pas lire l'état. |
 
-**4. Réglage de la politique de publication**
+**4. Réglage « En cas de doute »**
 
 | Cause affichée | Pour agir |
 |---|---|
-| confiance « probable » exclue par la politique « sûr uniquement » | Passez la politique à « Publier les équipements sûrs et probables (recommandé) » dans la configuration. |
-| confiance insuffisante pour la politique active | Idem. |
+| reconnu avec un léger doute, non publié avec le réglage « En cas de doute » sur « Ne pas publier » | « Publier quand même » sur la fiche (cet équipement seul), ou « En cas de doute » sur « Publier » dans le panneau « Choisir ce qui est publié » (tous les équipements dans ce cas). Changer le type ne lève pas ce blocage. |
+| la reconnaissance est trop incertaine pour le réglage choisi | Idem. |
 
 **5. Type non publiable**
 
@@ -576,7 +534,7 @@ Ces causes s'affichent avec un triangle d'avertissement, comptent comme **bloqu�
 
 | Cause affichée | Pour agir |
 |---|---|
-| aucun type Home Assistant identifié pour cette commande | Choisissez un autre type dans la colonne « Type HA », ou revenez à « auto ». |
+| aucun type Home Assistant identifié pour cette commande | Avec « Corriger le type… », choisissez un autre type, ou revenez à « Automatique ». |
 | aucun type Home Assistant candidat à valider | Idem. |
 
 **6. Commandes ignorées** (jamais comptées comme des défauts)
@@ -586,7 +544,7 @@ Ces commandes n'ont aucun équivalent dans Home Assistant ; il n'y a rien à fai
 | Cause | Signification |
 |---|---|
 | sans équivalent dans Home Assistant | Aucun type Home Assistant ne prend cette commande en charge. |
-| type non couvert par la V1 du plugin | Aucun des types Jeedom de la commande n'est reconnu par le plugin (« V1 » désigne la version actuelle du plugin ; la liste des types pris en charge est donnée plus haut). |
+| type pas encore pris en charge par le plugin | Aucun des types Jeedom de la commande n'est reconnu par le plugin (la liste des types pris en charge est donnée plus haut). |
 | non pris en charge par le plugin | Le type Home Assistant demandé n'est pas ouvert par le plugin : la ligne repliée le précise. |
 
 **7. Exclusions volontaires** (jamais comptées comme des problèmes)
@@ -595,13 +553,13 @@ Ces commandes n'ont aucun équivalent dans Home Assistant ; il n'y a rien à fai
 |---|---|
 | exclu manuellement (équipement) | Réglage « Jamais » de l'équipement. |
 | exclu manuellement (commande) | Réglage « Jamais » d'une entité. |
-| exclu de Jeedom2HA (équipement dans la liste d’exclusions) | Réglage d'exclusion propre à l'équipement dans Jeedom (la clé `jeedom2ha_excluded` de sa configuration). Aucun bouton du plugin ne le pose. |
-| exclu de Jeedom2HA (plugin source dans la liste d’exclusions) | Plugin coché dans la liste « Plugins exclus » de la configuration. |
-| exclu de Jeedom2HA (pièce dans la liste d’exclusions) | Exclusion de la pièce, posée depuis sa carte ou son détail (voir [Exclure une pièce](#exclure-une-pièce)) ; reprend aussi les pièces de l'ancien champ « Pièces exclues » de la configuration. Sauf équipements exposés à HomeKit (actifs) : ils ne sont pas écartés par leur pièce. |
+| exclu de Jeedom2HA (équipement dans la liste d’exclusions) | Réglage d'exclusion propre à l'équipement, posé dans Jeedom hors du plugin (par un script, par exemple). Aucun bouton du plugin ne le pose. |
+| exclu de Jeedom2HA (plugin source dans la liste d’exclusions) | Plugin décoché dans le panneau « Choisir ce qui est publié » (Par plugin). |
+| exclu de Jeedom2HA (pièce dans la liste d’exclusions) | Exclusion de la pièce, posée depuis sa carte ou son détail (voir [Exclure une pièce](#exclure-une-pièce)). Sauf équipements exposés à HomeKit (actifs) : ils ne sont pas écartés par leur pièce. |
 
-Dans la vue de travail, la **cause** d'un équipement « Exclu » est dite en clair, sans ouvrir la configuration : sur sa ligne de l'arbre (« par le plugin X », « par la pièce », « individuelle »), dans son détail (la phrase complète et l'endroit où agir) et, pour toute la pièce, dans la ligne « Exclus : » du détail de pièce (par exemple « 2 par le plugin X, 1 individuelle »). Le nom du plugin est celui affiché par Jeedom ; s'il est introuvable, c'est « par son plugin ». « par la pièce » correspond à l'exclusion de la pièce, « par le plugin » à la liste « Plugins exclus », « individuelle » au réglage « Jamais » ou au réglage propre à l'équipement dans Jeedom. Une seule cause est dite par équipement, dans l'ordre de priorité de Jeedom ; quand elle ne peut pas être déterminée (commandes exclues pour des raisons différentes), la ligne « Exclus : » compte l'équipement dans « autre ».
+Dans la pièce, la **cause** d'un équipement « Exclu » est dite en clair, sans ouvrir la configuration : dans l'info-bulle de sa ligne de l'arbre (« par le plugin X », « par la pièce », « individuelle »), dans sa fiche (la phrase complète et l'endroit où agir) et, pour toute la pièce, dans la ligne « Exclus : » de la pièce (par exemple « 2 par le plugin X, 1 individuelle ») et dans l'info-bulle de la marque « N exclus » de sa tuile. Ce n'est pas un état de plus. Le nom du plugin est celui affiché par Jeedom ; s'il est introuvable, c'est « par son plugin ». « par la pièce » correspond à l'exclusion de la pièce, « par le plugin » à l'exclusion du plugin (panneau « Choisir ce qui est publié »), « individuelle » au réglage « Jamais » ou au réglage propre à l'équipement dans Jeedom. Une seule cause est dite par équipement, dans l'ordre de priorité de Jeedom ; quand elle ne peut pas être déterminée (commandes exclues pour des raisons différentes), la ligne « Exclus : » compte l'équipement dans « autre ».
 
-Pour reprendre un équipement exclu manuellement, choisissez « Automatique ». Pour une exclusion de plugin, décochez le plugin dans « Plugins exclus » puis cliquez sur le bouton situé sous les filtres ; pour une exclusion de pièce, utilisez « Ne plus exclure la pièce… ». Pour le réglage propre à l'équipement, retirez-le sur l'équipement dans Jeedom, puis lancez « Relire Jeedom ».
+Pour reprendre un équipement exclu manuellement, choisissez « Automatique ». Pour une exclusion de plugin, recochez le plugin dans le panneau « Choisir ce qui est publié » puis appliquez ; pour une exclusion de pièce, utilisez « Ne plus exclure la pièce… ». Pour le réglage propre à l'équipement, retirez-le sur l'équipement dans Jeedom, puis lancez « Relire Jeedom ».
 
 **8. État neutre**
 
@@ -613,9 +571,22 @@ Pour reprendre un équipement exclu manuellement, choisissez « Automatique ». 
 
 | Cause affichée | Signification |
 |---|---|
-| échec de publication MQTT au dernier sync | La publication vers le broker a échoué lors de la dernière synchronisation. Relancez une republication ; si le message persiste, consultez les journaux. |
+| échec de la publication MQTT à la dernière relecture | La publication vers le broker a échoué lors de la dernière relecture. Relancez une republication ; si le message persiste, consultez les journaux. |
 
-Si un encart affiche un texte technique ou une liste de codes à la place d'une de ces phrases, téléchargez le diagnostic support et joignez-le à votre demande d'aide. Une cause inconnue du plugin (démon plus récent) classe la commande « Bloquée » : le code brut s'affiche en infobulle.
+Si un encart affiche un texte technique ou une liste de codes à la place d'une de ces phrases, téléchargez le diagnostic support ([Vérifier l'installation](#vérifier-linstallation)) et joignez-le à votre demande d'aide. Une cause inconnue du plugin (démon plus récent) classe la commande « Bloquée » : le code brut s'affiche en infobulle.
+
+### Les conseils
+
+Un **conseil** accompagne un équipement **publié** (ou à appliquer) qui pourrait faire mieux. Ce n'est pas un état : le badge reste « Publié », et la mention « Conseil » s'ajoute à côté. La fiche du conseil suit le même gabarit que les causes, avec une icône d'information.
+
+| Ce que dit la fiche | Ce que vous pouvez faire |
+|---|---|
+| « 3 sorties pourraient être pilotables. » (ou « Cet équipement pourrait être pilotable. ») — les ordres On et Off existent, mais Jeedom ne dit pas à quel état chacun correspond : elles sont publiées en lecture seule. | « Ouvrir l'équipement dans Jeedom » : dans chaque ordre On / Off, renseignez le champ « Valeur » avec l'état de la même sortie, puis cliquez sur « Relire Jeedom ». |
+| « Publié comme capteur d'ouverture. » — sans ordres Ouvrir et Fermer typés, Home Assistant peut seulement lire son état (portail, porte de garage). | « Ouvrir les types génériques » : donnez aux ordres d'ouverture et de fermeture leur type de portail ou de garage, puis « Relire Jeedom ». |
+| « La vitesse n'est pas reprise. » — le plugin publie ce ventilateur comme un interrupteur (marche / arrêt) : les ventilateurs à vitesse ne sont pas encore pris en charge. | Rien : c'est une limite du plugin. |
+| « Le nom dit « … », les types Jeedom disent « … ». » | « Corriger le type… », ou corrigez les types génériques dans Jeedom. |
+
+Sur la page du plugin, les équipements qui ont un conseil apparaissent après les bloqués dans le bloc « À faire », et la puce « conseils » les filtre ; dans la pièce, ils sont listés sous « Conseils dans cette pièce ». Ces deux endroits ne s'affichent que si le nombre de conseils est connu sans lire chaque fiche : sinon, le conseil se découvre dans la fiche de l'équipement.
 
 ---
 
@@ -623,15 +594,19 @@ Si un encart affiche un texte technique ou une liste de codes à la place d'une 
 
 | Symptôme | Où regarder | Action |
 |---|---|---|
-| Le démon ne démarre pas | Bandeau, indicateur « Démon » : « Arrêté » | Relancez l'installation des dépendances, puis démarrez le démon. Consultez le journal `jeedom2ha`. |
-| Le broker n'est pas joignable | Indicateur « MQTT » : « Déconnecté » | Vérifiez les paramètres et utilisez « Tester la connexion » dans la configuration. |
-| Les boutons d'action sont grisés | Ligne d'explication sous la barre de santé | Corrigez le démon ou MQTT : voir [la page principale](#les-actions-de-la-barre-de-santé). |
-| Un équipement manque dans Home Assistant | Ouvrez sa pièce : badge de l'équipement et encart de cause | Appliquez la correction de la [famille de causes](#les-causes-de-blocage) correspondante. |
-| Un réglage n'a pas d'effet dans Home Assistant | Badge « À appliquer » et bouton « Appliquer » dans l'en-tête de l'équipement | Cliquez sur « Appliquer », ou lancez « Relire Jeedom ». |
-| Les états ne se mettent pas à jour | Bandeau de santé | Vérifiez le démon et MQTT, puis le journal `jeedom2ha`. |
-| La barre de santé semble figée | Elle n'est lue qu'à l'ouverture de la page et après chaque action | Rechargez la page. |
+| Je ne sais pas par où commencer | Menu « ⋯ » de la barre d'état | Lancez « Vérifier l'installation… » : elle s'arrête au premier point « À corriger » et propose le remède. |
+| Le démon ne démarre pas | Barre d'état, indicateur « Démon » : « Arrêté » | Relancez l'installation des dépendances, puis démarrez le démon. Consultez le journal `jeedom2ha`. |
+| Le broker n'est pas joignable | Indicateur « MQTT » : « Déconnecté » | Dans la configuration du plugin, vérifiez les paramètres avec « Tester seulement », puis « Tester, enregistrer et redémarrer le démon ». |
+| Home Assistant ne montre rien | Indicateur « Home Assistant » (« Non confirmé » n'est pas une erreur) ; dans Home Assistant, Paramètres › Appareils et services › MQTT | Vérifiez l'intégration MQTT de Home Assistant, son broker et sa découverte (voir [Vérifier l'installation](#vérifier-linstallation)). |
+| Les boutons d'action sont grisés | Ligne d'explication sous la barre d'état | Corrigez le démon ou MQTT : voir [la barre d'état](#la-barre-détat). |
+| Un équipement manque dans Home Assistant | Puce « bloqués » ou recherche, puis la fiche de l'équipement | Suivez la fiche de cause : voir [Les causes de blocage](#les-causes-de-blocage). |
+| Un équipement est en lecture seule alors qu'il devrait être pilotable | Mention « Conseil » de sa fiche | Suivez le conseil : voir [Les conseils](#les-conseils). |
+| Un réglage n'a pas d'effet dans Home Assistant | Badge « À appliquer », bouton « Appliquer » de la fiche ou de la barre d'état | Cliquez sur « Appliquer », ou lancez « Relire Jeedom ». |
+| Home Assistant a perdu ses appareils | Paramètres › Appareils et services › MQTT, dans Home Assistant | « Republier tout ». |
+| Les états ne se mettent pas à jour | Barre d'état | Vérifiez le démon et MQTT, puis le journal `jeedom2ha`. |
+| La barre d'état semble figée | Elle est relue toutes les 30 secondes seulement quand l'onglet est visible, et après chaque action | Revenez sur l'onglet, ou rechargez la page. |
 
-Journaux : **Jeedom → Analyse → Logs → `jeedom2ha`**. Pour signaler un problème : [github.com/alexsahut/jeedom2ha/issues](https://github.com/alexsahut/jeedom2ha/issues).
+Journaux : **Jeedom → Analyse → Logs → `jeedom2ha`** (le plugin), `jeedom2ha_daemon` (les ordres reçus de Home Assistant et les refus), `jeedom2ha_packages` (l'installation). Pour signaler un problème : [github.com/alexsahut/jeedom2ha/issues](https://github.com/alexsahut/jeedom2ha/issues).
 
 ---
 
@@ -639,14 +614,16 @@ Journaux : **Jeedom → Analyse → Logs → `jeedom2ha`**. Pour signaler un pro
 
 ### Annexe : pièces dans Home Assistant (zone suggérée)
 
+> **La zone Home Assistant est fixée à la création de l'appareil.** Déplacer ensuite un équipement d'une pièce à l'autre dans Jeedom ne le déplace pas dans Home Assistant.
+
 Le plugin transmet à Home Assistant la **pièce Jeedom** de chaque équipement, comme « zone suggérée » (`suggested_area`). Si vous renommez la pièce dans Jeedom, le plugin met à jour cette information à la prochaine relecture de Jeedom.
 
 Home Assistant n'utilise cette zone suggérée **qu'à la création** de l'appareil. Si vous déplacez ensuite un équipement d'une pièce à l'autre dans Jeedom, l'appareil reste dans son ancienne zone dans Home Assistant.
 
 Pour le déplacer :
 
-- **Option 1 — Supprimer de Home Assistant, puis relire Jeedom.** Utilisez « Supprimer de Home Assistant… » sur l'équipement, la pièce ou le parc, puis « Relire Jeedom » : la relecture lit la pièce actuelle et recrée les entités. (« Republier » seul ne suffit pas : il travaille sur ce que la dernière lecture complète a lu et ne relit pas Jeedom ; si vous venez de déplacer l'équipement, relisez Jeedom d'abord.) Les personnalisations faites dans Home Assistant (icônes, alias, historique, automatisations) peuvent être perdues : lisez l'avertissement de la confirmation.
-- **Option 2 — Déplacement manuel.** Dans Home Assistant : **Paramètres → Appareils et services**, trouvez l'appareil et modifiez sa zone.
+- **Option 1 — Supprimer de Home Assistant, puis relire Jeedom.** Utilisez « Supprimer de Home Assistant… » sur l'équipement, la pièce ou toute la maison, puis « Relire Jeedom » : la relecture lit la pièce actuelle et recrée les entités. (« Republier » seul ne suffit pas : il travaille sur ce que la dernière lecture complète a lu et ne relit pas Jeedom ; si vous venez de déplacer l'équipement, relisez Jeedom d'abord.) Les personnalisations faites dans Home Assistant (icônes, alias, historique, automatisations) peuvent être perdues : lisez l'avertissement de la confirmation.
+- **Option 2 — Déplacement manuel.** Dans Home Assistant : **Paramètres › Appareils et services › MQTT**, ouvrez l'appareil (il porte le nom de l'équipement Jeedom) et modifiez sa zone.
 
 ### Annexe : noms et identifiants dans Home Assistant
 
@@ -659,7 +636,7 @@ Un bouton de scénario porte le nom du scénario.
 
 **L'appareil « Jeedom (jeedom2ha) »** est le pont lui-même, et non un équipement Jeedom : tous vos appareils sont « Connectés via Jeedom (jeedom2ha) », et son entité « État du pont » indique « Connecté » quand le démon est en ligne, « Déconnecté » quand il est arrêté.
 
-**Renommer dans Jeedom.** Le nouveau nom atteint Home Assistant à la **prochaine relecture de Jeedom**, au redémarrage du démon ou avec « Republier » : le plugin n'agit pas à l'enregistrement de l'équipement dans Jeedom. Pensez à lancer « Relire Jeedom » après un renommage.
+**Renommer dans Jeedom.** Le nouveau nom atteint Home Assistant à la **prochaine relecture de Jeedom**, ou au redémarrage du démon (qui relit Jeedom) ; « Republier » ne suffit pas, car il ne relit pas Jeedom. Le plugin n'agit pas à l'enregistrement de l'équipement dans Jeedom. Pensez à lancer « Relire Jeedom » après un renommage.
 
 **Ce que le plugin ne touche pas.** Un nom d'appareil ou d'entité, ou une pièce, que vous avez choisis vous-même dans Home Assistant font foi : le plugin ne les écrase pas. Les `entity_id` et noms des entités déjà créées ne changent pas non plus : la mise à jour ne fait évoluer que les noms affichés par défaut. Pour la pièce, voir l'annexe précédente : Home Assistant ne l'applique qu'à la création de l'appareil.
 
@@ -683,11 +660,13 @@ Le mot doit apparaître **en entier** dans le nom (la casse n'a pas d'importance
 | **Prise / interrupteur** (`switch`) | lumière, lumiere, light, lampe, ampoule ; volet, store, cover, blind, shutter, portail, garage ; chauffage, radiateur, thermostat, heater ; fumée, smoke, alarme, sirene |
 | **Volet** (`cover`) | lumière, lumiere, light, lampe, ampoule ; chauffage, radiateur, thermostat, heater ; prise, plug, socket ; fumée, smoke, alarme, sirene |
 
-Que faire : renommez l'équipement dans Jeedom puis lancez « Relire Jeedom », ou essayez le réglage « Toujours » (voir ses conditions plus haut).
+Exemples : « Lumière garage », « Lampe salle d'eau » (« eau » est un mot entier après l'apostrophe) ou « Éclairage piscine » ne sont pas publiés comme lumières. Ce n'est pas un « doute » au sens du réglage « En cas de doute » : l'équipement reste bloqué quel que soit ce réglage.
+
+Que faire : la fiche de l'équipement propose « Publier quand même » (sa publication passe sur « Toujours », puis « Appliquer » l'envoie) ou « Renommer l’équipement dans Jeedom, puis Relire Jeedom ». Corriger le type ne suffit pas dans ce cas : le nom continue d'écarter le type, et l'équipement reste bloqué tant que sa publication n'est pas réglée sur « Toujours ».
 
 ### Annexe : durée des actions
 
-Les actions « Republier » et « Supprimer de Home Assistant » peuvent demander du temps sur un grand parc. Le démon ne s'arrête jamais en cours de route : c'est l'écran qui cesse d'attendre.
+Les actions « Republier » et « Supprimer de Home Assistant » peuvent demander du temps sur une grande maison. Le démon ne s'arrête jamais en cours de route : c'est l'écran qui cesse d'attendre.
 
 - Si l'action dépasse environ 60 secondes, le message suivant s'affiche : « L'action Home Assistant dure plus longtemps que prévu (plus de 60 s). Elle peut se poursuivre côté démon : actualisez la page dans un instant pour voir le résultat. » Attendez quelques secondes, rechargez la page : le bandeau et la pièce reflètent alors le résultat réel.
 - Si le démon répond par une erreur immédiate : « Le démon a renvoyé une erreur pendant l'action Home Assistant — consultez les logs du plugin ». Consultez alors le journal `jeedom2ha`.

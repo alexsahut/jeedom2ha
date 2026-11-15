@@ -31,6 +31,8 @@ body[data-theme*="Light"] {
   --j2ha-line: rgba(0, 0, 0, 0.2);
   --j2ha-menu-bg: #ffffff;
   --j2ha-highlight: rgba(255, 193, 7, 0.35);
+  /* Triplet R, G, B (même forme que --bg-color du cœur) : repli de rgb(var(--bg-color, …)) quand le cœur ne le définit pas. */
+  --j2ha-page-rgb: 255, 255, 255;
 }
 
 /* Thème sombre (angles droits, fonds proches de rgb(25, 25, 25) relevé sur Jeedom 4.6.1). */
@@ -50,6 +52,7 @@ body[data-theme*="Dark"] {
   --j2ha-line: rgba(255, 255, 255, 0.28);
   --j2ha-menu-bg: #2a2a2a;
   --j2ha-highlight: rgba(255, 193, 7, 0.3);
+  --j2ha-page-rgb: 42, 42, 42;
 }
 
 /* color-mix() absent (vieux Safari, iPad mural) : fonds translucides équivalents en rgba(). */
@@ -1109,7 +1112,9 @@ body[data-theme*="Dark"] {
   top: 0;
   z-index: 3;
   padding: 8px 0 6px 0;
-  background-color: var(--bg-color, var(--j2ha-menu-bg));
+  /* Front v3 (Lot 0) : --bg-color du cœur est un TRIPLET (« 245, 245, 245 »), pas une couleur. var(--bg-color, …) seul
+   * donnait une valeur invalide à l'exécution, donc un fond transparent : le texte défilait sous l'en-tête collant. */
+  background-color: rgb(var(--bg-color, var(--j2ha-page-rgb)));
   border-bottom: 1px solid var(--j2ha-line);
 }
 .j2ha-wv .j2ha-eq-title {
@@ -1248,4 +1253,176 @@ body[data-theme*="Dark"] {
 }
 .j2ha-room-groups .objectListContainer > .j2ha-room-card.objectDisplayCard.j2ha-room-blocked {
   border-left: 4px solid var(--j2ha-warn) !important;
+}
+
+/* =====================================================================================================
+   front-v3 Lot 2 — pièce et fiche équipement. AJOUTS seulement, sous .j2ha-wv (vue de travail).
+   ===================================================================================================== */
+/* Fil d'Ariane dans la barre : Maison › Niveau › Pièce, chaque étage cliquable (il remplace « Page principale » et « Pièces »). */
+.j2ha-wv .j2ha-wv-bar > .j2ha-wv-crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 2px;
+  margin: 0;
+  font-size: 13px;
+}
+.j2ha-wv .j2ha-wv-crumb .j2ha-wv-crumb-sep { color: var(--j2ha-neutral); white-space: pre; }
+.j2ha-wv .j2ha-wv-crumb .j2ha-wv-back > i { margin-right: 4px; }
+.j2ha-wv .j2ha-wv-crumb .j2ha-wv-crumb-current { font-weight: 600; }
+.j2ha-wv .j2ha-wv-bar .j2ha-wv-drawer-toggle { min-width: 44px; }
+/* Arbre : l'état se lit à l'icône seule (info-bulle et nom accessible portent le mot). */
+.j2ha-wv .j2ha-wv-eq .j2ha-wv-state.j2ha-wv-state-icon {
+  flex: 0 0 18px;
+  display: inline-flex;
+  justify-content: center;
+}
+/* Résultats de recherche dans le volet de droite. */
+.j2ha-wv .j2ha-wv-results-list { margin: 8px 0 0 0; padding: 0; list-style: none; }
+.j2ha-wv .j2ha-wv-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-wv .j2ha-wv-result .j2ha-wv-state { flex: 0 0 18px; }
+.j2ha-wv .j2ha-wv-result .j2ha-wv-result-room { margin-left: auto; font-size: 12px; }
+.j2ha-wv .j2ha-wv-result:hover,
+.j2ha-wv .j2ha-wv-result:focus-visible { background-color: var(--j2ha-highlight); }
+.j2ha-wv .j2ha-wv-todo-empty .j2ha-wv-todo-none { display: inline-block; margin: 10px 0 6px 0; }
+/* Fiche : en-tête sur deux lignes. Ligne 1 : titre et badge | Auto / Toujours / Jamais, ⋯ à droite (le menu s'ouvre vers la
+   gauche, ancrage générique right: 0, et reste dans le panneau). Ligne 2 : plugin · n commandes · liens. */
+.j2ha-wv .j2ha-eq-line1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.j2ha-wv .j2ha-eq-line1 > .j2ha-eq-title { flex: 1 1 auto; min-width: 0; }
+.j2ha-wv .j2ha-eq-line1 > .j2ha-eq-controls {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin: 0 0 0 auto;
+}
+.j2ha-wv .j2ha-eq-controls > .j2ha-publication-error { flex: 1 0 100%; text-align: right; }
+.j2ha-wv .j2ha-eq-blocked-mention:empty,
+.j2ha-wv .j2ha-eq-mentions:empty { display: none; }
+.j2ha-wv .j2ha-eq-blocked-mention { color: var(--j2ha-warn); font-size: 14px; }
+.j2ha-wv .j2ha-eq-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--j2ha-neutral);
+}
+.j2ha-wv .j2ha-eq-meta .j2ha-eq-counters .j2ha-eq-counter-line { display: inline; margin: 0; }
+.j2ha-wv .j2ha-eq-meta .j2ha-eq-meta-links { display: inline-flex; flex-wrap: wrap; gap: 0 12px; }
+.j2ha-wv .j2ha-eq-meta .j2ha-eq-meta-link { font-size: 12px; cursor: pointer; }
+.j2ha-wv .j2ha-eq-meta span.j2ha-eq-meta-link { cursor: help; }
+/* Bande de cause (une ligne) : libellé court, ⓘ, au plus deux actions, « En savoir plus ». */
+.j2ha-wv .j2ha-eq-band.j2ha-v2-cause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  min-height: 44px;
+  margin: 8px 0 0 0;
+  padding: 6px 10px;
+  border: 0;
+  border-left: 3px solid var(--j2ha-warn);
+  border-radius: var(--border-radius, 0);
+  color: var(--j2ha-text);
+  background-color: var(--j2ha-warn-bg);
+}
+.j2ha-wv .j2ha-eq-band.j2ha-v2-cause.is-advice {
+  border-left-color: var(--j2ha-todo);
+  background-color: var(--j2ha-todo-bg);
+}
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-what { margin: 0; font-weight: 600; }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-what > i { color: var(--j2ha-warn); }
+.j2ha-wv .j2ha-eq-band.is-advice .j2ha-eq-band-what > i { color: var(--j2ha-todo); }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-info { color: var(--j2ha-neutral); }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-spacer { flex: 1 1 0; }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-acts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-acts > * { box-sizing: border-box; white-space: nowrap; }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-error { flex: 1 0 100%; }
+/* Split button « Publier en <type> ▾ » : la flèche ouvre les autres types plausibles. */
+.j2ha-wv .j2ha-eq-split { position: relative; display: inline-flex; }
+.j2ha-wv .j2ha-eq-split > .btn + .btn { margin-left: 1px; }
+.j2ha-wv .j2ha-eq-split .j2ha-eq-split-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 4;
+  display: none;
+  min-width: 180px;
+  margin: 2px 0 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background-color: var(--j2ha-menu-bg);
+  border: 1px solid var(--j2ha-line);
+}
+.j2ha-wv .j2ha-eq-split.j2ha-split-open .j2ha-eq-split-menu { display: block; }
+.j2ha-wv .j2ha-eq-split .j2ha-eq-split-item {
+  display: block;
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  color: var(--j2ha-text);
+  text-align: left;
+  white-space: nowrap;
+  background-color: transparent;
+  border: 0;
+}
+.j2ha-wv .j2ha-eq-split .j2ha-eq-split-item:hover,
+.j2ha-wv .j2ha-eq-split .j2ha-eq-split-item:focus { background-color: var(--j2ha-highlight); }
+/* Bloc « Dans Home Assistant » : une ligne de 32 px par entité, sans cadre ni phrase. */
+.j2ha-wv .j2ha-eq-ha { margin: 10px 0 4px 0; }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-count { font-weight: 400; color: var(--j2ha-neutral); }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-entity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  min-height: 32px;
+  padding: 2px 0;
+  border-bottom: 1px solid var(--j2ha-line);
+}
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-entity.is-preview { color: var(--j2ha-neutral); border-bottom-style: dashed; }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-icon { flex: 0 0 16px; text-align: center; color: var(--j2ha-neutral); }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-label { flex: 0 1 auto; min-width: 0; }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-capacity { font-size: 11px; font-weight: 600; }
+.j2ha-wv .j2ha-eq-ha .j2ha-v2-entity-id { margin-left: auto; overflow-wrap: anywhere; }
+.j2ha-wv .j2ha-eq-ha .j2ha-v2-entity-id code { font-size: 12px; }
+.j2ha-wv .j2ha-eq-ha .j2ha-v2-copy { min-width: 28px; min-height: 28px; color: var(--j2ha-neutral); cursor: pointer; }
+.j2ha-wv .j2ha-eq-ha .j2ha-eq-ha-toggle {
+  min-height: 28px;
+  padding: 0;
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.j2ha-wv .j2ha-v2-lbl.is-plain { background-color: var(--j2ha-neutral-bg); color: var(--j2ha-text); }
+/* Tableau : colonne Type « Auto » / « Personnalisé : X » suivie d'un crayon. */
+.j2ha-wv .j2ha-cmd-table .j2ha-type-link .j2ha-type-pen { margin-left: 6px; font-size: 11px; opacity: 0.7; }
+.j2ha-wv .j2ha-eq-tech .j2ha-v2-tech { margin-top: 8px; padding: 6px 0; border-top: 1px dashed var(--j2ha-line); }
+@media (max-width: 979px) {
+  .j2ha-wv .j2ha-wv-crumb .j2ha-wv-crumb-link { min-height: 44px; }
+  .j2ha-wv .j2ha-wv-result { min-height: 44px; }
+  .j2ha-wv .j2ha-eq-line1 > .j2ha-eq-controls { margin-left: 0; justify-content: flex-start; }
+  .j2ha-wv .j2ha-eq-ha .j2ha-v2-entity-id { margin-left: 26px; flex-basis: 100%; }
 }

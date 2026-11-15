@@ -84,7 +84,7 @@ async function withRealPage(t, fn, options) {
     await page.addScriptTag({ content: read(JQUERY) });
     await page.evaluate((vars) => { window.j2haRoomsTree = vars.j2haRoomsTree; window.j2haAncestors = vars.j2haAncestors; }, rendered.vars);
     await page.addScriptTag({ content: BOOTBOX_STUB });
-    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', ...(withView ? ['jeedom2ha_workview'] : []), 'jeedom2ha']) {
+    for (const file of ['jeedom2ha_mapping_override', 'jeedom2ha_infotip', 'jeedom2ha_lexique', 'jeedom2ha_ha_side', 'jeedom2ha_mapping_surface', 'jeedom2ha_type_panel', 'jeedom2ha_action_budget', 'jeedom2ha_overview', ...(withView ? ['jeedom2ha_workview'] : []), 'jeedom2ha_guide', 'jeedom2ha_exclusions', 'jeedom2ha']) {
       await page.addScriptTag({ content: read(`desktop/js/${file}.js`).replace(/\{\{([^}]*)\}\}/g, '$1') });
     }
     await page.waitForFunction(() => (document.querySelector('#j2ha_houseNumber')?.textContent ?? '').trim() !== '');
@@ -103,15 +103,17 @@ test('25.3 navigateur réel — un seul appel au chargement, jauges cohérentes,
     assert.equal(actions.filter((a) => a === 'getBridgeStatus').length, 1);
     const bodies = ctx.bodies;
     assert.ok(!bodies.some((b) => b.includes('refresh=')), 'aucun refresh au chargement');
+    // Garde levée (front v3, Lot 1) : « n / 12 » + « publiés », le nombre d'équipements dans l'onglet ; la puce filtre la grille.
     const text = (await page.locator('#j2ha_houseSub').textContent()).trim();
-    assert.match(text, /^publiés? sur 12$/);
-    assert.equal((await page.locator('#j2ha_houseMeta').textContent()).trim(), '12 équipements Jeedom, 4 pièces');
+    assert.match(text, /^publiés?$/);
+    assert.match((await page.locator('#j2ha_houseNumber').textContent()).trim(), /^\d+ \/ 12$/);
+    assert.equal((await page.locator('#j2ha_tabEquipmentsCount').textContent()).trim(), '12');
     assert.equal(await page.locator('#j2ha_roomCards .j2ha-room-card').count(), 5);
     assert.deepEqual(ctx.errors, []);
-    // Filtre sans requête réseau.
+    // Filtre sans requête réseau : des tuiles masquées, aucune requête.
     const before = (await journal()).length;
-    await page.locator('#j2ha_houseChips .j2ha-chip-filter:not([disabled])').first().click();
-    assert.ok((await page.locator('#j2ha_filterList .j2ha-frow').count()) > 0);
+    await page.locator('#j2ha_houseChips .j2ha-chip-filter[aria-controls="j2ha_roomCards"]').first().click();
+    assert.ok((await page.locator('#j2ha_roomCards .j2ha-room-card[hidden]').count()) > 0);
     assert.equal((await journal()).length, before);
     // Style : la jauge de la maison est visible et segmentée en flex.
     const display = await page.locator('#j2ha_houseGauge .j2ha-gauge').evaluate((el) => getComputedStyle(el).display);
@@ -173,7 +175,7 @@ test('25.3 navigateur réel — le focus clavier reste sur la puce après un fil
     assert.equal(ctx.journal.filter((e) => e.action === 'getEquipmentStates').length, 2);
     assert.match(await focused(), /j2ha-chip-filter/);
     await page.keyboard.press('Escape');
-    assert.equal(await page.locator('#j2ha_filterList .j2ha-frow').count(), 0, 'Échap retire le filtre');
+    assert.equal(await page.locator('#j2ha_houseChips .j2ha-chip-filter[aria-pressed="true"]').count(), 0, 'Échap retire le filtre');
     assert.deepEqual(ctx.errors, []);
   }, { workview: false });
 });

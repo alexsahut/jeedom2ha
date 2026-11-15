@@ -12,7 +12,16 @@ export async function run(page, { helpers }) {
   helpers.record('confirmation_ouverte', true);
   const confirm = page.locator('.bootbox .btn-primary').filter({ hasText: /^Relire$/ }).first();
   await confirm.click();
+  // Front v2 (Lot 1) : glossaire 3.2 — la page affiche « Relecture terminée. » (le démon et lib/interceptor.mjs envoient
+  // toujours « Synchronisation terminée. »). Ajout seul : les deux contrôles d'origine restent en dessous (garde
+  // « aucune ligne retirée » de test_story_25_3_gate) ; test_story_20_4_rescan_ui interdit l'ancien libellé dans la page.
   const zone = await page.waitForFunction(() => {
+    if (document.querySelector('#jeeToastContainer')?.textContent?.includes('Relecture terminée.')) {
+      return 'toast';
+    }
+    if (document.querySelector('#div_alert')?.textContent?.includes('Relecture terminée.')) {
+      return 'div_alert';
+    }
     if (document.querySelector('#jeeToastContainer')?.textContent?.includes('Synchronisation terminée.')) {
       return 'toast';
     }

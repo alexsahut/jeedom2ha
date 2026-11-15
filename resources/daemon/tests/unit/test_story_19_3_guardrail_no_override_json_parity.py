@@ -87,7 +87,9 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
     assert set(payload.keys()) == {
         "jeedom_eq_id", "eq_name", "mapped", "eligible", "equipment_publication_override",
         "equipment_decision", "entities", "sync_status", "commands",
+        "hints",  # Front v2 Lot 3 (champ additif) : conseils prudents
     }
+    assert payload["hints"] == []
     assert payload["eligible"] is True
     assert payload["equipment_publication_override"] is None
     assert payload["equipment_decision"] == _EXPECTED_COMMAND_DIAGNOSTIC
@@ -99,6 +101,15 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
         "override_pending": True,
         # Story 22.2 (champ additif) : présence réelle de l'entité dans HA.
         "present_in_ha": False,
+        # Front v2 Lot 3 (champs additifs) : lus dans le payload de découverte réel.
+        "ha_unique_id": f"jeedom2ha_eq_{EQ_ID}",
+        "ha_default_entity_id": f"light.jeedom2ha_{EQ_ID}",
+        "ha_name": None,
+        "ha_device_name": "Lampe garde-fou",
+        "ha_device_class": None,
+        "ha_unit": None,
+        "ha_controllable": True,
+        "ha_capabilities": ["on_off", "read"],
     }]
 
     for row, cmd in zip(payload["commands"], eq.cmds):
@@ -107,7 +118,10 @@ async def test_guardrail_tree_response_identical_to_pre_story_except_sync_status
             "attendu_ha", "effective_ha", "override_applied", "diagnostic",
             "published_in_ha",  # Story 22.2 (champ additif)
             "override_types_allowed",  # Story 22.2 R2 (champ additif)
+            "cmd_type", "cmd_sub_type", "linked_state_cmd_id",  # Front v2 Lot 3 (champs additifs)
         }
+        assert row["cmd_type"] == cmd.type and row["cmd_sub_type"] == cmd.sub_type
+        assert row["linked_state_cmd_id"] is None
         assert row["override_types_allowed"] == sorted(row["override_types_allowed"])
         assert "light" in row["override_types_allowed"]
         assert row["jeedom_cmd_id"] == cmd.id
@@ -147,7 +161,12 @@ async def test_guardrail_preview_response_identical_to_pre_story(cli, app, tmp_p
     assert set(payload.keys()) == {
         "jeedom_eq_id", "mapped", "covered", "auto", "overridden",
         "native_generic_types", "support_export",
+        # Front v2 Lot 3 (champs additifs) : aperçu en entités.
+        "entities_before", "entities_after", "entity_id_changes",
     }
+    assert payload["entities_before"] == payload["entities_after"]
+    assert [e["ha_default_entity_id"] for e in payload["entities_after"]] == [f"light.jeedom2ha_{EQ_ID}"]
+    assert payload["entity_id_changes"] == []
     assert payload["mapped"] is True
     assert payload["covered"] is True
     assert payload["auto"] == _EXPECTED_COMMAND_DIAGNOSTIC

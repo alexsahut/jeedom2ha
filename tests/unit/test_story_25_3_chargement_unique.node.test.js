@@ -164,10 +164,20 @@ describe('25.3 / AC6, Q7 — événements, coalescence 500 ms', () => {
     assert.equal(h.pending(), 1);
   });
 
-  it('aucune minuterie périodique (setInterval) dans les sources', () => {
-    for (const file of fs.readdirSync('desktop/js').filter((f) => f.endsWith('.js'))) {
-      assert.doesNotMatch(fs.readFileSync('desktop/js/' + file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''), /setInterval/, file);
+  // Garde levée (front v2, Lot 1, spec E0) : la barre d'état est relue toutes les 30 s tant que l'onglet est visible. La
+  // minuterie est UNIQUE, dans jeedom2ha.js, et ne relit que getBridgeStatus (refreshBridgeStatus) ; la lecture des états
+  // (getEquipmentStates) n'a toujours aucune minuterie périodique, et aucun autre fichier n'en a.
+  it('aucune minuterie périodique (setInterval) dans les sources, sauf la relecture de la barre d\'état', () => {
+    const strip = (file) => fs.readFileSync('desktop/js/' + file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const file of fs.readdirSync('desktop/js').filter((f) => f.endsWith('.js') && f !== 'jeedom2ha.js')) {
+      assert.doesNotMatch(strip(file), /setInterval/, file);
     }
+    const home = strip('jeedom2ha.js');
+    assert.equal((home.match(/setInterval\(/g) || []).length, 1, 'une seule minuterie périodique');
+    const body = home.slice(home.indexOf('window.setInterval(function() {'), home.indexOf('}, J2HA_BRIDGE_REFRESH_MS);'));
+    assert.ok(body.length > 0);
+    assert.doesNotMatch(body, /getEquipmentStates|j2haNotifyStatesChanged|reader|\$\.ajax/);
+    assert.match(body, /refreshBridgeStatus\(\);/);
   });
 });
 

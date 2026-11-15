@@ -17,10 +17,17 @@
  *
  * Story 25.6 : une carte ouvre la vue sur la PIÈCE SEULE (`data-j2ha-scope="piece"`). L'étape 2 vérifie d'abord cette portée
  * (`portee-piece-seule` : une seule pièce dans l'arbre, ses repères égaux à ceux de la carte, `seule:1` dans l'URL), puis
- * active « Toutes les pièces » sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
+ * active « Toute la maison » (bouton `.j2ha-wv-widen`, Lot 7 ; « Toutes les pièces » en 25.6) sans requête du plugin (`requete-pendant-elargissement`) et exécute SANS CHANGEMENT les
  * assertions existantes (toutes les pièces de la page, mêmes repères). Étapes 3 à 9 inchangées dans leurs exigences.
  *
- * Story 25.7 : l'étape 10 (`cause-exclusion`, lecture seule) vérifie, dans l'arbre élargi filtré sur « exclus et autres »,
+ * Front v3 (Lot 2) : la portée « pièce seule » et la bascule « Cette pièce | Toute la maison » sont supprimées (un seul arbre de
+ * toute la maison). L'étape 2 vérifie désormais l'arbre unique (`arbre-unique` : `data-j2ha-scope="toutes"`, toutes les pièces
+ * de la page, la pièce de la carte dépliée et sélectionnée, aucune bascule, URL sans `seule:1`), puis exécute SANS CHANGEMENT
+ * les assertions de 25.4 (toutes les pièces, mêmes repères). L'étape 3 vérifie aussi « n résultats » dans le volet de droite
+ * pendant une recherche. L'arbre n'affiche plus que l'icône d'état : le mot d'état et la cause d'exclusion sont lus dans son
+ * nom accessible (`aria-label`), sous la même forme du glossaire.
+ *
+ * Story 25.7 : l'étape 10 (`cause-exclusion`, lecture seule) vérifie, dans l'arbre élargi filtré sur « exclus ou inactifs » (« exclus et autres » avant le Lot 7),
  * que chaque ligne « Exclu » porte une mention de cause de la forme du glossaire (ou aucune), qu'aucune ligne « Désactivé »
  * n'en porte, et que la somme des repères « N exclus » des cartes égale le nombre de lignes « Exclu » ; zéro requête du plugin.
  *
@@ -64,10 +71,12 @@ async function readCards(page) {
     ratio: [...(card.querySelector('.j2ha-room-ratio')?.childNodes ?? [])]
       // Story 24.4 (R1) : idem pour « · N gardés (HomeKit) » (`j2ha-room-homekit-kept`), propre à la carte.
       .filter((node) => !(node.classList && (node.classList.contains('j2ha-room-notyet') || node.classList.contains('j2ha-room-homekit-kept'))))
-      .map((node) => node.textContent ?? '').join('').replace(/ publiés?$/, '').trim(),
+      // Front v3 (Lot 1, garde levée) : la tuile écrit « 2/4 » (sans espaces ni mot) ; l'arbre « 2 / 4 » : espaces ignorés.
+      .map((node) => node.textContent ?? '').join('').replace(/ publiés?$/, '').replace(/\s+/g, '').trim(),
     excluded: Number(((card.querySelector('.j2ha-room-marks .j2ha-mark-excluded')?.textContent ?? '').match(/^\d+/) ?? ['0'])[0]),
     // Les repères « non lus » (25.3) et « N exclus » (25.7) n'ont pas d'équivalent dans les repères de l'arbre.
-    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$/.test(text)),
+    // Front v3 (Lot 1, garde levée) : ni « N désactivés » ni « N rien à publier » (marques de la tuile, cible §1).
+    marks: [...card.querySelectorAll('.j2ha-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()).filter((text) => !/non lus?$|exclus?$|désactivés?$|rien à publier$/.test(text)),
   })));
 }
 
@@ -85,29 +94,28 @@ async function checkOpen(page, helpers) {
 }
 
 /**
- * (2, Story 25.6) Depuis une carte : l'arbre ne contient QUE la pièce de la carte cliquée, ses repères égalent ceux de la
- * carte, l'URL porte `seule:1` ; puis « Toutes les pièces » élargit sans aucune requête du plugin.
+ * (2, front v3 Lot 2) Depuis une carte : UN arbre de toute la maison, la pièce de la carte dépliée et sélectionnée, ses repères
+ * égaux à ceux de la carte, aucune bascule de portée, l'URL sans `seule:1`.
  */
-async function checkScopeAndWiden(page, helpers, cards) {
+async function checkOneTree(page, helpers, cards) {
   const opened = cards[0];
   const scope = await page.locator(VIEW).getAttribute('data-j2ha-scope');
   const rooms = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-room`).evaluateAll((nodes) => nodes.map((room) => ({
     id: room.getAttribute('data-object_id'),
+    selected: room.getAttribute('aria-selected') === 'true',
+    expanded: room.getAttribute('aria-expanded') === 'true',
     // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
-    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).replace(/\s+/g, '').trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const hash = await page.evaluate(() => window.location.hash);
-  if (scope !== 'piece' || rooms.length !== 1 || rooms[0].id !== opened.id || !/;seule:1$/.test(hash)) throw new Error('portee-piece-seule');
-  if (rooms[0].ratio !== opened.ratio || JSON.stringify(rooms[0].marks) !== JSON.stringify(opened.marks)) throw new Error('portee-piece-seule');
-  helpers.record('portee_ouverture', 'piece');
-  helpers.record('pieces_arbre_portee_piece', rooms.length);
-  const before = pluginCalls(helpers);
-  await page.locator(`${VIEW} .j2ha-wv-widen`).click();
-  await page.waitForFunction((selector) => document.querySelector(selector)?.getAttribute('data-j2ha-scope') === 'toutes', VIEW, { timeout: 5000 })
-    .catch(() => { throw new Error('portee-piece-seule'); });
-  if (pluginCalls(helpers) !== before) throw new Error('requete-pendant-elargissement');
-  helpers.record('requetes_pendant_elargissement', 0);
+  const toggles = await page.locator(`${VIEW} .j2ha-wv-scope, ${VIEW} .j2ha-wv-widen, ${VIEW} .j2ha-wv-narrow`).count();
+  const room = rooms.find((item) => item.id === opened.id);
+  if (scope !== 'toutes' || rooms.length !== cards.length || !room || !room.selected || !room.expanded || toggles !== 0 || /seule:1/.test(hash)) {
+    throw new Error('arbre-unique');
+  }
+  if (room.ratio !== opened.ratio || JSON.stringify(room.marks) !== JSON.stringify(opened.marks)) throw new Error('arbre-unique');
+  helpers.record('portee_ouverture', 'toutes');
 }
 
 /** (2) L'arbre contient toutes les pièces de la page B ; ses repères somment aux nombres de la page B. */
@@ -115,7 +123,7 @@ async function checkTree(page, helpers, cards) {
   const tree = await page.locator(`${VIEW} .j2ha-wv-room`).evaluateAll((rooms) => rooms.map((room) => ({
     id: room.getAttribute('data-object_id'),
     // Story 25.8 : une pièce exclue n'a plus de ratio ; la carte et l'arbre affichent « Pièce exclue » à sa place.
-    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).trim(),
+    ratio: ((room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-ratio')?.textContent ?? '') || (room.querySelector(':scope > .j2ha-wv-row .j2ha-wv-excluded')?.textContent ?? '')).replace(/\s+/g, '').trim(),
     marks: [...room.querySelectorAll(':scope > .j2ha-wv-row .j2ha-wv-room-marks .j2ha-mark')].map((mark) => (mark.textContent ?? '').trim()),
   })));
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -151,6 +159,12 @@ async function checkFilters(page, helpers) {
   await search.fill(query);
   await page.waitForTimeout(400);
   if ((await page.locator(`${VIEW} .j2ha-wv-room`).count()) < 1) throw new Error('recherche-sans-resultat');
+  // Front v3 (Lot 2) : pendant la recherche, le volet de droite dit « n résultats » (autant que de lignes d'équipement).
+  const found = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-eq`).count();
+  const title = ((await page.locator(`${VIEW} .j2ha-wv-results-title`).textContent()) ?? '').trim();
+  if (!(await page.locator(`${VIEW} .j2ha-wv-results`).isVisible()) || Number(title.replace(/[^0-9].*$/, '')) !== found) {
+    throw new Error('resultats-recherche');
+  }
   await search.fill('');
   await page.waitForTimeout(400);
   if (pluginCalls(helpers) !== before) throw new Error('requete-pendant-filtre');
@@ -163,7 +177,8 @@ async function checkSelection(page, helpers) {
   const before = reads(helpers, 'getMappingOverrides');
   const row = page.locator(`${VIEW} .j2ha-wv-eq`).first();
   const eqId = await row.getAttribute('data-eq-id');
-  const treeWord = ((await row.locator('.j2ha-state-word').first().innerText()) ?? '').trim();
+  // Front v3 (Lot 2) : icône seule dans l'arbre ; le mot d'état est le premier segment de son nom accessible.
+  const treeWord = ((await row.locator('.j2ha-state-word').first().getAttribute('aria-label')) ?? '').split(' · ')[0].trim();
   const started = Date.now();
   await row.locator('.j2ha-wv-row').click();
   const panel = page.locator(`${VIEW} .j2ha-eq-panel[data-eq-id="${eqId}"]`);
@@ -247,14 +262,15 @@ async function checkBack(page, helpers) {
 /** (10, Story 25.7) Cause d'exclusion : mentions de l'arbre conformes au glossaire, jamais sur un « Désactivé », somme des cartes = lignes « Exclu ». */
 async function checkExclusionCause(page, helpers, cards) {
   const before = pluginCalls(helpers);
-  if ((await page.locator(VIEW).getAttribute('data-j2ha-scope')) === 'piece') await page.locator(`${VIEW} .j2ha-wv-widen`).click();
   const chip = page.locator(`${VIEW} .j2ha-wv-chips .j2ha-chip-filter[data-filter="other"]`);
   const usable = (await chip.count()) > 0 && !(await chip.isDisabled());
   if (usable) await chip.click();
-  const rows = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-eq`).evaluateAll((items) => items.map((item) => ({
-    state: (item.querySelector('.j2ha-state-word')?.textContent ?? '').trim(),
-    cause: item.querySelector('.j2ha-wv-cause') ? (item.querySelector('.j2ha-wv-cause').textContent ?? '').trim() : null,
-  })));
+  // Front v3 (Lot 2) : « Exclu · par la pièce » — mot d'état puis cause, dans le nom accessible de l'icône d'état.
+  const rows = await page.locator(`${VIEW} .j2ha-wv-tree .j2ha-wv-eq`).evaluateAll((items) => items.map((item) => {
+    const parts = (item.querySelector('.j2ha-wv-state-icon')?.getAttribute('aria-label') ?? '').split(' · ');
+    const extra = parts.slice(1).filter((part) => part !== 'désactivé dans Jeedom' && !/^\d+ bloquées?$/.test(part));
+    return { state: item.querySelector('.j2ha-state-word') ? parts[0].trim() : '', cause: extra.length ? extra.join(' · ').trim() : null };
+  }));
   const FORM = /^(par le plugin .+|par son plugin|par la pièce|individuelle)$/;
   const excluded = rows.filter((row) => row.state === 'Exclu');
   if (excluded.some((row) => row.cause !== null && !FORM.test(row.cause))) throw new Error('cause-exclusion-hors-glossaire');
@@ -298,7 +314,7 @@ export async function run(page, { helpers }) {
   const cards = await readCards(page);
   await atStep(helpers, 1, 'ouverture-sans-lecture', () => checkOpen(page, helpers));
   await atStep(helpers, 2, 'arbre-et-reperes', async () => {
-    await checkScopeAndWiden(page, helpers, cards);
+    await checkOneTree(page, helpers, cards);
     await checkTree(page, helpers, cards);
   });
   await atStep(helpers, 3, 'recherche-et-filtres', () => checkFilters(page, helpers));

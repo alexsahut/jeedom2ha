@@ -227,6 +227,21 @@ function createDom() {
     each(this, (el) => args.forEach((arg) => toNodes(arg).slice().reverse().forEach((n) => { n.parent = el; el.children.unshift(n); })));
     return this;
   };
+  // Front v2 (Lot 5) : le panneau « Corriger le type » est inséré sous la ligne de la commande (`$tr.after($row)`).
+  proto.after = function (...args) {
+    each(this, (el) => {
+      const parent = el.parent;
+      if (!parent) return;
+      let at = parent.children.indexOf(el) + 1;
+      args.forEach((arg) => toNodes(arg).forEach((n) => {
+        if (n.parent) n.parent.children = n.parent.children.filter((c) => c !== n);
+        n.parent = parent;
+        parent.children.splice(at, 0, n);
+        at += 1;
+      }));
+    });
+    return this;
+  };
   proto.toggleClass = function (names, state) {
     each(this, (el) => String(names).split(/\s+/).filter(Boolean).forEach((c) => {
       const on = state === undefined ? !el.classes.has(c) : !!state;

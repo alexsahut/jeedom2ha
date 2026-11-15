@@ -107,6 +107,14 @@ def normalize_finite_number(value: Any) -> Optional[float]:
     return number if math.isfinite(number) else None
 
 
+_SCENARIO_MODES = ("provoke", "schedule", "all")
+
+
+def _normalize_scenario_mode(value: Any) -> Optional[str]:
+    """Front v3 (Lot 4a) — mode Jeedom d'un scénario (`scenario::getMode()`), sinon None."""
+    return value if isinstance(value, str) and value in _SCENARIO_MODES else None
+
+
 def _normalize_homekit_source(value: Any) -> Optional[str]:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -225,11 +233,26 @@ class JeedomScenario:
     # Story 24.1 — signal d'exposition HomeKit du scénario (lecture seule, tri-état)
     homekit_exposed: Optional[bool] = None
     homekit_exposed_source: Optional[str] = None
+    # Front v3 (Lot 4a, option B) — publication choisie par l'utilisateur (`publishedScenarios`).
+    # None = champ absent (PHP d'avant le Lot 4a, ou configuration non migrée) : publié comme avant.
+    published: Optional[bool] = None
+    # Front v3 (Lot 4a) — lectures transmises au front par le statut, sans effet sur la projection.
+    is_new: Optional[bool] = None
+    group: Optional[str] = None
+    mode: Optional[str] = None
+    has_trigger: Optional[bool] = None
+    has_schedule: Optional[bool] = None
+    manual: Optional[bool] = None
 
     @property
     def homekit_exposed_effective(self) -> Optional[bool]:
         """Story 24.4 (Q4-5) — même règle que pour les équipements, avec ``is_active``."""
         return compute_homekit_exposed_effective(self.homekit_exposed, self.is_active)
+
+    @property
+    def publication_selected(self) -> bool:
+        """Front v3 (Lot 4a) — seul un refus explicite (`published: false`) retire le bouton."""
+        return self.published is not False
 
 @dataclass
 class EligibilityResult:
@@ -334,6 +357,14 @@ class TopologySnapshot:
                     is_active=_to_bool(sc_raw.get("is_active"), default=True),
                     homekit_exposed=_to_tristate(sc_raw.get("homekit_exposed")),
                     homekit_exposed_source=_normalize_homekit_source(sc_raw.get("homekit_exposed_source")),
+                    # Front v3 (Lot 4a) — champs additifs ; absents = None (comportement inchangé).
+                    published=_to_tristate(sc_raw.get("published")),
+                    is_new=_to_tristate(sc_raw.get("is_new")),
+                    group=sc_raw.get("group") if isinstance(sc_raw.get("group"), str) else None,
+                    mode=_normalize_scenario_mode(sc_raw.get("mode")),
+                    has_trigger=_to_tristate(sc_raw.get("has_trigger")),
+                    has_schedule=_to_tristate(sc_raw.get("has_schedule")),
+                    manual=_to_tristate(sc_raw.get("manual")),
                 )
             except (ValueError, TypeError, KeyError):
                 continue

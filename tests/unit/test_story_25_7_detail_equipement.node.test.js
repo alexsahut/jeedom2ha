@@ -51,19 +51,26 @@ describe('25.7 / AC4 — encart de cause du détail d\'équipement', () => {
     assert.equal(notice.attr('role'), 'status');
     assert.ok(notice.hasClass('j2ha-notice-neutral'));
     assert.equal(ui.$('.j2ha-eq-exclusion .fa-eye-slash').length, 1);
-    assert.equal(plain(ui.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Exclu par le plugin Alpha (configuration du plugin, « Plugins exclus »)');
+    // Garde levée (front v3, Lot 3) : la phrase de mapping_override.js (« … configuration du plugin, « Plugins exclus » ») est
+    // traduite à l'affichage (« Plugin exclu : Alpha » + ⓘ) : la configuration ne règle plus ce qui est publié. Le bouton mène
+    // au panneau « Choisir ce qui est publié » (vérifié en vrai Chromium, test_front_v3_lot3_panneaux) ; ce banc n'a pas la
+    // page entière : repli sur le lien de la configuration, qui renvoie au panneau.
+    assert.equal(plain(ui.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Plugin exclu : Alpha');
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(plain(ui.$('.j2ha-eq-exclusion .j2ha-v3-info').attr('data-j2ha-tip')), /Choisir ce qui est publié/);
     const link = ui.$('.j2ha-eq-exclusion .j2ha-open-plugin-config');
     assert.equal(link.length, 1);
-    assert.equal(link.attr('href'), 'index.php?v=d&p=plugin&id=jeedom2ha');
-    assert.equal(link.attr('rel'), 'noopener');
+    assert.equal(plain(link.text()).trim(), 'Choisir ce qui est publié');
     assert.equal(plain(ui.$('.j2ha-eq-panel .j2ha-eq-publish-badge').text()).trim(), 'Exclu', 'le mot d\'état reste « Exclu »');
     assert.equal(ui.count('executeHaAction'), 0, 'aucune écriture');
   });
 
-  maybe('par la pièce, individuelle : phrases de D1, pas de lien', () => {
+  // Garde levée (front v3, Lot 3) : la pièce exclue porte aussi le bouton « Choisir ce qui est publié » (ouvert sur la pièce).
+  maybe('par la pièce, individuelle : phrases de D1 ; pièce : bouton vers le panneau, pas celui du plugin', () => {
     const room = open(202);
     assert.equal(plain(room.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Exclu par la pièce : toute la pièce est exclue');
     assert.equal(room.$('.j2ha-eq-exclusion .j2ha-open-plugin-config').length, 0);
+    assert.equal(room.$('.j2ha-eq-exclusion .j2ha-open-room-choose').length, 1);
     const never = open(203);
     assert.equal(plain(never.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Exclusion individuelle : réglage « Jamais »');
     assert.equal(never.$('.j2ha-eq-exclusion .j2ha-notice').length, 1);
@@ -71,7 +78,7 @@ describe('25.7 / AC4 — encart de cause du détail d\'équipement', () => {
 
   maybe('plugin inconnu de la page : l\'identifiant (repli) ; nom vide impossible côté page, « son plugin » côté fonction', () => {
     const ui = open(204);
-    assert.equal(plain(ui.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Exclu par le plugin plugin_gone (configuration du plugin, « Plugins exclus »)');
+    assert.equal(plain(ui.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Plugin exclu : plugin_gone');
   });
 
   maybe('équipement désactivé : aucun encart ; état « Désactivé »', () => {
@@ -102,12 +109,16 @@ describe('25.7 / AC4 — encart de cause du détail d\'équipement', () => {
   maybe('les lignes d\'arbre portent la mention courte de la cause, nom du plugin compris', () => {
     const ui = startWorkview({ scene: SCENE, equipments: ENTRIES });
     openCard(ui, 2);
-    const mention = (eqId) => plain(ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-cause`).text()).trim();
+    // Garde levée (front v3, Lot 2) : l'arbre n'affiche plus que l'icône d'état ; la mention courte de la cause est portée par
+    // son info-bulle et son nom accessible (« Exclu · par le plugin Alpha »), toujours absente pour un désactivé.
+    const label = (eqId) => plain(ui.$(`.j2ha-wv-eq[data-eq-id="${eqId}"] .j2ha-wv-state-icon`).attr('aria-label') || '');
+    const mention = (eqId) => label(eqId).split(' · ').slice(1).join(' · ');
     assert.equal(mention(201), 'par le plugin Alpha');
     assert.equal(mention(202), 'par la pièce');
     assert.equal(mention(203), 'individuelle');
     assert.equal(mention(204), 'par le plugin plugin_gone');
-    assert.equal(ui.$('.j2ha-wv-eq[data-eq-id="205"] .j2ha-wv-cause').length, 0, 'un désactivé n\'a jamais de mention');
+    assert.equal(ui.$(`.j2ha-wv-eq[data-eq-id="201"] .j2ha-wv-state-icon`).attr('title'), ui.$(`.j2ha-wv-eq[data-eq-id="201"] .j2ha-wv-state-icon`).attr('aria-label'));
+    assert.doesNotMatch(label(205), /plugin|pièce|individuelle/, 'un désactivé n\'a jamais de mention');
     const exclusion = plain(ui.$('.j2ha-wv-exclusion').text()).trim();
     assert.match(exclusion, /^Exclus : /);
     assert.match(exclusion, /par le plugin Alpha/);

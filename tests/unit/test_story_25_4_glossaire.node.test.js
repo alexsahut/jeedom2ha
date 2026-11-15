@@ -26,8 +26,12 @@ function labels(code) {
 describe('25.4 / AC26 — libellés de la vue', () => {
   it('les libellés exigés par la story passent par {{…}} et aucun fichier core/i18n n’existe', () => {
     const found = labels(source);
-    for (const label of ['Toutes les pièces', 'Page principale', 'Exclus', 'Pièces', 'Masquer les pièces', 'Rechercher une pièce ou un équipement', 'À traiter dans cette pièce',
-      'Rien à traiter dans cette pièce', 'Aucun résultat', 'Sélectionnez une pièce ou un équipement', 'Pièces et équipements', 'Indicateurs de la pièce',
+    // Garde levée (front v2, Lot 7, spec E3) : « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », et la
+    // recherche, toujours globale, s'annonce « Rechercher dans toute la maison » (groupe « Dans les autres pièces »).
+    // Garde levée (front v3, Lot 2) : la bascule et « Page principale » disparaissent (fil d'Ariane « Maison »), la recherche
+    // s'appelle « Rechercher » et dit « résultats », une pièce saine dit « Rien à faire ».
+    for (const label of ['Maison', 'Non lu', 'résultats', 'Résultats', 'Dans les autres pièces', 'Conseils dans cette pièce', 'Exclus', 'Pièces', 'Masquer les pièces', 'Rechercher', 'À traiter dans cette pièce',
+      'Rien à faire', 'Aucun résultat', 'Sélectionnez une pièce ou un équipement', 'Pièces et équipements', 'Indicateurs de la pièce',
       "Fil d'Ariane", 'Replier', 'Déplier', 'Appliquer', 'Ouvrir les types génériques']) {
       assert.ok(found.includes(label), label);
     }
@@ -50,7 +54,7 @@ describe('25.4 / AC26 — libellés de la vue', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17, unread: 2 });
     openCard(ui, 10);
     for (const el of ui.$('.j2ha-wv-tree .j2ha-state-text').list) assert.ok(Object.values(M.EQUIPMENT_STATE_LABELS).includes(plain(ui.$(el).text()).trim()));
-    for (const selector of ['.j2ha-wv-chip', '.j2ha-wv-kpi', '.j2ha-wv-back', '.j2ha-wv-widen', '.j2ha-wv-drawer-toggle', '.j2ha-room-republish', '.j2ha-wv-todo-apply', '.j2ha-mark', '.j2ha-wv-todo-title']) {
+    for (const selector of ['.j2ha-wv-chip', '.j2ha-wv-kpi', '.j2ha-wv-back', '.j2ha-wv-widen', '.j2ha-wv-narrow', '.j2ha-wv-drawer-toggle', '.j2ha-room-republish', '.j2ha-wv-todo-apply', '.j2ha-mark', '.j2ha-wv-todo-title']) {
       ui.$('.j2ha-wv ' + selector).list.forEach((el) => assert.doesNotMatch(plain(ui.$(el).text()).trim(), /\.$/, selector));
     }
     const rendered = plain(ui.$('#j2ha_workView').text());

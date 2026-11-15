@@ -1,0 +1,162 @@
+'use strict';
+
+// Front v2 — Lot 0 (socle) : ordre des scripts, points de montage invisibles tant qu'ils sont vides,
+// modules chargeables sous node, aucune couleur en dur dans jeedom2ha_v2.css.
+
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const php = read('desktop/php/jeedom2ha.php');
+const css = read('desktop/css/jeedom2ha_v2.css');
+
+const MODULES = [
+  ['jeedom2ha_lexique', 'Jeedom2haLexique'],
+  ['jeedom2ha_ha_side', 'Jeedom2haHaSide'],
+  ['jeedom2ha_guide', 'Jeedom2haGuide'],
+  ['jeedom2ha_exclusions', 'Jeedom2haExclusions'],
+  ['jeedom2ha_type_panel', 'Jeedom2haTypePanel'],
+];
+
+function includes(kind) {
+  const re = new RegExp("include_file\\('desktop', '([a-z0-9_]+)', '" + kind + "', 'jeedom2ha'\\)", 'g');
+  return [...php.matchAll(re)].map((m) => m[1]);
+}
+
+describe('Front v2 — Lot 0 : include_file de la page', () => {
+  it('feuilles de style : jeedom2ha puis jeedom2ha_v2', () => {
+    assert.deepEqual(includes('css'), ['jeedom2ha', 'jeedom2ha_v2']);
+  });
+
+  it('scripts dans l\'ordre prescrit', () => {
+    assert.deepEqual(includes('js'), [
+      'jeedom2ha_mapping_override',
+      // Garde levée (front v3, Lot 6) : composant d'aide ⓘ partagé, chargé avant tous les modules qui rendent une ⓘ.
+      'jeedom2ha_infotip',
+      'jeedom2ha_lexique',
+      'jeedom2ha_ha_side',
+      'jeedom2ha_mapping_surface',
+      'jeedom2ha_type_panel',
+      'jeedom2ha_action_budget',
+      'jeedom2ha_overview',
+      'jeedom2ha_workview',
+      'jeedom2ha_guide',
+      'jeedom2ha_exclusions',
+      // Garde levée (front v3, Lot 4b) : onglet Scénarios, chargé après les modules dont il lit l'état et avant jeedom2ha.js.
+      'jeedom2ha_scenarios',
+      'jeedom2ha',
+    ]);
+    assert.ok(php.indexOf("include_file('desktop', 'jeedom2ha', 'js'") < php.indexOf("include_file('core', 'plugin.template', 'js')"));
+  });
+
+  it('chaque script inclus existe', () => {
+    for (const name of includes('js')) assert.ok(fs.existsSync(path.join(ROOT, 'desktop/js', name + '.js')), name);
+    assert.ok(fs.existsSync(path.join(ROOT, 'desktop/css/jeedom2ha_v2.css')));
+  });
+
+  it('réglages courants transmis au JS', () => {
+    assert.match(php, /sendVarToJS\('j2haExcludedPlugins', \(string\) config::byKey\('excludedPlugins', 'jeedom2ha', ''\)\)/);
+    assert.match(php, /sendVarToJS\('j2haConfidencePolicy', \(string\) config::byKey\('confidencePolicy', 'jeedom2ha', 'sure_probable'\)\)/);
+  });
+});
+
+describe('Front v2 — Lot 0 : points de montage', () => {
+  const emptyDiv = (id) => new RegExp('<div id="' + id + '" class="[^"]+"[^>]*></div>');
+
+  // Garde levée (front v3, Lot 1, « zéro paragraphe ») : la phrase d'aide (#j2ha_v2_helpline) et la légende
+  // (#j2ha_v2_legend) sont retirées de la page ; leurs points de montage aussi.
+  it('conteneurs vides présents', () => {
+    for (const id of ['j2ha_v2_helpline', 'j2ha_v2_legend']) assert.ok(!php.includes('id="' + id + '"'), id + ' retiré');
+    for (const id of ['j2ha_v2_guide', 'j2ha_v2_todo', 'j2ha_v2_toast']) {
+      assert.match(php, emptyDiv(id), id);
+      assert.equal(php.split('id="' + id + '"').length, 2, id + ' unique');
+    }
+    assert.match(php, /id="j2ha_v2_toast"[^>]*aria-live="polite"/);
+  });
+
+  it('positions : guide avant la vue principale, à faire après le bloc maison et avant la grille', () => {
+    const at = (s) => { const i = php.indexOf(s); assert.ok(i >= 0, s); return i; };
+    assert.ok(at('id="j2ha_v2_guide"') < at('<div id="j2ha_mainView">'));
+    assert.ok(at('id="j2ha_houseBlock"') < at('id="j2ha_v2_todo"'));
+    assert.ok(at('id="j2ha_v2_todo"') < at('id="j2ha_roomCards"'));
+    assert.ok(at('id="j2ha_roomCards"') < at('/#j2ha_mainView'));
+  });
+
+  // Garde levée au Lot 1 : les entrées réservées sont branchées dans le menu « Autres actions » (actives) et l'item
+  // « Home Assistant » porte son libellé ; le conteneur réservé n'existe plus.
+  it('bouton réservé masqué ; entrées du Lot 1 branchées dans le menu ; item Home Assistant libellé et visible (gris) par défaut', () => {
+    assert.match(php, /<button type="button" id="bt_j2haChoosePublished"[^>]* hidden>/);
+    assert.ok(!php.includes('j2ha_v2_menuReserved'), 'plus de conteneur réservé');
+    const menu = php.slice(php.indexOf('id="j2ha_moreMenu"'), php.indexOf('j2ha-menu-sep'));
+    assert.match(menu, /id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">/);
+    assert.match(menu, /id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">/);
+    // Garde levée (front v3, Lot 1) : pastille « point + mot », le mot porté par `data-word`, toujours visible (grise si inconnue).
+    // Garde levée (front v3, Lot 6) : la pastille porte aussi `j2ha-tip` (focusable, bulle au clic) ; même mot, même niveau.
+    assert.match(php, /<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">\s*<span id="span_healthHa" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip"[^>]*? data-word="\{\{Home Assistant\}\}" data-level="unknown"/);
+  });
+
+  it('CSS : les conteneurs vides ne s\'affichent pas', () => {
+    for (const cls of ['guide', 'helpline', 'todo', 'legend', 'toast']) {
+      assert.match(css, new RegExp('\\.j2ha-v2-' + cls + ':empty[,\\s{]'), cls);
+    }
+    assert.match(css, /\.j2ha-v2-guide:empty,[\s\S]*?\{\s*display: none;/);
+  });
+});
+
+describe('Front v2 — Lot 0 : modules', () => {
+  for (const [file, globalName] of MODULES) {
+    it(file + ' : chargeable sous node et expose ' + globalName + ' dans la page', () => {
+      const full = path.join(ROOT, 'desktop/js', file + '.js');
+      delete require.cache[full];
+      const mod = require(full);
+      assert.equal(typeof mod, 'object');
+      assert.ok(mod !== null);
+
+      const src = fs.readFileSync(full, 'utf8');
+      const root = {};
+      // Hors node : la globale est posée sur la racine (window dans la page).
+      new Function('globalThis', 'module', src)(root, undefined);
+      assert.equal(typeof root[globalName], 'object', globalName);
+      assert.doesNotMatch(src, /COMMAND_CAUSE_CATEGORIES|categoryOfCause|JSON\.stringify/);
+    });
+  }
+});
+
+describe('Front v2 — Lot 0 : jeedom2ha_v2.css', () => {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('aucune couleur en dur (hexadécimal, rgb/hsl, nom de couleur)', () => {
+    assert.doesNotMatch(code, /#[0-9a-fA-F]{3,8}\b/);
+    assert.doesNotMatch(code, /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/);
+    const named = /(?:^|[\s:,(])(white|black|red|green|blue|orange|gray|grey|yellow|purple|silver|navy)(?=[\s;,)!]|$)/im;
+    assert.doesNotMatch(code, named);
+  });
+
+  it('les couleurs viennent des variables de thème', () => {
+    const decls = [...code.matchAll(/(?:^|[;{\s])((?:background|color|border(?:-[a-z]+)*|box-shadow|outline)\s*:[^;}]+)/g)].map((m) => m[1]);
+    assert.ok(decls.length > 20);
+    assert.match(code, /var\(--j2ha-ok\)/);
+    assert.match(code, /var\(--j2ha-warn\)/);
+    assert.match(code, /var\(--j2ha-todo\)/);
+  });
+
+  it('composants de la maquette présents', () => {
+    for (const cls of ['two', 'side', 'cause', 'steps', 'step', 'foot', 'toast', 'panel', 'diff']) {
+      assert.match(code, new RegExp('\\.j2ha-v2-' + cls + '\\b'), cls);
+    }
+  });
+
+  // Garde levée (front v3, Lot 1) : les lots v3 ajoutent leurs blocs ici avec des classes `j2ha-v3-…`. Une classe existante de
+  // jeedom2ha.css n'apparaît que dans un sélecteur restreint par une classe `j2ha-v3-…` (aucune règle existante redéfinie).
+  it('ne redéfinit aucune classe existante de jeedom2ha.css', () => {
+    const parts = [...code.matchAll(/([^{}]+)\{[^{}]*\}/g)].flatMap((m) => m[1].split(',')).map((p) => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      const classes = [...part.matchAll(/\.(j2ha-[a-z0-9_-]+)/g)].map((m) => m[1]);
+      const scoped = classes.some((c) => c.startsWith('j2ha-v3-'));
+      for (const c of classes) assert.ok(c === 'j2ha-v2' || c.startsWith('j2ha-v2-') || c.startsWith('j2ha-v3-') || scoped, part);
+    }
+  });
+});

@@ -6,6 +6,27 @@
 
 ---
 
+# 2026-11-14 — Refonte de l'interface (front v3)
+
+- **Plus de phrases à l'écran.** Un état se lit à sa couleur, son icône et son mot ; l'explication est dans l'info-bulle, et « En savoir plus » mène à la documentation, réécrite écran par écran.
+- **Barre d'état sur une ligne** : pastilles Démon, MQTT et Home Assistant, « Relu HH:MM », ✓ « Rien à faire » seulement après une relecture réussie de moins de 24 h (sinon « Non vérifié »), bouton « Appliquer (n) » quand des réglages attendent, ⚙ pour la configuration, menu « ⋯ » pour le reste.
+- **Page maison** : le chiffre « publiés sur le total », des puces qui filtrent les pièces, une seule liste « À faire », des tuiles de pièce compactes.
+- **Pièce et fiche** : un arbre de toute la maison avec recherche, un fil d'Ariane cliquable, une cause en une ligne avec le bouton qui corrige.
+- **« Corriger le type »** s'ouvre par-dessus la page ; **« Choisir ce qui est publié »** n'a plus qu'une entrée, avec des cases à trois états ; la configuration ne garde que le broker.
+- **Scénarios au choix**, dans un nouvel onglet « Scénarios » : les scénarios déjà publiés le restent, rien ne disparaît de Home Assistant ; un scénario créé ensuite arrive **non publié**, marqué ✱, et se publie d'un interrupteur, puis « Appliquer ». Sur une installation neuve, aucun scénario n'est publié avant votre choix.
+- Le guide de démarrage ne dit « Fait » que pour ce qu'il a constaté, et ne revient plus une fois terminé.
+- Les équipements publiés et leurs identifiants dans Home Assistant ne changent pas.
+
+---
+
+# 2026-11-14 — Vue de travail : un seul arbre, une fiche plus courte
+
+- L'arbre de la vue de travail contient toujours toute la maison ; une carte l'ouvre sur sa pièce. La bascule « Cette pièce | Toute la maison » disparaît ; la recherche filtre tout l'arbre et le volet de droite dit « n résultats ».
+- Le fil d'Ariane `Maison › Niveau › Pièce` est cliquable et remplace les boutons « Page principale » et « Pièces ». Dans l'arbre, l'état d'un équipement se lit à son icône (le mot en info-bulle).
+- Fiche d'un équipement : en-tête sur deux lignes (le menu « ⋯ » à droite), une bande d'une ligne par cause avec « Publier en <type> ▾ », un bloc « Dans Home Assistant » d'une ligne par entité (identifiant à copier). « Toujours » n'est plus grisé sur un équipement publié. Aucune requête de plus, aucune publication changée.
+
+---
+
 # 2026-11-13 — Thermostats : la carte de Home Assistant devient utilisable
 
 - Un thermostat Jeedom (plugin « Thermostat », ou tout équipement portant les mêmes types génériques) montre dans Home Assistant la température mesurée, la consigne, le mode (chauffe ou arrêt), le preset en cours et si le chauffage chauffe. Avant, il apparaissait éteint, sans température ni consigne.

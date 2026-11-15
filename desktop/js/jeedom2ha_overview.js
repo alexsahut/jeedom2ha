@@ -7,12 +7,26 @@
  * le bouton « Actualiser ». Partie pure (testée sous Node) + partie navigateur en fin de fichier. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./jeedom2ha_mapping_override.js'));
+    module.exports = factory(require('./jeedom2ha_mapping_override.js'),
+      function () { return require('./jeedom2ha_lexique.js'); }, function () { return require('./jeedom2ha_ha_side.js'); });
     return;
   }
-  root.Jeedom2haOverview = factory(root.Jeedom2haMappingOverride);
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (M) {
+  root.Jeedom2haOverview = factory(root.Jeedom2haMappingOverride,
+    function () { return root.Jeedom2haLexique || null; }, function () { return root.Jeedom2haHaSide || null; });
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (M, lexicon, haSide) {
   'use strict';
+
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
+  // Pastille ou marque purement informative : focusable, cliquable, même bulle que ⓘ ; son `title` reste en complément.
+  function infoTip($el, opts) { var T = infoTipApi(); return T ? T.attach($el, undefined, opts) : $el; }
+
 
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   var COALESCE_MS = 500;            // Q7 : une action = une relecture, coalescée
@@ -33,6 +47,21 @@
   var MSG_UNAVAILABLE = '{{Chiffres indisponibles}}';
 
   function unreadLabel(count) { return plural(count, 'non lu', 'non lus'); }
+
+  /**
+   * Front v2 (Lot 9a, regard neuf v2) : repères des équipements « inactifs » d'une pièce (désactivés dans Jeedom, rien à
+   * publier), pour que « 3 / 4 publiés » dise toujours pourquoi il en manque. Lus dans les lignes de `computeOverview`
+   * (état unique `resolveEquipmentState`) ; « Exclu » garde son propre repère. Rend [{ key, count, text }].
+   */
+  function inactiveMarks(room) {
+    var rows = room && Array.isArray(room.equipments) ? room.equipments : [];
+    var disabled = rows.filter(function (r) { return r.state === 'disabled'; }).length;
+    var nothing = rows.filter(function (r) { return r.state === 'nothing_to_publish'; }).length;
+    var marks = [];
+    if (disabled > 0) marks.push({ key: 'disabled', count: disabled, text: plural(disabled, 'désactivé', 'désactivés') });
+    if (nothing > 0) marks.push({ key: 'nothing_to_publish', count: nothing, text: nothing + ' ' + w('rien à publier') });
+    return marks;
+  }
   function blockedMentionLabel(count) { return plural(count, 'bloquée', 'bloquées'); }
 
   function houseHeadline(published, total) {
@@ -55,24 +84,25 @@
     { key: 'published', label: function (n) { return plural(n, 'publié', 'publiés'); } },
     { key: 'blocked', label: function (n) { return plural(n, 'bloqué', 'bloqués'); } },
     { key: 'to_apply', label: function (n) { return n + ' ' + w('à appliquer'); } },
-    { key: 'other', label: function (n) { return n + ' ' + w('exclus et autres'); } },
+    // Front v2 (Lot 7) : « exclus ou inactifs » (amendement du glossaire, spec 3.2) : exclus, désactivés et rien à publier.
+    { key: 'other', label: function (n) { return n + ' ' + w('exclus ou inactifs'); } },
     { key: 'unread', label: function (n) { return unreadLabel(n); } },
   ];
 
   function emptyCounts() { return { published: 0, to_apply: 0, blocked: 0, other: 0, unread: 0 }; }
 
   // Puces de filtre (Story 25.4) : calculées ICI pour la page principale ET pour la vue de travail, afin qu'aucun second
-  // calcul d'effectifs n'existe. « Non lus » n'apparaît que s'il y en a ; une puce à zéro est désactivée, SAUF la puce
-  // active (`active`) : elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la
-  // pièce ne compte aucun équipement du filtre hérité de la page B).
+  // calcul d'effectifs n'existe. Front v2 (Lot 7, E2) : une puce à zéro n'est PAS affichée, SAUF la puce active (`active`) :
+  // elle reste visible et cliquable pour pouvoir retirer le filtre (portée « pièce » de 25.6 où la pièce ne compte aucun
+  // équipement du filtre hérité de la page B). `disabled` reste dans le contrat (toujours faux).
   function chipsFor(counts, active) {
     var c = counts || emptyCounts();
     var chips = [];
     FILTERS.forEach(function (f) {
       var count = c[f.key] || 0;
       var isActive = active === f.key;
-      if (f.key === 'unread' && count === 0 && !isActive) return;
-      chips.push({ key: f.key, count: count, label: f.label(count), disabled: count === 0 && !isActive });
+      if (count === 0 && !isActive) return;
+      chips.push({ key: f.key, count: count, label: f.label(count), disabled: false });
     });
     return chips;
   }
@@ -97,6 +127,8 @@
           state: null, blocked_mention: 0, group: 'unread',
           // Story 25.7 : cause d'exclusion (mention à côté du mot « Exclu », jamais un état) et plugin de l'équipement.
           cause: null, homekit_kept: false, eq_type: typeof eq.eq_type === 'string' ? eq.eq_type : '',
+          // Front v2 (Lot 7) : conseil (mention dérivée, jamais un état) ; `null` = inconnu sans requête de plus.
+          advice: null,
         };
         if (entry && typeof entry === 'object') {
           // `summarizeRoom` lit l'identifiant dans l'entrée : on le garantit sans cloner l'entrée.
@@ -108,6 +140,7 @@
           // Story 24.4 (R1) : relevé de sa pièce exclue par HomeKit (champ additif de la route agrégée).
           row.homekit_kept = entry.homekit_kept_in_excluded_room === true;
           if (resolved.state === 'excluded') row.cause = M.exclusionCauseOf(entry, eq.enabled);
+          row.advice = adviceOfEntry(entry, resolved.state);
         }
         counts[row.group] += 1;
         rows.push(row);
@@ -117,6 +150,7 @@
       var exclusion = M.exclusionBreakdown(rows.filter(function (r) { return r.state === 'excluded'; }));
       out.rooms.push({
         object_id: room.object_id, object_name: room.object_name, summary: summary, counts: counts, exclusion: exclusion, equipments: rows,
+        advice: adviceCount(rows),
         // Story 25.8 : la pièce est exclue (clé `excludedObjects`) — jamais pour « Sans pièce ».
         excluded: room.excluded === true && room.object_id > 0,
       });
@@ -125,18 +159,85 @@
       GROUP_KEYS.forEach(function (key) { out.counts[key] += counts[key]; });
     });
     out.house = M.summarizeHouse(summaries);
+    var all = [];
+    out.rooms.forEach(function (r) { all = all.concat(r.equipments); });
+    out.advice = adviceCount(all);
     return out;
+  }
+
+  // --- Front v2 (Lot 7) : conseils connus sans requête de plus ---
+  // Un conseil (« publié mais améliorable ») se lit dans les `hints` d'un arbre. La route agrégée `/system/equipment_states`
+  // ne les porte pas (liste blanche sous garde) et les fiches ne sont jamais lues une à une : le nombre n'est connu que si
+  // CHAQUE entrée lue porte `hints` (tableau, même vide). Sinon `null` : aucune puce, aucun bloc, aucune mention.
+  function adviceOfEntry(entry, state) {
+    if (!entry || !Array.isArray(entry.hints)) return null;
+    if (state !== 'published') return false;
+    var H = haSide();
+    var hints = H && typeof H.computeHints === 'function' ? H.computeHints(entry) : entry.hints;
+    return Array.isArray(hints) && hints.length > 0;
+  }
+
+  function adviceCount(rows) {
+    var read = rows.filter(function (row) { return row.state !== null; });
+    if (read.length === 0 || read.some(function (row) { return row.advice === null; })) return null;
+    return read.filter(function (row) { return row.advice === true; }).length;
+  }
+
+  function adviceLabel(count) { return plural(count, 'conseil', 'conseils'); }
+
+  // --- Front v2 (Lot 7) : bloc « À faire » (E2) ---
+  // Une ligne par équipement bloqué (puis par conseil connu), avec la cause en clair et l'action de sa fiche
+  // (`Jeedom2haLexique.causeSheet`). La cause est lue dans l'entrée AGRÉGÉE par `groupBlockedCauses` (source unique) : aucun
+  // arbre n'est lu. Rend toutes les lignes ; la page n'en affiche que les cinq premières.
+  function causeSentence(quoi) {
+    var text = String(quoi || '').replace(/^Non publié\s*:\s*/, '');
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+  }
+
+  function todoItems(overview, equipments) {
+    var items = [];
+    if (!overview) return items;
+    var byId = equipments && typeof equipments === 'object' ? equipments : {};
+    var L = lexicon();
+    var H = haSide();
+    var advice = [];
+    overview.rooms.forEach(function (room) {
+      room.equipments.forEach(function (row) {
+        var entry = Object.prototype.hasOwnProperty.call(byId, String(row.eq_id)) ? byId[String(row.eq_id)] : null;
+        if (!entry) return;
+        var base = { eq_id: row.eq_id, eq_name: row.eq_name, eq_type: row.eq_type, room_id: row.room_id, room_name: row.room_name };
+        if (row.state === 'blocked') {
+          var groups = M.groupBlockedCauses(entry);
+          var first = groups[0] || null;
+          var context = H && typeof H.nameTypeWords === 'function' ? H.nameTypeWords(entry, row.eq_name) || {} : {};
+          var sheet = first && first.code && L ? L.causeSheet(first.code, context) : null;
+          items.push(Object.assign(base, {
+            kind: 'blocked',
+            // Front v3 (Lot 1) : code de la cause, pour son libellé court (la phrase reste en info-bulle).
+            code: first && first.code ? first.code : null,
+            text: sheet && sheet.known ? causeSentence(sheet.quoi) : (first ? (L && typeof L.causeLine === 'function' ? L.causeLine(first, null) : M.buildCauseNoticeText(first)) : ''),
+            action: sheet && sheet.known && sheet.actions.length ? sheet.actions[0] : null,
+          }));
+        } else if (row.advice === true) {
+          var hints = H && typeof H.computeHints === 'function' ? H.computeHints(entry) : [];
+          var hint = hints[0] || null;
+          var tip = hint && L ? L.causeSheet(hint.code, { count: hint.count }) : null;
+          advice.push(Object.assign(base, { kind: 'advice', code: hint && hint.code ? hint.code : null, text: tip && tip.known ? tip.quoi : '', action: null }));
+        }
+      });
+    });
+    return items.concat(advice);
   }
 
   function filterRows(overview, key) {
     var rows = [];
     overview.rooms.forEach(function (room) {
-      room.equipments.forEach(function (row) { if (row.group === key) rows.push(row); });
+      room.equipments.forEach(function (row) { if (key === 'advice' ? row.advice === true : row.group === key) rows.push(row); });
     });
     return rows;
   }
 
-  // Segments de la jauge, dans l'ordre publiés / à appliquer / bloqués / exclus et autres / non lus.
+  // Segments de la jauge, dans l'ordre publiés / à appliquer / bloqués / exclus ou inactifs / non lus.
   var GAUGE_ORDER = ['published', 'to_apply', 'blocked', 'other', 'unread'];
 
   function gaugeSegments(counts, total) {
@@ -152,10 +253,190 @@
     var parts = [(counts.published || 0) + ' ' + w((counts.published || 0) > 1 ? 'publiés' : 'publié') + ' ' + w('sur') + ' ' + total];
     if (counts.to_apply > 0) parts.push(counts.to_apply + ' ' + w('à appliquer'));
     if (counts.blocked > 0) parts.push(plural(counts.blocked, 'bloqué', 'bloqués'));
-    if (counts.other > 0) parts.push(counts.other + ' ' + w('exclus et autres'));
+    if (counts.other > 0) parts.push(counts.other + ' ' + w('exclus ou inactifs'));
     if (counts.unread > 0) parts.push(unreadLabel(counts.unread));
     return parts.join(', ');
   }
+
+  // --- Front v3 (Lot 1) : page maison sans phrase — figure, puces, marques de tuile, liseré, verdict de la barre d'état ---
+
+  /** « 8 / 22 » + « publiés » (chiffre maison, 26 px). */
+  function houseFigure(published, total) {
+    var p = published || 0;
+    return { number: p + ' / ' + (total || 0), sub: w(p > 1 ? 'publiés' : 'publié') };
+  }
+
+  // Une puce = icône + nombre + mot, définition en info-bulle. Ordre du liseré : publiés, à appliquer, bloqués, exclus.
+  // `scope` : 'grid' = la puce filtre la grille des pièces ; 'todo' = la puce montre la liste « À faire ».
+  var HOUSE_CHIPS = [
+    { key: 'published', icon: 'fa-check-circle', scope: 'grid', one: 'publié', many: 'publiés', title: '{{Visible dans Home Assistant}}' },
+    { key: 'to_apply', icon: 'fa-clock', scope: 'grid', one: 'à appliquer', many: 'à appliquer', title: '{{Réglage enregistré, à envoyer avec « Appliquer »}}' },
+    { key: 'blocked', icon: 'fa-exclamation-triangle', scope: 'todo', one: 'bloqué', many: 'bloqués', title: '{{Le plugin ne peut pas le publier : voir « À faire »}}' },
+    { key: 'other', icon: 'fa-eye-slash', scope: 'grid', one: 'exclu ou inactif', many: 'exclus ou inactifs', title: '{{Exclus par vous, désactivés dans Jeedom ou sans rien à publier}}' },
+    { key: 'unread', icon: 'fa-question-circle', scope: 'grid', one: 'non lu', many: 'non lus', title: '{{État pas encore lu}}' },
+    { key: 'advice', icon: 'fa-lightbulb', scope: 'todo', one: 'conseil', many: 'conseils', title: '{{Publié, mais pourrait faire mieux}}' },
+  ];
+
+  function chipDef(key) { return HOUSE_CHIPS.filter(function (c) { return c.key === key; })[0] || null; }
+
+  /** Puces de la maison : seulement les nombres non nuls, sauf la puce active (pour pouvoir la relâcher). */
+  function houseChips(counts, advice, active) {
+    var c = counts || emptyCounts();
+    var out = [];
+    HOUSE_CHIPS.forEach(function (def) {
+      var count = def.key === 'advice' ? (typeof advice === 'number' ? advice : 0) : (c[def.key] || 0);
+      if (count === 0 && active !== def.key) return;
+      out.push({ key: def.key, count: count, word: w(count > 1 ? def.many : def.one), icon: def.icon, title: def.title, scope: def.scope });
+    });
+    return out;
+  }
+
+  /** Libellé d'un segment du liseré (info-bulle et nom accessible) : « 6 à appliquer ». */
+  function segmentLabel(key, count) {
+    if (key === 'published') return plural(count, 'publié', 'publiés');
+    if (key === 'to_apply') return count + ' ' + w('à appliquer');
+    if (key === 'blocked') return plural(count, 'bloqué', 'bloqués');
+    if (key === 'other') return count + ' ' + w('exclus ou inactifs');
+    return unreadLabel(count);
+  }
+
+  /**
+   * Marques d'une tuile de pièce : icône + nombre, seulement les nombres non nuls (dans l'ordre bloqués, à appliquer,
+   * désactivés, rien à publier, non lus, exclus). `word` complète le nombre pour l'info-bulle et les lecteurs d'écran.
+   * `only` (facultatif) : la clé du filtre actif de la grille (seules ses marques restent ; « other » = exclus, désactivés,
+   * rien à publier).
+   */
+  function tileMarks(room, only) {
+    var c = (room && room.counts) || emptyCounts();
+    var rows = room && Array.isArray(room.equipments) ? room.equipments : [];
+    var n = function (state) { return rows.filter(function (r) { return r.state === state; }).length; };
+    var marks = [];
+    var push = function (key, group, count, icon, word) {
+      if (count > 0) marks.push({ key: key, group: group, count: count, icon: icon, word: word, title: count + ' ' + word });
+    };
+    push('blocked', 'blocked', c.blocked, 'fa-exclamation-triangle', w(c.blocked > 1 ? 'bloqués' : 'bloqué'));
+    push('to_apply', 'to_apply', c.to_apply, 'fa-clock', w('à appliquer'));
+    push('disabled', 'other', n('disabled'), 'fa-power-off', w(n('disabled') > 1 ? 'désactivés' : 'désactivé'));
+    push('nothing_to_publish', 'other', n('nothing_to_publish'), 'fa-minus-circle', w('rien à publier'));
+    push('unread', 'unread', c.unread, 'fa-question-circle', w(c.unread > 1 ? 'non lus' : 'non lu'));
+    // Story 25.7 : « N exclus » = la ventilation des exclusions (`exclusionBreakdown`), en dernier.
+    var excluded = room && room.exclusion && typeof room.exclusion.excluded === 'number' ? room.exclusion.excluded : n('excluded');
+    push('excluded', 'other', excluded, 'fa-eye-slash', w(excluded > 1 ? 'exclus' : 'exclu'));
+    return only ? marks.filter(function (m) { return m.group === only; }) : marks;
+  }
+
+  /** Une pièce reste-t-elle dans la grille sous le filtre `key` ? (les pièces à 0 sont masquées) */
+  function roomMatchesFilter(room, key) {
+    if (!key) return true;
+    if (!room || !room.counts) return false;
+    return (room.counts[key] || 0) > 0;
+  }
+
+  /** Équipements « à appliquer » (identifiants numériques), dans l'ordre des pièces : cible du bouton « Appliquer (n) ». */
+  function toApplyIds(overview) {
+    if (!overview) return [];
+    return filterRows(overview, 'to_apply').map(function (row) { return row.eq_id; });
+  }
+
+  /**
+   * Confirmation de « Appliquer (n) » : { title, lines[], confirmLabel }. Le démon reprend la décision au clic (réglages relus) :
+   * selon les réglages en attente, l'équipement est publié, mis à jour ou retiré — la ligne le dit.
+   */
+  function applyDialog(count) {
+    var n = typeof count === 'number' && count > 0 ? Math.floor(count) : 0;
+    var lines = [n + ' ' + w(n > 1 ? 'équipements publiés, mis à jour ou retirés de Home Assistant selon vos réglages' : 'équipement publié, mis à jour ou retiré de Home Assistant selon vos réglages')];
+    return { title: w('Appliquer') + ' ' + n + ' ' + w(n > 1 ? 'réglages en attente ?' : 'réglage en attente ?'), lines: lines, confirmLabel: w('Appliquer') + ' (' + n + ')' };
+  }
+
+  var VERDICT_MAX_AGE_MS = 24 * 3600 * 1000;
+
+  /**
+   * Mémoire de la dernière relecture OBSERVÉE par la page : quand la dernière opération du démon est une relecture, son
+   * résultat est retenu avec sa date de fin (`derniere_synchro_terminee`). Elle survit à une opération suivante (« Appliquer »,
+   * « Republier ») tant que la date de fin de relecture ne change pas. Pure : rend la mémoire à jour.
+   */
+  function rememberSync(memory, status) {
+    var op = status && typeof status === 'object' ? status.derniere_operation_resultat : null;
+    var at = status && typeof status.derniere_synchro_terminee === 'string' ? status.derniere_synchro_terminee : null;
+    if (op && typeof op === 'object' && op.intention === 'sync' && at) return { at: at, ok: op.resultat === 'succes' };
+    return memory && memory.at === at ? memory : null;
+  }
+
+  /**
+   * Verdict de la barre d'état, FAIL-CLOSED. `ok` (« ✓ Rien à faire ») seulement si TOUT est prouvé :
+   *   - démon et broker en marche ;
+   *   - états lus, rien à appliquer, rien de bloqué, rien de non lu ;
+   *   - la dernière opération, quelle qu'elle soit (relecture, « Appliquer », « Republier »…), a RÉUSSI (aucune en échec) ;
+   *   - une relecture RÉUSSIE terminée il y a moins de 24 h : la dernière opération elle-même, ou la relecture retenue par
+   *     `rememberSync` (même date de fin) quand une opération réussie l'a suivie.
+   * Quelque chose à faire : `null` (« Appliquer (n) » et « À faire » le disent). Sinon `unverified` (« ? Non vérifié »
+   * + [Relire]). `memory` : rendu de `rememberSync` ; `now` (ms) : facultatif, pour les tests.
+   */
+  function statusVerdict(status, overview, now, memory) {
+    if (!status || typeof status !== 'object' || !status.daemon) return null;
+    var broker = status.broker || status.mqtt || {};
+    if (broker.state !== 'connected') return null;
+    var c = overview && overview.counts ? overview.counts : null;
+    if (c && ((c.to_apply || 0) > 0 || (c.blocked || 0) > 0)) return null;
+    var unverified = { kind: 'unverified', text: w('Non vérifié'), title: w('Dernière relecture réussie inconnue ou de plus de 24 h') };
+    if (!c || (c.unread || 0) > 0) return unverified;
+    var op = status.derniere_operation_resultat;
+    if (!op || typeof op !== 'object' || op.resultat !== 'succes') return unverified;
+    var at = typeof status.derniere_synchro_terminee === 'string' ? status.derniere_synchro_terminee : null;
+    var syncOk = op.intention === 'sync' || (!!memory && memory.ok === true && memory.at === at);
+    if (!syncOk || !at) return unverified;
+    var atMs = new Date(at).getTime();
+    var t = typeof now === 'number' ? now : Date.now();
+    if (!isFinite(atMs) || t - atMs > VERDICT_MAX_AGE_MS || atMs - t > 5 * 60 * 1000) return unverified;
+    var d = new Date(atMs);
+    return { kind: 'ok', text: w('Rien à faire'), title: w('Relu à') + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) };
+  }
+
+  /** Nombre de scénarios publiés (champ additif `status.publication.scenarios_published`) ; `null` si inconnu. */
+  function scenarioCount(status) {
+    var publication = status && typeof status === 'object' ? status.publication : null;
+    var n = publication && typeof publication === 'object' ? publication.scenarios_published : null;
+    return typeof n === 'number' && isFinite(n) && n >= 0 ? Math.floor(n) : null;
+  }
+
+  /**
+   * Front v3 (Lot 4b) : texte du compte de l'onglet « Scénarios ». Avec la liste du démon (`status.scenarios`, Lot 4a) :
+   * « publiés/total », suivi de ✱ s'il y a des nouveaux. Sans elle (démon ancien) : le nombre publié d'avant, ou rien.
+   */
+  function scenarioTabText(status) {
+    var list = status && typeof status === 'object' && Array.isArray(status.scenarios) ? status.scenarios.filter(function (s) { return s && typeof s === 'object'; }) : null;
+    if (list) {
+      var published = list.filter(function (s) { return s.published === true; }).length;
+      return published + '/' + list.length + (list.some(function (s) { return s.is_new === true; }) ? ' ✱' : '');
+    }
+    var n = scenarioCount(status);
+    return n === null ? '' : String(n);
+  }
+
+  // Cause d'une ligne « À faire » en quatre mots au plus ; la phrase complète de la fiche reste en info-bulle.
+  var TODO_SHORT_CAUSES = {
+    no_generic_type_configured: '{{Sans type générique}}',
+    ambiguous_skipped: '{{Type ambigu}}',
+    name_heuristic_rejection: '{{Nom contraire au type}}',
+    duplicate_generic_types: '{{Types génériques en double}}',
+    conflicting_generic_types: '{{Types génériques en conflit}}',
+    switch_state_orphan: '{{Aucun ordre On / Off}}',
+    probable_skipped: '{{Type pas assez sûr}}',
+    low_confidence: '{{Type pas assez sûr}}',
+    no_supported_generic_type: '{{Type non pris en charge}}',
+    no_mapping: '{{Aucun type correspondant}}',
+    skipped_no_mapping_candidate: '{{Aucun type correspondant}}',
+    no_projection_possible: '{{Aucune commande utilisable}}',
+    ha_missing_command_topic: '{{Rien à piloter}}',
+    ha_missing_state_topic: '{{Pas de retour d’état}}',
+    discovery_publish_failed: '{{Envoi MQTT échoué}}',
+  };
+
+  function shortCause(code) {
+    return typeof code === 'string' && Object.prototype.hasOwnProperty.call(TODO_SHORT_CAUSES, code) ? TODO_SHORT_CAUSES[code] : '';
+  }
+
+  function pad2(n) { return ('0' + n).slice(-2); }
 
   // --- Story 25.8 : exclusion d'une pièce — nombre d'entités annoncé (Q1 B) et texte de la confirmation (D4) ---
   // Fonctions PURES : le nombre est calculé depuis la copie des états déjà en mémoire (aucune requête avant le clic de confirmation).
@@ -376,8 +657,6 @@
     nothing_to_publish: 'fa-minus-circle',
   };
 
-  function pad2(n) { return ('0' + n).slice(-2); }
-
   function createPage(env) {
     var $ = env.$;
     var rooms = env.rooms || [];
@@ -415,12 +694,14 @@
         .append($('<span class="j2ha-state-text"></span>').text(' ' + M.EQUIPMENT_STATE_LABELS[state]));
     }
 
+    // Liseré segmenté (maison : 6 px ; tuile : 4 px). Chaque segment porte un `title` et un `aria-label` avec son compte.
     function buildGauge(counts, total, extraClass) {
-      var $gauge = $('<div class="j2ha-gauge" role="img"></div>').addClass(extraClass || '');
+      var $gauge = $('<div class="j2ha-gauge j2ha-v3-stripe" role="group"></div>').addClass(extraClass || '');
       $gauge.attr('aria-label', gaugeLabel(counts, total));
       gaugeSegments(counts, total).forEach(function (seg) {
-        var $seg = $('<span class="j2ha-seg"></span>').addClass('j2ha-seg-' + seg.key)
-          .attr('data-filter', seg.key).attr('aria-hidden', 'true').attr('style', 'flex-grow:' + seg.count);
+        var label = segmentLabel(seg.key, seg.count);
+        var $seg = $('<span class="j2ha-seg" role="img"></span>').addClass('j2ha-seg-' + seg.key)
+          .attr('data-filter', seg.key).attr('title', label).attr('aria-label', label).attr('style', 'flex-grow:' + seg.count);
         if (extraClass !== 'j2ha-gauge-card') {
           $seg.on('click', function () { activateFilter(seg.key); });
         }
@@ -444,23 +725,25 @@
       if (!vm.overview) {
         setText('#j2ha_houseNumber', '');
         setText('#j2ha_houseSub', '');
-        setText('#j2ha_houseMeta', '');
-        $gaugeHost.append($('<div class="j2ha-gauge j2ha-gauge-neutral" role="img"></div>').attr('aria-label', vm.message || w('Chargement...')));
+        $gaugeHost.append($('<div class="j2ha-gauge j2ha-gauge-neutral j2ha-v3-stripe" role="img"></div>').attr('aria-label', vm.message || w('Chargement...')));
         return;
       }
       var o = vm.overview;
-      var head = houseHeadline(o.counts.published, o.total);
+      var head = houseFigure(o.counts.published, o.total);
       setText('#j2ha_houseNumber', head.number);
       setText('#j2ha_houseSub', head.sub);
-      setText('#j2ha_houseMeta', o.total + ' ' + w('équipements Jeedom') + ', ' + plural(o.rooms_count, 'pièce', 'pièces'));
       $gaugeHost.append(buildGauge(o.counts, o.total));
-      chipsFor(o.counts, filter).forEach(function (chip) {
-        var $chip = $('<button type="button" class="j2ha-chip-filter"></button>')
+      houseChips(o.counts, o.advice, filter).forEach(function (chip) {
+        var $chip = $('<button type="button" class="j2ha-chip-filter j2ha-v3-chip"></button>')
           .addClass('j2ha-chip-filter-' + chip.key).attr('data-filter', chip.key)
           .attr('aria-pressed', filter === chip.key ? 'true' : 'false')
-          .append($('<span class="j2ha-chip-dot"></span>'))
-          .append(document_text(chip.label));
-        if (chip.disabled) $chip.prop('disabled', true);
+          .attr('aria-controls', chip.scope === 'todo' ? 'j2ha_v2_todo' : 'j2ha_roomCards')
+          .attr('title', chip.title)
+          .attr('aria-label', chip.count + ' ' + chip.word + ' : ' + chip.title)
+          .append($('<i class="fas" aria-hidden="true"></i>').addClass(chip.icon))
+          .append($('<b class="j2ha-v3-chip-n"></b>').text(String(chip.count)))
+          .append(document_text(' '))
+          .append($('<span class="j2ha-v3-chip-word"></span>').text(chip.word));
         $chip.on('click', function () { activateFilter(chip.key); });
         $chip.on('keydown', onFilterKey);
         $chips.append($chip);
@@ -470,15 +753,63 @@
 
     function document_text(text) { return env.document.createTextNode(text); }
 
+    function currentStatus() { return typeof env.bridgeStatus === 'function' ? env.bridgeStatus() : null; }
+
+    // Onglets (« Équipements n » / « Scénarios n ») : le nombre de scénarios vient du démon (`status.publication`).
+    function renderTabs() {
+      var total = rooms.reduce(function (n, room) { return n + (Array.isArray(room.equipments) ? room.equipments.length : 0); }, 0);
+      setText('#j2ha_tabEquipmentsCount', String(total));
+      setText('#j2ha_tabScenariosCount', scenarioTabText(currentStatus()));
+    }
+
+    var activeTab = 'equipments';
+    function selectTab(key) {
+      activeTab = key === 'scenarios' ? 'scenarios' : 'equipments';
+      $('.j2ha-v3-tab').each(function (_i, el) {
+        var on = $(el).attr('data-tab') === activeTab;
+        $(el).attr('aria-selected', on ? 'true' : 'false').attr('tabindex', on ? '0' : '-1');
+        $(el).closest('li').toggleClass('active', on);
+      });
+      $('#j2ha_tab_equipments').prop('hidden', activeTab !== 'equipments');
+      $('#j2ha_tab_scenarios').prop('hidden', activeTab !== 'scenarios');
+    }
+
+    var syncMemory = null;
+    // Barre d'état, partie « page » : bouton « Appliquer (n) » (visible si n > 0) et verdict « Rien à faire » fail-closed.
+    function renderStatus() {
+      var o = lastView && lastView.overview;
+      var n = o && !lastView.stale ? (o.counts.to_apply || 0) : 0;
+      var $apply = $('#bt_j2haApply');
+      if ($apply.attr('data-ha-pending') !== '1') {
+        $apply.find('.j2ha-v3-apply-count').text(n > 0 ? '(' + n + ')' : '');
+        $apply.prop('hidden', n === 0);
+        $apply.attr('title', n + ' ' + w(n > 1 ? 'réglages à envoyer à Home Assistant' : 'réglage à envoyer à Home Assistant'));
+      }
+      var $verdict = $('#j2ha_v3_verdict').empty().removeAttr('data-kind').removeAttr('title');
+      syncMemory = rememberSync(syncMemory, currentStatus());
+      var verdict = statusVerdict(currentStatus(), o && !lastView.stale ? o : null, env.now(), syncMemory);
+      if (!verdict) return;
+      $verdict.attr('data-kind', verdict.kind).attr('title', verdict.title);
+      if (verdict.kind === 'ok') {
+        $verdict.append($('<i class="fas fa-check-circle" aria-hidden="true"></i>')).append(document_text(' ' + verdict.text));
+        return;
+      }
+      $verdict.append($('<span class="j2ha-v3-verdict-q" aria-hidden="true">?</span>')).append(document_text(' ' + verdict.text + ' '));
+      var $reread = $('<button type="button" class="btn btn-default btn-xs j2ha-v3-reread"></button>').text(w('Relire'))
+        .attr('title', w('Relire Jeedom'));
+      $reread.on('click', function () { $('#bt_rescanTopology').trigger('click'); });
+      $verdict.append($reread);
+    }
+
+    // ↻ (« Actualiser les chiffres ») : heure de la dernière lecture des états en info-bulle, rotation pendant la lecture.
     function renderFreshness(state) {
       var at = state && state.readAt;
-      setText('#j2ha_freshness', at ? w('Chiffres relus à') + ' ' + pad2(at.getHours()) + ':' + pad2(at.getMinutes()) : '');
       var $button = $('#bt_refreshStates');
       var busy = !!(state && state.refreshing);
+      var label = busy ? w('Actualisation…') : w('Actualiser les chiffres') + (at ? ' (' + w('relus à') + ' ' + pad2(at.getHours()) + ':' + pad2(at.getMinutes()) + ')' : '');
       $button.prop('disabled', busy);
-      $button.attr('aria-busy', busy ? 'true' : 'false');
-      $button.empty().append($('<i class="fas fa-sync-alt"></i>').toggleClass('fa-spin', busy))
-        .append(document_text(' ' + (busy ? w('Actualisation…') : w('Actualiser'))));
+      $button.attr('aria-busy', busy ? 'true' : 'false').attr('title', label).attr('aria-label', label);
+      $button.empty().append($('<i class="fas fa-sync-alt" aria-hidden="true"></i>').toggleClass('fa-spin', busy));
     }
 
     // Story 25.8 : libellé du menu « ⋯ » de la carte selon l'état d'exclusion de la pièce (« Exclure… » / « Ne plus exclure… »).
@@ -500,21 +831,48 @@
       return room.equipments.filter(function (row) { return row.homekit_kept === true; }).length;
     }
 
-    function excludedLine(notYet, kept) {
-      var $line = $('<div class="j2ha-room-ratio j2ha-room-excluded-line"></div>')
-        .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'))
-        .append(document_text(' ' + w('Pièce exclue')));
-      if (notYet > 0) {
-        $line.append($('<span class="j2ha-room-notyet"></span>').text(' · ' + notYet + ' ' + w(notYet > 1 ? 'pas encore retirés' : 'pas encore retiré')));
-      }
-      if (kept > 0) {
-        $line.append($('<span class="j2ha-room-homekit-kept"></span>').text(' · ' + kept + ' ' + w(kept > 1 ? 'gardés (HomeKit)' : 'gardé (HomeKit)')));
-      }
-      return $line;
+    // Marque : icône + nombre visibles ; le mot (« 2 bloqués ») est lu par les lecteurs d'écran et repris en info-bulle.
+    function markNode(cls, icon, count, word, title) {
+      return $('<span class="j2ha-mark j2ha-v3-mark"></span>').addClass(cls).attr('title', title || (count + ' ' + word))
+        .append($('<i class="fas" aria-hidden="true"></i>').addClass(icon))
+        .append($('<span class="j2ha-v3-mark-n"></span>').text(String(count)))
+        .append($('<span class="j2ha-v3-sr"></span>').text(' ' + word));
     }
+
+    // Pièce exclue : ⊘ à la place du ratio ; « pas encore retirés » et « gardés (HomeKit) » en marques chiffrées.
+    function excludedMarks(notYet, kept) {
+      var out = [];
+      if (notYet > 0) out.push(markNode('j2ha-room-notyet', 'fa-clock', notYet, w(notYet > 1 ? 'pas encore retirés' : 'pas encore retiré')));
+      if (kept > 0) out.push(markNode('j2ha-room-homekit-kept', 'fa-home', kept, w(kept > 1 ? 'gardés (HomeKit)' : 'gardé (HomeKit)')));
+      return out;
+    }
+
+    // Ratio « n/m » de la tuile, en tête de `.j2ha-room-state` (placé dans la grille de la tuile par le CSS). Le compteur affiché
+    // (publiés, ou l'état filtré) est aussi exposé en `data-count` sur la tuile : une pièce exclue n'affiche que ⊘, son
+    // compteur reste lisible par les parcours.
+    function setRatio($slot, text, title, excluded) {
+      var $ratio = $('<span class="j2ha-v3-tile-ratio"></span>');
+      $slot.append($ratio);
+      if (excluded) {
+        $ratio.addClass('j2ha-room-excluded-line').attr('title', w('Pièce exclue'))
+          .append($('<i class="fas fa-eye-slash" aria-hidden="true"></i>'))
+          .append($('<span class="j2ha-room-ratio j2ha-v3-sr"></span>').text(w('Pièce exclue')));
+        return;
+      }
+      $ratio.removeClass('j2ha-room-excluded-line');
+      if (title) $ratio.attr('title', title);
+      $ratio.append($('<span class="j2ha-room-ratio"></span>').text(text));
+    }
+
+    // Filtre de grille actif (puces Publiés, À appliquer, Exclus, Non lus) ; Bloqués et Conseils montrent la liste « À faire ».
+    function gridFilter() { var def = chipDef(filter); return def && def.scope === 'grid' ? filter : null; }
+    function todoFilter() { var def = chipDef(filter); return def && def.scope === 'todo' ? filter : null; }
 
     function renderCards(vm) {
       var o = vm.overview;
+      var gf = o ? gridFilter() : null;
+      // Bloqués / Conseils : la vue filtrée EST la liste « À faire » (une seule représentation à la fois).
+      $('#j2ha_roomCards').prop('hidden', !!(o && todoFilter()));
       $('#j2ha_roomCards .j2ha-room-card').each(function (_i, el) {
         var $card = $(el);
         var id = parseInt($card.attr('data-object_id'), 10);
@@ -522,73 +880,50 @@
         var room = o ? o.rooms.filter(function (r) { return r.object_id === id; })[0] : null;
         var excluded = isRoomExcluded(id);
         syncRoomMenu($card, excluded);
-        $card.removeClass('j2ha-room-blocked j2ha-room-dim j2ha-room-excluded');
+        $card.removeClass('j2ha-room-blocked j2ha-room-dim j2ha-room-excluded').prop('hidden', false).removeAttr('data-count');
         if (!room) {
-          $card.removeAttr('aria-label');
+          $card.removeAttr('aria-label').removeAttr('title');
+          if (excluded) setRatio($slot, '', '', true);
           if (excluded) {
-            // Les états ne sont pas lus : la carte dit quand même que la pièce est exclue (écriture déjà enregistrée).
+            // Les états ne sont pas lus : la tuile dit quand même que la pièce est exclue (écriture déjà enregistrée).
             $card.addClass('j2ha-room-excluded');
-            $slot.append(excludedLine(0));
             $card.attr('aria-label', roomName(id) + ', ' + w('pièce exclue'));
           }
           return;
         }
         var c = room.counts;
         var total = room.summary.equipments_total;
-        // Story 25.8 (AC12, Q4) : « Pièce exclue » REMPLACE seulement le ratio ; la jauge et les repères sont conservés.
-        if (excluded) {
-          $card.addClass('j2ha-room-excluded');
-          $slot.append(excludedLine(notYetRemovedCount(room), keptHomekitCount(room)));
-        } else {
-          $slot.append($('<div class="j2ha-room-ratio"></div>').text(c.published + ' / ' + total + ' ' + w(c.published > 1 ? 'publiés' : 'publié')));
-        }
-        $slot.append(buildGauge(c, total, 'j2ha-gauge-card'));
-        var $marks = $('<div class="j2ha-room-marks"></div>');
-        if (c.blocked > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(plural(c.blocked, 'bloqué', 'bloqués')));
-        if (c.to_apply > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-to_apply"></span>').text(c.to_apply + ' ' + w('à appliquer')));
-        if (c.unread > 0) $marks.append($('<span class="j2ha-mark j2ha-mark-unread"></span>').text(unreadLabel(c.unread)));
-        // Story 25.7 (Q5) : repère gris « N exclus » (même nombre que le compteur de la pièce), ventilation en infobulle et
-        // dans le nom accessible ; après les repères existants, sans toucher à la jauge ni au ratio.
+        // Filtre de grille : les pièces à 0 sont masquées ; les compteurs de la tuile suivent le filtre.
+        if (gf && !roomMatchesFilter(room, gf)) $card.prop('hidden', true);
+        var shown = gf ? (c[gf] || 0) : c.published;
+        var ratioTitle = gf ? segmentLabel(gf, shown) + ' ' + w('sur') + ' ' + total : room.object_name + ' : ' + c.published + ' ' + w(c.published > 1 ? 'publiés' : 'publié') + ' ' + w('sur') + ' ' + total;
+        if (excluded) $card.addClass('j2ha-room-excluded');
+        setRatio($slot, shown + '/' + total, ratioTitle, excluded);
+        $card.attr('data-count', String(shown));
+        var $marks = $('<div class="j2ha-room-marks j2ha-v3-marks"></div>');
+        tileMarks(room, gf).forEach(function (mark) {
+          $marks.append(markNode('j2ha-mark-' + mark.key, mark.icon, mark.count, mark.word));
+        });
+        if (excluded) excludedMarks(notYetRemovedCount(room), keptHomekitCount(room)).forEach(function ($m) { $marks.append($m); });
+        // Story 25.7 (Q5) : ventilation des exclusions (plugin, pièce, individuelle) dans le nom accessible et l'info-bulle.
         var excludedText = '';
         if (room.exclusion && room.exclusion.excluded > 0) {
-          var ventilation = M.exclusionBreakdownText(room.exclusion, pluginNames);
-          excludedText = w('Exclus') + ' : ' + ventilation;
-          $marks.append($('<span class="j2ha-mark j2ha-mark-excluded"></span>').text(plural(room.exclusion.excluded, 'exclu', 'exclus'))
-            .attr('title', excludedText).attr('aria-label', excludedText));
+          excludedText = w('Exclus') + ' : ' + M.exclusionBreakdownText(room.exclusion, pluginNames);
+          $marks.find('.j2ha-mark-excluded').attr('title', excludedText).attr('aria-label', excludedText);
         }
         $slot.append($marks);
+        $slot.append(buildGauge(c, total, 'j2ha-gauge-card'));
         if (c.blocked > 0) $card.addClass('j2ha-room-blocked');
-        if (filter && filterMatchesNothing(room)) $card.addClass('j2ha-room-dim');
-        $card.attr('aria-label', room.object_name + (excluded ? ', ' + w('pièce exclue') : '') + ', ' + gaugeLabel(c, total) + (excludedText ? ', ' + excludedText : ''));
+        var inactiveText = inactiveMarks(room).map(function (m) { return m.text; }).join(', ');
+        $card.attr('aria-label', room.object_name + (excluded ? ', ' + w('pièce exclue') : '') + ', ' + gaugeLabel(c, total) + (inactiveText ? ', ' + inactiveText : '') + (excludedText ? ', ' + excludedText : ''));
       });
-    }
-
-    function filterMatchesNothing(room) {
-      return room.counts[filter] === 0;
-    }
-
-    function renderList(vm) {
-      var $panel = $('#j2ha_filterPanel');
-      var $list = $('#j2ha_filterList').empty();
-      if (!filter || !vm.overview) {
-        $panel.hide();
-        return;
-      }
-      var rows = orderLikeGrid(filterRows(vm.overview, filter));
-      var def = FILTERS.filter(function (f) { return f.key === filter; })[0];
-      setText('#j2ha_filterTitle', def.label(rows.length));
-      rows.forEach(function (row) {
-        var $btn = $('<button type="button" class="j2ha-frow-btn"></button>').attr('data-room-id', row.room_id);
-        if (row.state) $btn.append(stateWord(row.state));
-        else $btn.append($('<span class="j2ha-state-word j2ha-state-unread"></span>').append($('<i class="fas fa-question-circle"></i>')).append($('<span class="j2ha-state-text"></span>').text(' ' + w('Non lu'))));
-        $btn.append($('<span class="j2ha-frow-name j2ha-free-name"></span>').text(row.eq_name));
-        $btn.append($('<span class="text-muted j2ha-frow-room j2ha-free-name"></span>').text(row.room_name));
-        if (row.blocked_mention > 0) $btn.append($('<span class="j2ha-mark j2ha-mark-blocked"></span>').text(blockedMentionLabel(row.blocked_mention)));
-        $btn.on('click', function () { openEquipmentView(row.room_id, row.eq_id); });
-        $btn.on('keydown', onFilterKey);
-        $list.append($('<li class="j2ha-frow"></li>').append($btn));
+      // Un titre de groupe dont toutes les tuiles sont masquées disparaît avec elles.
+      $('#j2ha_roomCards .j2ha-room-group').each(function (_i, el) {
+        var $g = $(el);
+        var visible = 0;
+        $g.find('.j2ha-room-card').each(function (_j, card) { if (!$(card).prop('hidden')) visible += 1; });
+        $g.prop('hidden', visible === 0);
       });
-      $panel.show();
     }
 
     // L'ordre de la liste est celui de la grille (pièces regroupées par parent), puis l'ordre natif des équipements.
@@ -609,12 +944,92 @@
       }
     }
 
+    // --- Liste « À faire » (#j2ha_v2_todo) : une ligne par équipement bloqué, puis par conseil ; masquée si vide ---
+    var TODO_LIMIT = 5;
+    var todoExpanded = false;
+
+    function equipmentUrl(item) {
+      var type = typeof item.eq_type === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(item.eq_type) ? item.eq_type : '';
+      return type ? 'index.php?v=d&m=' + type + '&p=' + type + '&id=' + encodeURIComponent(String(item.eq_id)) : '';
+    }
+
+    // L'action de la fiche de cause (Jeedom2haLexique) : « Corriger le type… » et « Voir » ouvrent la fiche de l'équipement
+    // dans la page ; les types génériques et l'équipement s'ouvrent dans Jeedom (nouvel onglet).
+    function todoAction(item) {
+      var key = item.action && item.action.key;
+      var href = key === 'generic_types' ? 'index.php?v=d&p=types' : (key === 'equipment' || key === 'rename' ? equipmentUrl(item) : '');
+      if (href) {
+        var $link = $('<a class="btn btn-default btn-xs j2ha-v2-todo-action" target="_blank" rel="noopener"></a>')
+          .attr('href', href).attr('data-action', key).attr('title', item.action.label);
+        if (key === 'generic_types') $link.append($('<i class="fas fa-tags" aria-hidden="true"></i>')).append(document_text(' ' + w('Types génériques')));
+        else $link.text(item.action.label);
+        return $link;
+      }
+      // Front v2 (Lot 9a, point 9) : « Publier quand même » ouvre la fiche, où le bouton du même nom règle l'équipement sur
+      // « Toujours » (aperçu et confirmation habituels, puis « Appliquer »).
+      var inPage = key === 'correct_type' || key === 'publish_anyway';
+      var label = inPage ? item.action.label : w('Voir');
+      var $btn = $('<button type="button" class="btn btn-default btn-xs j2ha-v2-todo-action"></button>')
+        .attr('data-action', key || 'open').text(label);
+      $btn.attr('aria-label', label + ' : ' + item.eq_name);
+      $btn.on('click', function () { openEquipmentView(item.room_id, item.eq_id); });
+      return $btn;
+    }
+
+    function todoRow(item) {
+      var blocked = item.kind === 'blocked';
+      var $row = $('<div class="j2ha-v2-row j2ha-v2-todo-row j2ha-v3-todo-row"></div>').attr('data-eq-id', item.eq_id).attr('data-kind', item.kind)
+        .addClass(blocked ? 'is-warn' : 'is-tip');
+      var stateWordText = blocked ? M.EQUIPMENT_STATE_LABELS.blocked : w('Conseil');
+      $row.append(infoTip($('<i class="fas j2ha-v3-todo-icon"></i>').addClass(blocked ? 'fa-exclamation-triangle' : 'fa-lightbulb')
+        .attr('title', stateWordText).attr('aria-label', stateWordText).attr('role', 'img')));
+      // Le nom ouvre la fiche de l'équipement dans la page (même chemin que « Voir »).
+      var $open = $('<button type="button" class="j2ha-free-name j2ha-v3-todo-name j2ha-v3-todo-open"></button>').text(item.eq_name)
+        .attr('title', item.eq_name);
+      $open.on('click', function () { openEquipmentView(item.room_id, item.eq_id); });
+      $row.append($open);
+      $row.append($('<span class="text-muted j2ha-free-name j2ha-v3-todo-room"></span>').text(item.room_name));
+      var short = shortCause(item.code);
+      var $cause = $('<span class="j2ha-v2-todo-cause j2ha-v3-todo-cause"></span>').text(short || item.text || '');
+      if (item.text) infoTip($cause.attr('title', item.text), { doc: 'les-causes-de-blocage' });
+      $row.append($cause);
+      $row.append(todoAction(item));
+      return $row;
+    }
+
+    function renderTodo(vm) {
+      var $host = $('#j2ha_v2_todo').empty();
+      if (!vm.overview || gridFilter()) return;
+      var only = todoFilter();
+      var all = todoItems(vm.overview, vm.equipments);
+      var items = orderLikeGrid(all.filter(function (i) { return i.kind === 'blocked'; }))
+        .concat(orderLikeGrid(all.filter(function (i) { return i.kind !== 'blocked'; })));
+      if (only) items = items.filter(function (i) { return only === 'blocked' ? i.kind === 'blocked' : i.kind === 'advice'; });
+      if (items.length === 0) return;
+      var $head = $('<div class="j2ha-v2-todo-head"></div>')
+        .append($('<strong class="j2ha-v2-todo-title"></strong>').text('{{À faire}}'))
+        .append($('<span class="j2ha-v3-todo-n"></span>').text(String(items.length)));
+      $host.append($head);
+      var $list = $('<div class="j2ha-v3-todo-list"></div>');
+      var limit = only || todoExpanded ? items.length : TODO_LIMIT;
+      items.slice(0, limit).forEach(function (item) { $list.append(todoRow(item)); });
+      $host.append($list);
+      if (items.length > limit) {
+        var $more = $('<button type="button" class="j2ha-v2-link j2ha-v3-todo-more"></button>')
+          .text(w('Tout afficher') + ' (' + items.length + ')');
+        $more.on('click', function () { todoExpanded = true; render(); });
+        $host.append($more);
+      }
+    }
+
     function render() {
       lastView = buildViewModel(lastState && lastState.response, rooms, lastState && lastState.valid);
       renderHouse(lastView);
       renderFreshness(lastState);
       renderCards(lastView);
-      renderList(lastView);
+      renderTodo(lastView);
+      renderTabs();
+      renderStatus();
       subscribers.slice().forEach(function (fn) { fn(); });
     }
 
@@ -631,13 +1046,17 @@
       render();
     }
 
-    // Story 25.4 (AC1) : une puce ou un segment de la jauge ouvre la vue de travail avec ce filtre ; un second clic sur
-    // le filtre déjà actif le retire (la page principale reste affichée). Sans vue (env.openView absent ou refusé),
-    // le comportement de 25.3 est conservé : liste filtrée sur la page principale.
+    // Front v3 (Lot 1) : une puce ou un segment du liseré filtre SUR PLACE — la grille (pièces à 0 masquées, compteurs filtrés)
+    // pour Publiés / À appliquer / Exclus / Non lus, la liste « À faire » pour Bloqués / Conseils ; un second clic le retire.
     function activateFilter(key) {
-      if (filter === key) { setFilter(null); return; }
-      if (typeof env.openView === 'function' && env.openView({ filter: key }) !== false) return;
       setFilter(key);
+    }
+
+    // Pose le filtre (jamais de bascule) et amène sa représentation à l'écran.
+    function showFilter(key) {
+      if (filter !== key) { filter = key; render(); }
+      var node = $(todoFilter() ? '#j2ha_v2_todo' : '#j2ha_roomCards').get(0);
+      if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
     }
 
     function openEquipmentView(roomId, eqId) {
@@ -768,8 +1187,17 @@
 
     function init() {
       $('#bt_refreshStates').on('click', function () { reader.refresh(); });
-      $('#bt_clearFilter').on('click', function () { setFilter(null); });
-      $('#j2ha_filterPanel').on('keydown', onFilterKey);
+      // Front v3 (Lot 1) : onglets Équipements / Scénarios (flèches gauche / droite entre les deux).
+      $('.j2ha-v3-tab').each(function (_i, el) {
+        $(el).on('click', function () { selectTab($(el).attr('data-tab')); });
+        $(el).on('keydown', function (event) {
+          var key = event && event.key;
+          if (key !== 'ArrowLeft' && key !== 'ArrowRight') return;
+          if (event.preventDefault) event.preventDefault();
+          selectTab(activeTab === 'equipments' ? 'scenarios' : 'equipments');
+          $('.j2ha-v3-tab[data-tab="' + activeTab + '"]').focus();
+        });
+      });
       $('#j2ha_moreMenu .j2ha-menu-wrap').each(function (_i, el) { bindMenu($(el)); });
       $('#j2ha_roomCards .j2ha-room-menu').each(function (_i, el) { bindRoomMenu($(el)); });
       $('#bt_openDiagnostic').on('click', openDiagnosticDialog);
@@ -790,6 +1218,7 @@
       $(env.document).on('click', function (event) {
         if (openMenuWrap && $(event && event.target).closest('.j2ha-menu-wrap').length === 0) closeMenu(false);
       });
+      selectTab('equipments');
       render();
       reader.load();
     }
@@ -808,6 +1237,12 @@
       },
       filter: function () { return filter; },
       view: function () { return lastView; },
+      // L'état du démon vient d'être relu (onglet Scénarios, Appliquer, verdict), sans relire les équipements.
+      statusChanged: function () { renderTabs(); renderStatus(); },
+      // Front v3 (Lot 1) : cible et confirmation de « Appliquer (n) », lues dans la copie des états (aucune requête).
+      toApplyIds: function () { return lastView && !lastView.stale ? toApplyIds(lastView.overview) : []; },
+      applyDialog: function () { return applyDialog(lastView && !lastView.stale ? toApplyIds(lastView.overview).length : 0); },
+      selectTab: selectTab,
       // Story 25.4 : ce que la vue de travail lit (copie unique en mémoire, agrégats dérivés) et abonnement aux rendus.
       snapshot: snapshotNow,
       subscribe: function (fn) {
@@ -826,9 +1261,27 @@
     chipsFor: chipsFor,
     roomExclusionImpact: roomExclusionImpact,
     roomExclusionDialog: roomExclusionDialog,
+    todoItems: todoItems,
+    causeSentence: causeSentence,
+    houseFigure: houseFigure,
+    houseChips: houseChips,
+    HOUSE_CHIPS: HOUSE_CHIPS,
+    segmentLabel: segmentLabel,
+    tileMarks: tileMarks,
+    roomMatchesFilter: roomMatchesFilter,
+    toApplyIds: toApplyIds,
+    applyDialog: applyDialog,
+    statusVerdict: statusVerdict,
+    rememberSync: rememberSync,
+    scenarioCount: scenarioCount,
+    scenarioTabText: scenarioTabText,
+    shortCause: shortCause,
+    adviceCount: adviceCount,
+    adviceLabel: adviceLabel,
     GROUP_KEYS: GROUP_KEYS,
     GROUP_OF_STATE: GROUP_OF_STATE,
     plural: plural,
+    inactiveMarks: inactiveMarks,
     unreadLabel: unreadLabel,
     blockedMentionLabel: blockedMentionLabel,
     classifyResponse: classifyResponse,
@@ -856,6 +1309,8 @@
         openRoom: function (id) { if (typeof window.j2haOpenRoom === 'function') window.j2haOpenRoom(id); },
         // Story 25.8 : demande d'exclusion d'une pièce (confirmation chiffrée, écriture, relecture) — jeedom2ha.js.
         excludeRoom: function () { if (typeof window.requestRoomExclusion === 'function') return window.requestRoomExclusion.apply(window, arguments); },
+        // Front v2 (Lot 7) : dernier état du démon (relais getBridgeStatus de jeedom2ha.js), lu pour la mention des scénarios.
+        bridgeStatus: function () { return window.jeedom2haLastBridgeStatus || null; },
         // Story 25.4 : la vue de travail remplace la fenêtre de pièce ; `false` = vue indisponible (repli sur la page B).
         openView: function (target) {
           var view = window.Jeedom2haWorkviewInstance;
@@ -867,6 +1322,12 @@
       window.j2haNotifyStatesChanged = function () { page.reader.trigger(); };
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') page.reader.onVisible();
+      });
+      // Front v2 (Lot 7) : chaque réponse de getBridgeStatus (lue par jeedom2ha.js) met à jour la mention des scénarios ;
+      // aucune requête ajoutée, on écoute seulement la fin des appels existants.
+      window.$(document).on('ajaxComplete', function (_event, _xhr, settings) {
+        var data = settings && settings.data;
+        if (typeof data === 'string' && data.indexOf('action=getBridgeStatus') !== -1) page.statusChanged();
       });
       page.init();
     });

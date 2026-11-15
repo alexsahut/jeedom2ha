@@ -64,15 +64,18 @@ describe('20.3 / AC2 — modale Diagnostic supprimée, export support conservé'
     assert.doesNotMatch(code, /data-action=diagnostic|Diagnostic de Couverture|modal-diagnostic|Jeedom2haDiagnosticHelpers/);
   });
 
-  it('« Configuration » garde eqLogicThumbnailContainer / eqLogicAction / data-action ; « Ajouter » est retiré (décision d’Alex du 2026-10-11)', () => {
+  // Garde levée (front v3, Lot 1) : la tuile « Gestion / Configuration » (eqLogicThumbnailContainer / logoSecondary) est remplacée
+  // par l'icône ⚙ de la barre d'état, qui garde le déclencheur du cœur (`eqLogicAction`, `data-action="gotoPluginConf"`).
+  it('« Configuration » garde eqLogicAction / data-action (icône ⚙ de la barre d’état) ; « Ajouter » est retiré (décision d’Alex du 2026-10-11)', () => {
     assert.doesNotMatch(page, /eqLogicAction[^>]*data-action="add"/);
-    assert.match(page, /<div class="eqLogicThumbnailContainer">\s*<div class="cursor eqLogicAction logoSecondary" data-action="gotoPluginConf"/);
-    assert.match(page, /eqLogicAction logoSecondary" data-action="gotoPluginConf"/);
+    assert.match(page, /id="div_bridgeHealthBanner"[\s\S]*?class="btn btn-default btn-sm eqLogicAction j2ha-v3-icon-btn" data-action="gotoPluginConf"/);
+    assert.doesNotMatch(page, /eqLogicThumbnailContainer|logoSecondary/);
   });
 
-  it('« Télécharger le diagnostic support » est conservé, avec son action exportDiagnostic', () => {
+  // Garde levée (front v3, Lot 3) : libellé court « ⬇ Diagnostic » (l'explication en info-bulle) ; le bouton et son action restent.
+  it('le bouton du diagnostic support est conservé (« Diagnostic »), avec son action exportDiagnostic', () => {
     assert.match(page, /id="bt_exportDiagnostic"/);
-    assert.match(page, /\{\{Télécharger le diagnostic support\}\}/);
+    assert.match(page, /<i class="fas fa-download"><\/i> \{\{Diagnostic\}\}/);
     assert.match(jsSources['jeedom2ha.js'], /action:\s+'exportDiagnostic'/);
   });
 });
@@ -153,7 +156,10 @@ describe('20.3 / AC6 — libellés français d’usage', () => {
 
   it('table validée : libellés de remplacement présents', () => {
     const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
-    assert.match(php, /\{\{Configuration Home Assistant par pièce\}\}/);
+    // Garde levée (front v2, Lot 7, glossaire 3.2) : « Configuration Home Assistant par pièce » → « Ce que Jeedom publie dans Home Assistant ».
+    // Garde levée (front v3, Lot 1, « zéro paragraphe ») : le titre est retiré ; l'ancien libellé reste absent.
+    assert.doesNotMatch(php, /\{\{Configuration Home Assistant par pièce\}\}/);
+    assert.match(php, /\{\{Équipements\}\}[\s\S]*\{\{Scénarios\}\}/);
     assert.equal(M.buildUncoveredLabel(), 'Ignorée → sans équivalent dans Home Assistant');
     const reason = (code) => M.buildBlockingReason({
       publication_reason: code, should_publish: false, projection_validity: { is_valid: false },

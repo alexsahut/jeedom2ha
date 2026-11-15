@@ -487,7 +487,8 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
     assert.equal(options.buttons.cancel.className, 'btn-default');
-    for (const word of ['Attention', 'historique', 'dashboards', 'automatisations', 'entity_id']) {
+    // Garde levée (front v2, Lot 9a, point 8) : « dashboards » → « tableaux de bord », « entity_id » → « identifiant » (glossaire 3.1).
+    for (const word of ['Attention', 'historique', 'tableaux de bord', 'automatisations', 'identifiant']) {
       assert.ok(options.message.includes(word), word);
     }
   });
@@ -498,12 +499,15 @@ describe('R1-F/G — confirmation forte (couverture 5.2/5.3) et état d’attent
     assert.equal(ui.lastConfirmation().options.buttons.confirm.className, 'btn-primary');
   });
 
-  it('boutons globaux : suppression en rouge, mise en garde forte, sans nombre', () => {
+  // Garde levée (front v2, Lot 6, spec E9) : le nombre vient de la copie des états en mémoire ; tant qu'elle n'est pas lue, la
+  // confirmation le DIT (« Nombre d'entités inconnu pour l'instant ») au lieu d'afficher un chiffre faux.
+  it('boutons globaux : suppression en rouge, mise en garde forte, nombre inconnu dit tel quel sans lecture', () => {
     const ui = openRoomWith(null);
     ui.click('.j2ha-ha-action[data-ha-action="supprimer-recreer"]');
     const { options } = ui.lastConfirmation();
     assert.equal(options.buttons.confirm.className, 'btn-danger');
-    assert.match(options.message, /Supprimer de Home Assistant tout le parc publié \?/);
+    assert.match(options.title, /Supprimer tout de Home Assistant/);
+    assert.match(options.message, /Nombre d(&#39;|')entités inconnu pour l(&#39;|')instant/);
     assert.doesNotMatch(options.message, /\d/);
     options.buttons.confirm.callback();
     const call = ui.pending('executeHaAction')[0];
@@ -596,7 +600,8 @@ describe('G — rendu du détail de pièce et d’équipement de la vue C (ex-fe
     assert.equal(ui.$('.j2ha-eq-name').text(), '<i>Nom</i>');
     assert.equal(ui.$('.j2ha-eq-name i').length, 0);
     assert.ok(ui.$('.j2ha-eq-panel').hasClass('j2ha-eq-disabled'));
-    assert.match(ui.$('.j2ha-eq-panel').text(), /désactivé dans Jeedom/);
+    // Garde levée (front v3, Lot 2) : « désactivé dans Jeedom » est l'info-bulle et le nom accessible d'une icône de l'en-tête.
+    assert.match(ui.$('.j2ha-eq-panel .j2ha-eq-off').attr('aria-label'), /désactivé dans Jeedom/);
   });
 
   it('KPI de pièce : un chiffre et un mot par état non nul, issus du dénombrement des entrées agrégées', () => {

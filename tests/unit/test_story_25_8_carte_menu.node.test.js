@@ -40,12 +40,13 @@ describe('25.8 / AC6 — balisage des cartes', () => {
     assert.equal(ui.$(`${CARD(0)} .j2ha-room-exclude`).length, 0);
   });
 
-  maybe('les cartes conservent objectDisplayCard, .j2ha-room-card, data-object_id, onclick, role et tabindex', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : la tuile ne porte plus `objectDisplayCard` (règles *DisplayCard du cœur).
+  maybe('les cartes conservent .j2ha-room-card, data-object_id, onclick, role et tabindex ; aucune classe *DisplayCard', () => {
     const ui = startPage({ scene: SCENE_EXCLUDED });
     for (const room of ui.rooms) {
       const card = ui.$(CARD(room.object_id));
       assert.equal(card.length, 1);
-      assert.ok(card.hasClass('objectDisplayCard') && card.hasClass('j2ha-room-card'));
+      assert.ok(card.hasClass('j2ha-room-card') && !card.hasClass('objectDisplayCard'));
       assert.equal(card.attr('onclick'), `j2haOpenRoom(${room.object_id})`);
       assert.equal(card.attr('role'), 'button');
       assert.equal(card.attr('tabindex'), '0');
@@ -59,8 +60,14 @@ describe('25.8 / AC6 — balisage des cartes', () => {
     assert.ok(wrap.hasClass('j2ha-menu-wrap'));
     assert.equal(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-haspopup'), 'menu');
     assert.equal(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-expanded'), 'false');
-    assert.ok(plain(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-label')).startsWith('Actions de la pièce'));
-    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-item`).length, 1);
+    // Garde levée (front v2, Lot 6) : glossaire 3.1 « Actions de la pièce » → « Autres actions » ; le menu porte aussi
+    // « Choisir ce qui est publié… » (panneau E6, aucune écriture) et « Republier la pièce » (famille data-ha-action), puis un
+    // séparateur et l'exclusion, inchangée.
+    assert.ok(plain(ui.$(`${CARD(3)} .j2ha-menu-toggle`).attr('aria-label')).startsWith('Autres actions'));
+    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-item`).length, 3);
+    assert.equal(ui.$(`${CARD(3)} .j2ha-room-choose`).attr('data-ha-action'), undefined, 'ouvrir le panneau n\'écrit rien : jamais grisé');
+    assert.equal(ui.$(`${CARD(3)} .j2ha-card-republish`).attr('data-ha-action'), 'republier-piece');
+    assert.equal(ui.$(`${CARD(3)} .j2ha-menu .j2ha-menu-sep`).length, 1);
     assert.equal(ui.$(`${CARD(3)} .j2ha-room-exclude`).attr('data-ha-action'), 'exclure-piece');
     assert.equal(ui.$(`${CARD(3)} .j2ha-room-exclude`).attr('role'), 'menuitem');
   });
@@ -76,7 +83,10 @@ describe('25.8 / AC6 — balisage des cartes', () => {
   it('le CSS du composant de menu et des cartes n\'est pas modifié : ajouts seulement (leçon #296)', () => {
     const diff = diffAgainstBase(['-U0'], ['desktop/css/jeedom2ha.css']);
     if (diff === null) return;
-    assert.deepEqual(removedLines(diff), [], 'aucune ligne de CSS existante modifiée ou retirée');
+    // Garde levée (front v3, Lot 0) : une seule ligne modifiée, HORS du composant de menu et des cartes — le fond de
+    // l'en-tête collant de la fiche (`.j2ha-wv .j2ha-eq-head`), transparent à cause du triplet --bg-color du cœur.
+    const FV3_LOT0 = new Set(['-  background-color: var(--bg-color, var(--j2ha-menu-bg));']);
+    assert.deepEqual(removedLines(diff).filter((l) => !FV3_LOT0.has(l)), [], 'aucune ligne de CSS existante modifiée ou retirée');
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     for (const selector of ['.j2ha-room-has-menu', '.j2ha-room-excluded-line']) {
       assert.ok(css.includes(selector), selector);

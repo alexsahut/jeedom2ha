@@ -110,10 +110,9 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
     assert.equal(ui.calls.length, before);
   });
 
-  maybe('compact : bouton « Pièces » (aria-expanded, aria-controls), replié si une sélection existe, ouvert sinon ; sélectionner referme', () => {
+  maybe('compact : bouton du tiroir (icône « Pièces », aria-expanded, aria-controls), replié si une sélection existe, ouvert sinon ; sélectionner referme', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 800, height: 1000 } });
     ui.openRoom(10);
-    ui.click('.j2ha-wv-widen'); // Story 25.6 : la carte ouvre la pièce seule ; l'arbre complet s'obtient en élargissant
     const toggle = ui.$('.j2ha-wv-drawer-toggle');
     const nav = ui.$('.j2ha-wv-nav');
     assert.equal(toggle.length, 1);
@@ -126,7 +125,8 @@ describe('25.4 / AC21, AC22 — disposition et tiroir', () => {
     assert.equal(toggle.attr('aria-expanded'), 'false', 'sélectionner referme le tiroir');
     assert.ok(!nav.hasClass('j2ha-wv-nav-open'));
     const none = startBig({ rooms: 3, equipments: 30, seed: 6, window: { width: 800 } });
-    none.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'); // ouverture par un filtre : aucune sélection
+    // Garde levée (front v2, Lot 7) : la puce de la maison filtre sur place ; l'ouverture sans sélection passe par l'API de la vue.
+    none.wv.open({ filter: 'published' }); // ouverture par un filtre : aucune sélection
     assert.equal(none.$('.j2ha-wv-drawer-toggle').attr('aria-expanded'), 'true', 'aucune sélection : le panneau est ouvert');
   });
 

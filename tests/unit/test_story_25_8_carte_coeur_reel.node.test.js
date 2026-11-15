@@ -21,11 +21,15 @@ div[class*="DisplayCard"] { height: 130px !important; overflow: hidden; }
 div.objectDisplayCard { height: 130px; min-height: 130px !important; text-align: center; }
 div.objectDisplayCard > i { display: inline-block; height: 42px !important; }
 `;
-const css = CORE_STUB + fs.readFileSync(path.join(__dirname, '..', '..', 'desktop/css/jeedom2ha.css'), 'utf8');
+// Front v3 (Lot 1) : les deux feuilles du plugin, dans l'ordre de la page.
+const css = CORE_STUB + fs.readFileSync(path.join(__dirname, '..', '..', 'desktop/css/jeedom2ha.css'), 'utf8')
+  + fs.readFileSync(path.join(__dirname, '..', '..', 'desktop/css/jeedom2ha_v2.css'), 'utf8');
 const scene = Object.assign({}, SCENE, { config: { excludedObjects: '3' } });
 const CARD = (id) => `#j2ha_roomCards .j2ha-room-card[data-object_id="${id}"]`;
 
-test('correctif 25.8 réel — seule l\'icône de pièce garde 38 px ; « ⋯ » et œil barré à la taille du texte', async (t) => {
+// Garde levée (front v3, Lot 1, cible §1) : la tuile ne porte plus `objectDisplayCard` ; les règles du cœur ne l'atteignent plus
+// (icône de pièce à 20 px, plus à 38 px). Le reste du correctif est vérifié à l'identique.
+test('correctif 25.8 réel — icône de pièce à 20 px (hors des règles du cœur) ; « ⋯ » et œil barré à la taille du texte', async (t) => {
   await withRealView(t, { css, scene, width: 1280, height: 800 }, async (page) => {
     const m = await page.evaluate((sel) => {
       const card = document.querySelector(sel);
@@ -38,7 +42,7 @@ test('correctif 25.8 réel — seule l\'icône de pièce garde 38 px ; « ⋯ »
         lineHeight: card.querySelector('.j2ha-room-excluded-line').getBoundingClientRect().height,
       };
     }, CARD(3));
-    assert.equal(m.room, 38, 'icône de pièce (cœur)');
+    assert.equal(m.room, 20, 'icône de pièce (tuile v3, hors des règles *DisplayCard du cœur)');
     assert.ok(m.toggle <= 16, `« ⋯ » à ${m.toggle}px`);
     assert.ok(m.item <= 14, `icône de l'entrée à ${m.item}px`);
     assert.ok(m.eye <= 14, `œil barré à ${m.eye}px`);

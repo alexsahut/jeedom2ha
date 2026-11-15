@@ -23,20 +23,22 @@ describe('25.6 / AC6 — zéro requête', () => {
     search.props.value = 'eq';
     search.handlers.input.call(search, { target: search });
     ui.advance(400);
-    ui.click('.j2ha-wv-widen');
+    // Garde levée (front v3, Lot 2) : plus de bascule « Toute la maison » (un seul arbre) ; la recherche est vidée à la place.
+    search.props.value = '';
+    search.handlers.input.call(search, { target: search });
+    ui.advance(400);
     ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row');
     ui.win.history.back();
     ui.win.history.forward();
     ui.click('.j2ha-wv-back');
     openCard(ui, 12);
-    ui.click('.j2ha-wv-widen');
     ui.click('.j2ha-wv-back');
     assert.equal(ui.calls.length, before, 'aucune requête du tout');
     assert.equal(ui.count('getEquipmentStates'), 1, 'la seule lecture est celle du chargement de la page B');
     assert.equal(ui.count('getMappingOverrides'), 0);
   });
 
-  maybe('sélectionner un équipement en portée pièce : une seule lecture d’arbre', () => {
+  maybe('sélectionner un équipement : une seule lecture d’arbre', () => {
     const ui = startBig({ rooms: 4, equipments: 44, seed: 7 });
     openCard(ui, 10);
     const before = ui.reads();

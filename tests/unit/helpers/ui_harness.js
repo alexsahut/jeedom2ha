@@ -19,6 +19,15 @@ const { createFakeWindow } = require('./fake_browser');
 const M = require('../../../desktop/js/jeedom2ha_mapping_override.js');
 const O = require('../../../desktop/js/jeedom2ha_overview.js');
 const W = require('../../../desktop/js/jeedom2ha_workview.js');
+// Front v2 (Lot 2) : modules purs chargés avant la surface dans la page (lexique, côté Home Assistant).
+const LEX = require('../../../desktop/js/jeedom2ha_lexique.js');
+const HA_SIDE = require('../../../desktop/js/jeedom2ha_ha_side.js');
+// Front v2 (Lot 6) : textes des confirmations chiffrées (E9), chargés avant jeedom2ha.js comme dans la page.
+const EXCL = require('../../../desktop/js/jeedom2ha_exclusions.js');
+// Front v2 (Lot 5) : panneau « Corriger le type » (module pur), lu par la surface au clic comme dans la page.
+const TYPE_PANEL = require('../../../desktop/js/jeedom2ha_type_panel.js');
+// Front v3 (Lot 6) : composant d'aide ⓘ, chargé avant la surface dans la page (la surface lit `window.Jeedom2haInfoTip`).
+const INFOTIP = require('../../../desktop/js/jeedom2ha_infotip.js');
 const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
 const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
 const homeSlice = home.slice(home.indexOf('function refreshBridgeStatus'), home.indexOf('/* Permet la réorganisation'));
@@ -97,14 +106,17 @@ function tree(id, diagnostics, extra) {
 }
 const ok = (payload) => ({ state: 'ok', result: { payload } });
 
-/** Squelette minimal de la page (ids et classes lus par B et C) : cartes regroupées dans l'ordre des pièces. */
+/** Squelette minimal de la page (ids et classes lus par B et C) : cartes regroupées dans l'ordre des pièces.
+ * Front v3 (Lot 1) : même structure que la page (onglets, bloc maison sans phrase, liste « À faire », tuiles sans
+ * `objectDisplayCard` ni `*ListContainer`) ; plus de liste filtrée (#j2ha_filterPanel). */
 function skeletonFor(rooms) {
-  const cards = (rooms || []).map((room) => `<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="${room.object_id}"><span class="name">${room.object_name}</span><span class="text-muted j2ha-room-count"> (${room.equipments.length})</span><div class="j2ha-room-state"></div></div>`).join('');
-  return '<div id="j2ha_mainView"><div id="j2ha_houseBlock"><span id="j2ha_houseNumber"></span><span id="j2ha_houseSub"></span>'
-    + '<div id="j2ha_houseMeta"></div><div id="j2ha_houseGauge"></div><div id="j2ha_houseChips"></div><span id="j2ha_freshness"></span>'
-    + '<button id="bt_refreshStates"></button><div id="j2ha_readStatus"></div></div>'
-    + '<div id="j2ha_filterPanel"><strong id="j2ha_filterTitle"></strong><button id="bt_clearFilter"></button><ul id="j2ha_filterList"></ul></div>'
-    + `<div id="j2ha_roomCards" class="j2ha-room-groups"><div class="j2ha-room-group"><div class="objectListContainer">${cards}</div></div></div></div>`
+  const cards = (rooms || []).map((room) => `<div class="cursor j2ha-room-card j2ha-v3-tile" data-object_id="${room.object_id}" data-total="${room.equipments.length}"><i class="fas fa-door-open j2ha-room-icon"></i><span class="name j2ha-v3-tile-name">${room.object_name}</span><div class="j2ha-room-state"></div></div>`).join('');
+  return '<div id="j2ha_mainView"><span id="j2ha_tabEquipmentsCount"></span><span id="j2ha_tabScenariosCount"></span>'
+    + '<div id="j2ha_tab_equipments"><div id="j2ha_houseBlock"><span id="j2ha_houseNumber"></span><span id="j2ha_houseSub"></span>'
+    + '<button id="bt_refreshStates"></button><div id="j2ha_houseGauge"></div><div id="j2ha_houseChips"></div><div id="j2ha_readStatus"></div></div>'
+    + '<div id="j2ha_v2_todo" class="j2ha-v2-todo"></div>'
+    + `<div id="j2ha_roomCards" class="j2ha-room-groups j2ha-v3-grid"><div class="j2ha-room-group j2ha-v3-group"><div class="j2ha-v3-tiles">${cards}</div></div></div></div>`
+    + '<div id="j2ha_tab_scenarios" hidden></div></div>'
     + '<div id="j2ha_workView" class="j2ha-wv"></div>';
 }
 
@@ -119,6 +131,7 @@ function createUi(rooms, options) {
     bootbox: dom.bootbox,
     document: dom.document,
     Jeedom2haMappingOverride: M,
+    Jeedom2haExclusions: EXCL,
     setTimeout,
     clearTimeout,
     console,
@@ -126,6 +139,11 @@ function createUi(rooms, options) {
   // `window` est le faux navigateur (location / history / matchMedia / tailles) ; le code testé y pose ses globales.
   Object.assign(win, {
     Jeedom2haMappingOverride: M,
+    Jeedom2haLexique: LEX,
+    Jeedom2haHaSide: HA_SIDE,
+    Jeedom2haExclusions: EXCL,
+    Jeedom2haTypePanel: TYPE_PANEL,
+    Jeedom2haInfoTip: INFOTIP,
     j2haRoomsTree: rooms || [],
     j2haAncestors: opts.ancestors || [],
     j2haPluginNames: opts.pluginNames || {},

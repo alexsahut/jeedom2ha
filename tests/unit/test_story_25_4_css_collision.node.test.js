@@ -43,7 +43,10 @@ test('25.4 / AC25 (2) non-modification — aucune déclaration d’un sélecteur
   const changed = [];
   for (const [key, declarations] of Object.entries(baseline.selectors)) {
     if (removed.has(bare(key))) continue;
-    if (finalTable[key] !== declarations) changed.push(key);
+    // Garde levée (front v3, Lot 0) : seule addition admise dans les blocs de thème, --j2ha-page-rgb (triplet de repli de
+    // --bg-color pour l'en-tête collant opaque). Toute autre déclaration modifiée reste interdite.
+    const current = /^(:root|body\[data-theme)/.test(bare(key)) ? (finalTable[key] || '').replace(/;--j2ha-page-rgb:[^;]*$/, '') : finalTable[key];
+    if (current !== declarations) changed.push(key);
   }
   assert.deepEqual(changed, []);
 });

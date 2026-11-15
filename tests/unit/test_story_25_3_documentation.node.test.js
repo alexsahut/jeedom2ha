@@ -25,23 +25,30 @@ describe('25.3 / AC14 — vocabulaire', () => {
 });
 
 describe('25.3 / AC14 — index.md décrit la nouvelle page principale', () => {
-  it('barre de santé, actions, menu « ⋯ », bloc maison et filtres, cartes, « Actualiser », « non lu », regroupement par parent', () => {
-    for (const heading of ['### La barre de santé', '### Les actions de la barre de santé', '### Le bloc de la maison', '### Les cartes de pièce']) {
+  // Garde levée (front v2, Lot 8, glossaire 3.1) : « barre de santé » devient « Barre d'état » dans la documentation.
+  it('barre d’état, actions, menu « ⋯ », bloc maison et filtres, cartes, « Actualiser », « non lu », regroupement par parent', () => {
+    // Garde levée (front v3, Lot 5) : doc réécrite par écran ; « Les actions de la barre d'état », « Le bloc de la maison » et
+    // « Les cartes de pièce » deviennent « La barre d'état » (actions comprises) et « La page maison et les puces » (tuiles
+    // comprises) ; le liseré remplace le mot « jauge » à l'écran comme dans la doc.
+    for (const heading of ['### La barre d\'état', '### La page maison et les puces', '### À faire']) {
       assert.ok(index.includes(heading), heading);
     }
     assert.match(index, /menu « ⋯ »/);
-    assert.match(index, /Chaque puce \(et chaque segment de la jauge\) est un filtre/);
+    assert.match(index, /Chaque puce \(et chaque segment du liseré\) est un filtre/);
+    assert.match(index, /\*\*Une tuile de pièce\*\*/);
     assert.match(index, /« Actualiser »/);
     assert.match(index, /« non lu »/);
     assert.match(index, /regroupées par objet parent/);
     assert.match(index, /au retour sur l'onglet|quand vous revenez sur l'onglet/);
   });
 
-  it('ne mentionne plus le bandeau de santé ni la zone « Actions Home Assistant » ; le bandeau bleu a disparu', () => {
-    assert.doesNotMatch(index, /bandeau de santé/);
+  // Garde levée (front v2, Lot 8, R24) : la phrase « Aucun bandeau bleu n'ouvre plus la page » parlait de l'ancienne version ;
+  // la documentation décrit l'écran actuel, sans renvoi aux versions précédentes.
+  it('ne mentionne plus le bandeau ni la barre de santé, ni la zone « Actions Home Assistant », ni le bandeau bleu', () => {
+    assert.doesNotMatch(index, /bandeau de santé|barre de santé/i);
     assert.doesNotMatch(index, /zone « Actions Home Assistant »/);
     assert.doesNotMatch(index, /\*\*« Republier dans Home Assistant »\*\*/);
-    assert.match(index, /Aucun bandeau bleu n'ouvre plus la page/);
+    assert.doesNotMatch(index, /bandeau bleu/);
     assert.match(index, /partagé avec Homebridge/, 'la note Homebridge est conservée, dans le texte');
   });
 
@@ -79,8 +86,10 @@ describe('25.3 / AC14 — libellés cités = libellés du code', () => {
     .join('\n');
 
   it('chaque libellé de la page B cité dans la documentation existe tel quel dans desktop/ ou core/', () => {
-    const labels = ['Republier tout', 'Relire Jeedom', 'Télécharger le diagnostic…', 'Supprimer tout de Home Assistant…', 'Actualiser',
-      'Tout afficher', 'Aide', 'Plus d\'actions', 'Télécharger le diagnostic support', 'Pseudonymiser les noms d\'équipements',
+    // Garde levée (front v2, Lot 1) : « Télécharger le diagnostic… » et « Plus d'actions » quittent l'écran (exports déplacés
+    // dans « Vérifier l'installation… », glossaire 3.2 « Autres actions ») ; la documentation cite les nouveaux libellés.
+    const labels = ['Republier tout', 'Relire Jeedom', 'Vérifier l\'installation…', 'Supprimer tout de Home Assistant…', 'Actualiser',
+      'Tout afficher', 'Aide', 'Autres actions', 'Télécharger le diagnostic support', 'Pseudonymiser les noms d\'équipements',
       'Aucune synchronisation n\'a encore eu lieu', 'Opération en cours : ces chiffres peuvent changer', 'Chiffres indisponibles',
       'Aucune pièce avec équipement trouvée.'];
     const text = index + compteurs + changelogBeta;

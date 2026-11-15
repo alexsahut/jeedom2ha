@@ -47,12 +47,11 @@ function openCard(ui, objectId) {
 }
 
 /**
- * Story 25.6 : une carte ouvre désormais la pièce SEULE (`data-j2ha-scope="piece"`). Les tests de 25.4 qui supposent l'arbre
- * complet élargissent explicitement (bouton « Toutes les pièces ») : même arbre, même fragment (l'entrée est remplacée).
+ * Story 25.6 : une carte ouvrait la pièce SEULE, et les tests de 25.4 élargissaient (bouton « Toute la maison »). Front v3
+ * (Lot 2) : la bascule est supprimée, une carte ouvre l'arbre complet ; ce raccourci est gardé pour les tests de 25.4.
  */
 function openCardWide(ui, objectId) {
   openCard(ui, objectId);
-  ui.click('.j2ha-wv-widen');
 }
 
 module.exports = { startWorkview, startBig, openCard, openCardWide, phpAvailable, assert, SCENE };

@@ -206,19 +206,21 @@ async function waitAtStep(helpers, index, label, operation) {
 
 /** Ouvre la pièce 25, déplie l'équipement 579 et consigne les constats DOM non sensibles. */
 export async function run(page, { helpers }) {
-  const managementOrder = await page.locator('.eqLogicThumbnailContainer').evaluateAll((nodes) => {
-    const actions = nodes.find((node) => node.querySelector('[data-action="gotoPluginConf"]'));
+  // Front v3 (Lot 1, garde levée) : la tuile « Gestion / Configuration » est retirée ; la configuration s'ouvre par l'icône ⚙
+  // de la barre d'état (même déclencheur du cœur, `.eqLogicAction[data-action="gotoPluginConf"]`), avant la surface.
+  const managementOrder = await page.evaluate(() => {
+    const actions = document.querySelector('#div_bridgeHealthBanner .eqLogicAction[data-action="gotoPluginConf"]');
     const surface = document.querySelector('#j2ha_roomCards');
-    const banner = document.querySelector('#div_bridgeHealthBanner');
     return {
       beforeSurface: Boolean(actions && surface && (actions.compareDocumentPosition(surface) & Node.DOCUMENT_POSITION_FOLLOWING)),
-      beforeBanner: Boolean(actions && banner && (actions.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      inBanner: Boolean(actions),
+      tiles: document.querySelectorAll('.eqLogicThumbnailContainer [data-action="gotoPluginConf"]').length,
     };
   });
   if (!managementOrder.beforeSurface) throw new Error('gestion-apres-surface');
-  if (!managementOrder.beforeBanner) throw new Error('gestion-apres-bandeau');
+  if (!managementOrder.inBanner || managementOrder.tiles !== 0) throw new Error('gestion-hors-barre-etat');
   helpers.record('gestion_avant_surface', true);
-  helpers.record('gestion_avant_bandeau', true);
+  helpers.record('gestion_dans_barre_etat', true);
   await waitAtStep(helpers, 0, 'elements-retires', () => checkRemovedElements(page, helpers));
   const pageRanks = await forbiddenTextRanks(page, '.eqLogicThumbnailDisplay');
   const editRanks = await forbiddenTextRanks(page, '.eqLogic');

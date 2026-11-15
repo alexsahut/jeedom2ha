@@ -147,7 +147,8 @@ function j2ha_group_rooms(array $rooms, array $ancestors) {
 			$seen[$cur] = true;
 			$cur = $knownFather($cur);
 		}
-		return implode(' › ', $chain);
+		// Front v3 (Lot 1) : seul le nom du parent direct ; le préfixe « Maison › » est retiré (c'est toujours la maison).
+		return count($chain) > 0 ? $chain[count($chain) - 1] : '';
 	};
 
 	$isolated = array();
@@ -193,9 +194,12 @@ function j2ha_group_rooms(array $rooms, array $ancestors) {
 }
 
 /**
- * Menu « ⋯ » d'une carte de pièce (Story 25.8, AC6) : une seule entrée, « Exclure la pièce… » ou « Ne plus exclure la
- * pièce… ». Réutilise le composant `.j2ha-menu-*` de 25.1 sans en modifier les règles. L'entrée porte `data-ha-action` : elle est
- * grisée par le même gating que les autres actions (pont indisponible, relecture en cours). Jamais pour « Sans pièce ».
+ * Menu « ⋯ » d'une carte de pièce (Story 25.8, AC6 ; front v2, Lot 6) : « Choisir ce qui est publié… » (ouvre le panneau
+ * d'exclusion unifiée positionné sur la pièce, aucune écriture), « Republier la pièce » (même route que la vue de la pièce), puis,
+ * après un séparateur, « Exclure la pièce… » ou « Ne plus exclure la pièce… ». Réutilise le composant `.j2ha-menu-*` de 25.1
+ * sans en modifier les règles. Les entrées qui écrivent portent `data-ha-action` : elles sont grisées par le même gating que les
+ * autres actions (pont indisponible, relecture en cours). Libellé du bouton : « Autres actions » (glossaire 3.1). Jamais pour
+ * « Sans pièce ».
  */
 function j2ha_render_room_menu(array $room) {
 	$name = j2ha_html($room['object_name']);
@@ -203,9 +207,15 @@ function j2ha_render_room_menu(array $room) {
 	$label = $excluded ? '{{Ne plus exclure la pièce…}}' : '{{Exclure la pièce…}}';
 	$html = '<span class="j2ha-menu-wrap j2ha-room-menu">';
 	$html .= '<button type="button" class="j2ha-menu-toggle j2ha-room-menu-toggle" aria-haspopup="menu" aria-expanded="false"'
-		. ' aria-label="{{Actions de la pièce}} ' . $name . '" title="{{Actions de la pièce}}">'
+		. ' aria-label="{{Autres actions}} ' . $name . '" title="{{Autres actions}}">'
 		. '<i class="fas fa-ellipsis-h"></i></button>';
-	$html .= '<ul class="j2ha-menu j2ha-room-menu-list" role="menu"><li role="none">'
+	$html .= '<ul class="j2ha-menu j2ha-room-menu-list" role="menu">'
+		. '<li role="none"><button type="button" class="j2ha-menu-item j2ha-room-choose" role="menuitem">'
+		. '<i class="fas fa-check-square"></i><span>{{Choisir ce qui est publié…}}</span></button></li>'
+		. '<li role="none"><button type="button" class="j2ha-menu-item j2ha-card-republish" role="menuitem" data-ha-action="republier-piece" disabled>'
+		. '<i class="fas fa-upload"></i><span>{{Republier la pièce}}</span></button></li>'
+		. '<li class="j2ha-menu-sep" role="separator"></li>'
+		. '<li role="none">'
 		. '<button type="button" class="j2ha-menu-item j2ha-room-exclude" role="menuitem" data-ha-action="exclure-piece"'
 		. ' data-excluded="' . ($excluded ? '1' : '0') . '" disabled>'
 		. '<i class="fas fa-eye-slash"></i><span class="j2ha-room-exclude-label">' . $label . '</span></button>'
@@ -214,22 +224,27 @@ function j2ha_render_room_menu(array $room) {
 	return $html;
 }
 
-/** Carte de pièce : conserve `objectDisplayCard`, `j2ha-room-card`, `data-object_id` et `onclick` (jamais `eqLogicDisplayCard`). */
+/**
+ * Tuile de pièce (front v3, Lot 1) : 220 × 72 px, icône, nom sur une ligne, ratio `n/m` à droite, marques (icône + nombre),
+ * liseré de 4 px collé au bas, menu « ⋯ » au survol. Conserve `j2ha-room-card`, `data-object_id` et `onclick`.
+ * Compatibilité avec le CSS du cœur : `div[class*="DisplayCard"]` impose `height:130px; overflow:hidden` — la tuile ne porte
+ * AUCUNE classe contenant `DisplayCard` et n'est dans aucun conteneur `*ListContainer`.
+ */
 function j2ha_render_room_card(array $room) {
 	$id = (int) $room['object_id'];
 	$icon = isset($room['icon_classes']) ? j2ha_icon_classes('<i class="' . $room['icon_classes'] . '"></i>') : J2HA_ICON_FALLBACK;
 	$color = isset($room['color']) ? j2ha_color_hex($room['color']) : '';
-	$html = '<div class="objectDisplayCard cursor j2ha-room-card" data-object_id="' . $id . '" tabindex="0" role="button"'
+	$html = '<div class="cursor j2ha-room-card j2ha-v3-tile' . ($id > 0 ? '' : ' j2ha-v3-tile-none') . '" data-object_id="' . $id
+		. '" data-total="' . count($room['equipments']) . '" tabindex="0" role="button"'
 		. ($color !== '' ? ' data-color="' . j2ha_html($color) . '"' : '')
 		. ' onclick="j2haOpenRoom(' . $id . ')">';
+	$html .= '<i class="' . j2ha_html($icon) . ' j2ha-room-icon" aria-hidden="true"></i>';
+	$html .= '<span class="name j2ha-v3-tile-name' . ($id > 0 ? ' j2ha-free-name' : '') . '" title="' . j2ha_html($room['object_name']) . '">'
+		. j2ha_html($room['object_name']) . '</span>';
+	$html .= '<div class="j2ha-room-state"></div>';
 	if ($id > 0) {
 		$html .= j2ha_render_room_menu($room);
 	}
-	$html .= '<i class="' . j2ha_html($icon) . ' j2ha-room-icon"></i>';
-	$html .= '<br>';
-	$html .= '<span class="name' . ($id > 0 ? ' j2ha-free-name' : '') . '">' . j2ha_html($room['object_name']) . '</span>';
-	$html .= '<span class="text-muted j2ha-room-count"> (' . count($room['equipments']) . ')</span>';
-	$html .= '<div class="j2ha-room-state"></div>';
 	$html .= '</div>';
 	return $html;
 }
@@ -238,11 +253,11 @@ function j2ha_render_room_card(array $room) {
 function j2ha_render_room_groups(array $groups) {
 	$html = '';
 	foreach ($groups as $group) {
-		$html .= '<div class="j2ha-room-group">';
+		$html .= '<div class="j2ha-room-group j2ha-v3-group">';
 		if ($group['title'] !== null && $group['title'] !== '') {
 			$html .= '<h4 class="j2ha-room-group-title j2ha-free-name">' . j2ha_html($group['title']) . '</h4>';
 		}
-		$html .= '<div class="objectListContainer">';
+		$html .= '<div class="j2ha-v3-tiles">';
 		foreach ($group['rooms'] as $room) {
 			$html .= j2ha_render_room_card($room);
 		}

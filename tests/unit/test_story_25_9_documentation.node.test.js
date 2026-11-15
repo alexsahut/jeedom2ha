@@ -12,26 +12,25 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const index = read('docs/fr_FR/index.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const page = [read('plugin_info/configuration.php'), read('core/php/jeedom2ha_excluded_plugins.php')].join('\n').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'");
-const filtering = index.slice(index.indexOf('### Filtrage et publication'), index.indexOf('## Première synchronisation'));
+// Garde levée (front v2, Lot 8) : le § « Filtrage et publication » suit le titre du bloc à l'écran, « Ce qui est publié » (E8).
+// Garde levée (front v3, Lot 5) : le § devient « Ce qui est publié, Avancé » (sous « Configuration »), jusqu'à « Vérifier l'installation ».
+const filtering = index.slice(index.indexOf('#### Ce qui est publié, Avancé'), index.indexOf('### Vérifier l\'installation'));
 
 describe('25.9 / AC8 — documentation de la configuration', () => {
-  it('§ Filtrage et publication : liste à cocher (plugins présents, absents encore exclus, ordre sans importance), plus de ligne « Pièces exclues »', () => {
-    for (const needle of ['liste à cocher', 'au moins un équipement', 'jeedom2ha lui-même', 'absent de Jeedom', 'L\'ordre des cases n\'a pas d\'importance',
-      'Sauvegarder', 'même format']) {
-      assert.ok(filtering.includes(needle) || index.includes(needle), needle);
-    }
-    assert.doesNotMatch(filtering, /\| \*\*Pièces exclues\*\* \|/);
+  // Garde levée (front v3, Lot 3) : la liste à cocher « Plugins exclus » quitte la configuration (une seule source : le panneau
+  // « Choisir ce qui est publié ») ; le § « Ce qui est publié » renvoie au panneau et ne décrit plus de liste ; la famille 7 suit.
+  it('§ Ce qui est publié : renvoi au panneau unique, plus de liste à cocher ni de ligne « Pièces exclues »', () => {
+    assert.ok(filtering.length > 200, 'section présente');
+    assert.match(filtering, /\[Choisir ce qui est publié\]\(#choisir-ce-qui-est-publié\)/);
+    assert.doesNotMatch(filtering, /liste à cocher|\| \*\*Pièces exclues\*\* \||\| \*\*Plugins exclus\*\* \|/);
     assert.doesNotMatch(filtering, /virtual,zwave,rfxcom|`1,5,12`/);
-    assert.match(filtering, /Pièces exclues : elles se règlent depuis la page du plugin \(menu « ⋯ » d'une carte de pièce, ou détail de la pièce\)\./);
-    assert.match(filtering, /\[Exclure une pièce\]\(#exclure-une-pièce\)/);
-    assert.match(filtering, /reprises telles quelles/);
   });
 
-  it('§ Première synchronisation et famille 7 « Exclusions volontaires » sont réalignées', () => {
-    assert.match(index, /2\. Ajustez les filtres si nécessaire \(plugins exclus, politique de publication ; les pièces s'excluent depuis la page du plugin\)\./);
-    assert.match(index, /Plugin coché dans la liste « Plugins exclus » de la configuration\./);
-    assert.match(index, /décochez le plugin dans « Plugins exclus »/);
-    assert.doesNotMatch(index, /champs « Plugins exclus » et « Pièces exclues »/);
+  it('§ Première publication et famille 7 « Exclusions volontaires » sont réalignées', () => {
+    assert.match(index, /3\. « Choisir ce qui est publié » \| « Tout publier \(recommandé\) » ou « Choisir… »/);
+    assert.match(index, /Plugin décoché dans le panneau « Choisir ce qui est publié » \(Par plugin\)\./);
+    assert.match(index, /recochez le plugin dans le panneau « Choisir ce qui est publié »/);
+    assert.doesNotMatch(index, /champs « Plugins exclus » et « Pièces exclues »|liste « Plugins exclus » de la configuration/);
   });
 
   it('plus aucun champ « Pièces exclues » décrit comme un champ de configuration', () => {
@@ -39,10 +38,12 @@ describe('25.9 / AC8 — documentation de la configuration', () => {
     assert.doesNotMatch(index, /au champ « Pièces exclues »/);
   });
 
+  // Garde levée (front v2, Lot 9b, regard neuf v2 G6/G8) : la mention « Anciennement « Politique de publication ». » parlait d'une
+  // version que l'utilisateur n'a jamais connue ; elle est remplacée par la distinction doute / blocage. Le libellé n'est plus exigé.
   it('chaque libellé cité existe verbatim dans la page de configuration', () => {
-    for (const label of ['Plugins exclus', '(absent de Jeedom)', 'Aucun plugin avec des équipements.', 'Les équipements des plugins cochés ne sont pas publiés dans Home Assistant.',
-      "Pièces exclues : elles se règlent depuis la page du plugin (menu « ⋯ » d'une carte de pièce, ou détail de la pièce).", 'pièces exclues', 'pièce exclue',
-      'Ouvrir la page du plugin', 'Politique de publication']) {
+    // Garde levée (front v3, Lot 3) : libellés de la configuration réduite au broker.
+    for (const label of ['Choisir ce qui est publié', 'Retour à la page du plugin', 'Une seule installation jeedom2ha par broker MQTT.',
+      'cron5 désactivé : mises à jour manuelles', 'Tester, enregistrer et redémarrer le démon', 'Réinitialiser le formulaire']) {
       assert.ok(page.includes(label), `« ${label} » absent de la page de configuration`);
     }
   });

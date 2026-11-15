@@ -94,5 +94,8 @@ test('25.3 gate — l’inventaire des identifiants conservés par la page (sél
     assert.ok(page.includes(attr), attr);
   }
   const helpers = fs.readFileSync('desktop/php/jeedom2ha_overview_helpers.php', 'utf8');
-  for (const needle of ['j2ha-room-card', 'data-object_id', 'objectDisplayCard']) assert.ok(helpers.includes(needle), needle);
+  // Garde levée (front v3, Lot 1, cible §1) : la tuile ne porte plus `objectDisplayCard` (règles *DisplayCard du cœur : 130 px,
+  // overflow:hidden) ; les sélecteurs des parcours lisent `.j2ha-room-card[data-object_id]`, conservés.
+  for (const needle of ['j2ha-room-card', 'data-object_id']) assert.ok(helpers.includes(needle), needle);
+  assert.ok(!/class="[^"]*DisplayCard/.test(helpers), 'aucune classe *DisplayCard sur la tuile');
 });

@@ -81,12 +81,13 @@ describe('25.4 / AC1, AC2 — le point d’entrée des cartes ne crée aucune mo
     assert.equal(ui.isOpen(), true);
   });
 
-  maybe('les cartes conservent objectDisplayCard, j2ha-room-card, data-object_id et j2haOpenRoom(id) ; jamais eqLogicDisplayCard', () => {
+  // Garde levée (front v3, Lot 1, cible §1) : la tuile ne porte plus `objectDisplayCard` (règles *DisplayCard du cœur).
+  maybe('les cartes conservent j2ha-room-card, data-object_id et j2haOpenRoom(id) ; aucune classe *DisplayCard', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
     const cards = ui.$('#j2ha_roomCards .j2ha-room-card');
     assert.ok(cards.length >= 3);
     cards.list.forEach((card) => {
-      assert.ok(card.classes.has('objectDisplayCard'));
+      assert.ok(![...card.classes].some((c) => /DisplayCard/.test(c)));
       assert.ok(!card.classes.has('eqLogicDisplayCard'));
       assert.match(card.attrs['data-object_id'], /^\d+$/);
       assert.equal(card.attrs.onclick, `j2haOpenRoom(${card.attrs['data-object_id']})`);

@@ -18,6 +18,15 @@
  *   - ctx.declaredRescan : true seulement si le parcours déclare le rescan (AC7).
  *   - ctx.declaredRoomExclusions : { [objectId]: { excluded: '1' | '0' } } — exclusions de pièce déclarées par le
  *     parcours (Story 25.8, AC14) : `saveRoomExclusion` n'est simulée que pour un objectId et un sens déclarés.
+ *   - ctx.declaredFilteringConfig : { excludedPlugins: [valeurs CSV acceptées], confidencePolicy } — front v2 (Lot 6) : écriture
+ *     `saveFilteringConfig` depuis le panneau « Choisir ce qui est publié… » de la page du plugin, SIMULÉE seulement pour une
+ *     valeur déclarée (application puis annulation) ; sans déclaration, elle reste un effet de bord bloqué.
+ *   - ctx.declaredEquipmentPublications : { [eqId]: true } — front v2 (Lot 5) : équipements dont la publication
+ *     (`executeHaAction` publier / equipement / [eqId], le second temps de « Enregistrer et publier ») est SIMULÉE,
+ *     jamais transmise. Tout autre `executeHaAction` reste un effet de bord refusé.
+ *   - ctx.declaredScenarioPublications : { [scenarioId]: true } — front v3 (Lot 4a) : choix de publication des scénarios
+ *     (`saveScenarioPublication`, publier / ne plus publier) SIMULÉ seulement si tous les identifiants des deux listes sont
+ *     déclarés ; sans déclaration, il reste un effet de bord bloqué (il écrit la configuration et relit Jeedom).
  *   - ctx.lastPreviewType : { [`${eqId}:${cmdId}`]: haEntityType } — dernier type
  *     prévisualisé par previewMappingOverride pour ce couple, exigé identique par
  *     saveMappingOverride (AC2).
@@ -66,11 +75,16 @@ const SIDE_EFFECT_ACTIONS = [
   'saveFilteringConfig',
   'forceMqttManagerImport',
   'testMqttConnection',
+  'saveScenarioPublication',
 ];
 
 // Paramètres de core/ajax/jeedom2ha.ajax.php:877-920 (previewMappingOverride,
 // saveMappingOverride, revertMappingOverride) : eqId, cmdId, haEntityType.
 const OVERRIDE_WRITE_ACTIONS = ['saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride'];
+
+// Front v2 (Lot 6) : plugins exclus écrits depuis la page du plugin (panneau d'exclusion unifiée) — écriture SIMULÉE déclarée.
+const FILTERING_CONFIG_ACTION = 'saveFilteringConfig';
+const FILTERING_CONFIG_PARAMS = 'action,confidencePolicy,excludedPlugins';
 
 // Story 25.8 : exclusion d'une pièce depuis la surface — écriture de configuration SIMULÉE, jamais transmise à la box.
 const ROOM_EXCLUSION_ACTION = 'saveRoomExclusion';
@@ -223,6 +237,52 @@ function validateRoomExclusion(req, params, ctx) {
   return !!entry && typeof entry === 'object' && entry.excluded === params.excluded;
 }
 
+// Front v2 (Lot 6) : POST, exactement action + excludedPlugins + confidencePolicy ; `excludedPlugins` = une des valeurs déclarées
+// par le parcours (liste de chaînes), `confidencePolicy` = la valeur déclarée (sure_only ou sure_probable).
+function validateFilteringConfig(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== FILTERING_CONFIG_PARAMS) return false;
+  const declared = ctx.declaredFilteringConfig;
+  if (!declared || typeof declared !== 'object' || !Array.isArray(declared.excludedPlugins)) return false;
+  if (params.confidencePolicy !== 'sure_only' && params.confidencePolicy !== 'sure_probable') return false;
+  if (params.confidencePolicy !== declared.confidencePolicy) return false;
+  return declared.excludedPlugins.some((value) => typeof value === 'string' && value === params.excludedPlugins);
+}
+
+// Front v2 (Lot 5) : POST, exactement action + intention + portee + selection, `publier` / `equipement` / `[eqId]`, eqId
+// déclaré par le parcours dans `declaredEquipmentPublications`. Simulée : rien n'est transmis à la box.
+const EQUIPMENT_PUBLICATION_PARAMS = 'action,intention,portee,selection';
+function validateDeclaredEquipmentPublication(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== EQUIPMENT_PUBLICATION_PARAMS) return false;
+  if (params.intention !== 'publier' || params.portee !== 'equipement') return false;
+  const match = /^\[([1-9][0-9]{0,9})\]$/.exec(params.selection);
+  if (!match) return false;
+  return hasOwnSafe(ctx.declaredEquipmentPublications, match[1]) && ctx.declaredEquipmentPublications[match[1]] === true;
+}
+
+// Front v3 (Lot 4a) : POST, exactement action + ids_to_publish + ids_to_unpublish ; chaque liste au format strict de la route
+// (`[12,15]` ou `[]`, entiers positifs sans zéro initial ni doublon), au moins un identifiant, aucun dans les deux listes, et
+// chaque identifiant déclaré par le parcours dans `declaredScenarioPublications`. Simulée : rien n'est transmis à la box.
+const SCENARIO_PUBLICATION_ACTION = 'saveScenarioPublication';
+const SCENARIO_PUBLICATION_PARAMS = 'action,ids_to_publish,ids_to_unpublish';
+const SCENARIO_ID_LIST = /^\[(?:[1-9][0-9]{0,9}(?:,[1-9][0-9]{0,9})*)?\]$/;
+function scenarioIdList(value) {
+  if (typeof value !== 'string' || !SCENARIO_ID_LIST.test(value)) return null;
+  const ids = value.slice(1, -1).split(',').filter((id) => id !== '');
+  return new Set(ids).size === ids.length ? ids : null;
+}
+function validateDeclaredScenarioPublication(req, params, ctx) {
+  if (req.method !== 'POST' || !params || !ctx || typeof ctx !== 'object') return false;
+  if (Object.keys(params).sort().join(',') !== SCENARIO_PUBLICATION_PARAMS) return false;
+  const toPublish = scenarioIdList(params.ids_to_publish);
+  const toUnpublish = scenarioIdList(params.ids_to_unpublish);
+  if (!toPublish || !toUnpublish || toPublish.length + toUnpublish.length === 0) return false;
+  if (toPublish.some((id) => toUnpublish.includes(id))) return false;
+  return [...toPublish, ...toUnpublish].every((id) => hasOwnSafe(ctx.declaredScenarioPublications, id)
+    && ctx.declaredScenarioPublications[id] === true);
+}
+
 function validateDeclaredRescan(req, ctx) {
   return req.method === 'POST' && ctx && ctx.declaredRescan === true;
 }
@@ -288,6 +348,20 @@ export function classifyRequest(req, ctx) {
         return { verdict: 'simulate', reason: 'exclusion-piece-declaree', action, params };
       }
       return { verdict: 'block-fail', reason: 'exclusion-piece-non-declaree', action };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === FILTERING_CONFIG_ACTION && validateFilteringConfig(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'plugins-exclus-declares', action, params };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === 'executeHaAction'
+      && validateDeclaredEquipmentPublication(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'publication-equipement-declaree', action, params };
+    }
+
+    if (url.pathname === PLUGIN_AJAX_PATH && action === SCENARIO_PUBLICATION_ACTION
+      && validateDeclaredScenarioPublication(req, params, ctx)) {
+      return { verdict: 'simulate', reason: 'publication-scenarios-declaree', action, params };
     }
 
     if (url.pathname === PLUGIN_AJAX_PATH && SIDE_EFFECT_ACTIONS.includes(action)) {

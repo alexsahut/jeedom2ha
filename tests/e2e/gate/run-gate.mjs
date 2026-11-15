@@ -169,6 +169,7 @@ const TARGET_WRITE_ACTIONS = new Set([
   'saveMappingOverride', 'revertMappingOverride', 'savePublicationOverride', 'revertPublicationOverride',
   'saveRoomExclusion', 'scanTopology', 'executeHaAction', 'saveFilteringConfig', 'forceMqttManagerImport',
   'testMqttConnection',
+  'saveScenarioPublication', // front v3 (Lot 4a)
 ]);
 const TARGET_ID = /^[1-9][0-9]{0,9}$/;
 
@@ -507,7 +508,13 @@ async function main() {
       declaredPublicationOverrides: parcours.declaredPublicationOverrides || {},
       // Story 25.8 : exclusions de pièce déclarées par le parcours ({ [objectId]: { excluded: '1' | '0' } }), défaut {}.
       declaredRoomExclusions: parcours.declaredRoomExclusions || {},
+      // Front v2 (Lot 6) : plugins exclus déclarés par le parcours ({ excludedPlugins: [valeurs], confidencePolicy }), défaut null.
+      declaredFilteringConfig: parcours.declaredFilteringConfig || null,
       declaredRescan: parcours.declaredRescan === true,
+      // Front v2 (Lot 5) : publications d'équipement simulées déclarées par le parcours ({ [eqId]: true }), défaut {}.
+      declaredEquipmentPublications: parcours.declaredEquipmentPublications || {},
+      // Front v3 (Lot 4a) : scénarios dont le choix de publication est simulé ({ [scenarioId]: true }), défaut {}.
+      declaredScenarioPublications: parcours.declaredScenarioPublications || {},
       lastPreviewType: simState.lastPreviewType,
     };
     // Story 24.11 : un parcours à cible dynamique part de déclarations vides, propres à cette exécution.

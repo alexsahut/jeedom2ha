@@ -61,6 +61,7 @@ from models.ui_contract_4d import (
     compute_home_statut,
 )
 from models.actions_ha import build_actions_ha
+from models import ha_side  # Front v2 Lot 3 — côté HA, lecture seule
 from mapping.registry import MapperRegistry, resolve_expected_ha
 from mapping.button import ScenarioButtonMapper
 from mapping.overrides import (
@@ -1548,6 +1549,49 @@ async def _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, 
         await asyncio.sleep(delay)
 
 
+def _present_discovery_entries_by_eq(app) -> Dict[int, set]:
+    """Front v2 Lot 3 — topics de découverte encore dans HA, par équipement (lecture seule).
+
+    Équipement retenu : `_is_currently_published_in_ha` (même prédicat que
+    `sync_status.published_in_ha`, dépublication différée comprise). Topics : ceux des candidats
+    publiés (`_candidate_topic_entries`, principal publié ou vivant comme dans
+    `_previous_present_cmd_ids`) unis à ceux en attente de dépublication
+    (`_pending_unpublish_parts`, ce que rejouera `_replay_deferred_discovery_unpublish`).
+    """
+    publications = app.get("publications") or {}
+    pending = app.get("pending_discovery_unpublish") or {}
+    present: Dict[int, set] = {}
+    for eq_id in set(publications) | set(pending):
+        decision = publications.get(eq_id)
+        if not _is_currently_published_in_ha(eq_id, decision, pending):
+            continue
+        entries: set = set()
+        mapping = getattr(decision, "mapping_result", None)
+        if mapping is not None:
+            for candidate in [mapping, *(mapping.additional_mappings or [])]:
+                if candidate is mapping:
+                    alive = bool(
+                        getattr(decision, "discovery_published", False)
+                        or getattr(decision, "active_or_alive", False)
+                    )
+                else:
+                    ref = getattr(candidate, "publication_decision_ref", None)
+                    alive = bool(getattr(ref, "discovery_published", False))
+                if alive:
+                    entries.update(_candidate_topic_entries(mapping, candidate))
+        if eq_id in pending:
+            entity_type, node_ids = _pending_unpublish_parts(pending[eq_id])
+            if not node_ids:
+                entries.add((entity_type, f"jeedom2ha_{eq_id}"))
+            for entry in node_ids:
+                if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                    entries.add((str(entry[0]), str(entry[1])))
+                else:
+                    entries.add((entity_type, str(entry)))
+        present[eq_id] = entries
+    return present
+
+
 async def _handle_system_status(request: web.Request) -> web.Response:
     """Handle GET /system/status — liveness probe."""
     local_secret = request.app["local_secret"]
@@ -1584,6 +1628,13 @@ async def _handle_system_status(request: web.Request) -> web.Response:
             "broker": mqtt_section,
             "derniere_synchro_terminee": request.app.get("derniere_synchro_terminee"),
             "derniere_operation_resultat": request.app.get("derniere_operation_resultat", "aucun"),
+            # Front v2 Lot 3 (additif) : birth de HA et dénombrement de ce qui est publié.
+            "ha": ha_side.ha_status(request.app.get("ha_birth_seen_at")),
+            "publication": ha_side.publication_counts(
+                _present_discovery_entries_by_eq(request.app), request.app.get("scenario_publications"),
+            ),
+            # Front v3 (Lot 4a, additif) : scénarios et leur publication, pour l'onglet Scénarios.
+            "scenarios": _scenario_status_rows(request.app),
         },
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -1817,6 +1868,8 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
 
     async def _ha_birth_cb():
         """Called when homeassistant/status = online — republish from RAM cache."""
+        # Front v2 Lot 3 (additif) : horodatage du dernier `online` de HA, lu par /system/status.
+        app["ha_birth_seen_at"] = datetime.now(timezone.utc).isoformat()
         # Story 22.4 — appareil du pont d'abord.
         await _publish_bridge_discovery(app)
         await _republish_all_from_cache(app, "ha_birth")
@@ -2077,6 +2130,86 @@ _SYNC_ORIGINS = frozenset({"boot", "rescan", "service"})
 def _sync_origin(request: web.Request) -> str:
     mode = request.headers.get("X-Jeedom2ha-Sync-Mode")
     return mode if mode in _SYNC_ORIGINS else "service"
+
+
+# Front v3 (Lot 4a) — raisons de la décision d'un scénario non choisi : retiré confirmé / à retirer.
+SCENARIO_NOT_SELECTED = "scenario_not_selected"
+SCENARIO_NOT_SELECTED_PENDING = "scenario_not_selected_pending"
+
+
+async def _withdraw_unselected_scenario(publisher, scenario_mapper, scenario, previous, failed_ids: Set[int]):
+    """Front v3 (Lot 4a, option B) — décision d'un scénario non choisi, et retrait de son bouton.
+
+    Le retrait passe par `DiscoveryPublisher.unpublish` (config et disponibilité retenues vidées).
+    Il n'est rejoué que si l'état du broker est inconnu : première synchro du démon, bouton publié à
+    la synchro précédente, ou retrait précédent non confirmé. Un retrait déjà confirmé n'émet rien.
+    Broker injoignable ou retrait en échec : l'identifiant rejoint `failed_ids`, la synchro n'est pas
+    complète et le cron du plugin la rejoue.
+    """
+    mapping = scenario_mapper.map(scenario)
+    decision = PublicationDecision(
+        should_publish=False,
+        reason=SCENARIO_NOT_SELECTED,
+        mapping_result=mapping,
+        active_or_alive=bool(scenario.is_active),
+        discovery_published=False,
+    )
+    mapping.publication_decision_ref = decision
+    if previous is not None and getattr(previous, "reason", None) == SCENARIO_NOT_SELECTED:
+        return decision
+    ok = False
+    if publisher is not None:
+        try:
+            ok = bool(await publisher.unpublish(f"jeedom2ha_scenario_{scenario.id}"))
+        except Exception as exc:  # pragma: no cover - défensif : le pont ne lève pas
+            _LOGGER.error("[SCENARIO] scenario_id=%d : retrait en échec — %s", scenario.id, exc)
+    if ok:
+        _LOGGER.info("[SCENARIO] scenario_id=%d non publié (choix de l'utilisateur) : bouton retiré", scenario.id)
+    else:
+        decision.reason = SCENARIO_NOT_SELECTED_PENDING
+        failed_ids.add(scenario.id)
+        _LOGGER.warning("[SCENARIO] scenario_id=%d non publié : retrait du bouton à rejouer", scenario.id)
+    return decision
+
+
+def _scenario_status_rows(app) -> list:
+    """Front v3 (Lot 4a) — liste des scénarios pour le statut (lecture seule, aucune publication).
+
+    `published` : choix de l'utilisateur (absent = publié, comme avant) ; `in_ha` : bouton publié à la
+    dernière synchro ; `ha_entity_id` : identifiant attendu dans HA, seulement si le scénario est publié.
+    """
+    topology = app.get("topology")
+    if topology is None:
+        return []
+    decisions = app.get("scenario_publications") or {}
+    failed_ids = app.get("scenario_publication_failed_ids") or set()
+    rows = []
+    for scenario_id in sorted(topology.scenarios):
+        scenario = topology.scenarios[scenario_id]
+        published = scenario.publication_selected
+        rows.append({
+            "id": scenario_id,
+            "name": scenario.name,
+            "group": scenario.group,
+            "mode": scenario.mode,
+            "has_trigger": scenario.has_trigger,
+            "has_schedule": scenario.has_schedule,
+            "manual": scenario.manual,
+            "is_active": bool(scenario.is_active),
+            "published": published,
+            "is_new": bool(scenario.is_new),
+            "in_ha": bool(getattr(decisions.get(scenario_id), "discovery_published", False)),
+            "ha_entity_id": f"button.jeedom2ha_scenario_{scenario_id}" if published else None,
+        })
+        # Front v3 (Lot 8, revue P2 #406) — un retrait en échec (`scenario_not_selected_pending`) ne prouve pas
+        # l'absence du bouton : `in_ha` devient inconnu (None) et `withdraw_pending` le dit. `ha_pending` :
+        # publication, disponibilité ou retrait pas encore confirmé par la dernière synchro. Champs additifs.
+        withdraw_pending = getattr(decisions.get(scenario_id), "reason", None) == SCENARIO_NOT_SELECTED_PENDING
+        rows[-1]["withdraw_pending"] = withdraw_pending
+        rows[-1]["ha_pending"] = withdraw_pending or scenario_id in failed_ids
+        if withdraw_pending:
+            rows[-1]["in_ha"] = None
+    return rows
 
 
 def _publish_scenario_availability(mqtt_bridge: MqttBridge, scenario_id: int, is_active: bool) -> bool:
@@ -2484,6 +2617,16 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     # alors pas son empreinte, pour réessayer à l'échéance suivante.
     scenario_publication_failed_ids: Set[int] = set()
     for scenario_id, scenario in snapshot.scenarios.items():
+        # Front v3 (Lot 4a, option B) — scénario que l'utilisateur n'a pas choisi de publier
+        # (`published: false`) : pas de bouton ; retiré par le chemin `unpublish` existant s'il a pu
+        # l'être. Champ absent = publié comme avant. La purge ci-dessous reçoit toujours TOUS les
+        # identifiants lisibles (`scenario_publications`), elle ne retire donc que les supprimés.
+        if not scenario.publication_selected:
+            scenario_publications[scenario_id] = await _withdraw_unselected_scenario(
+                publisher if broker_ready else None, scenario_mapper, scenario,
+                request.app["scenario_publications"].get(scenario_id), scenario_publication_failed_ids,
+            )
+            continue
         sc_mapping = scenario_mapper.map(scenario)
         sc_decision = PublicationDecision(
             should_publish=True,
@@ -2557,6 +2700,12 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         request.app["publications"].pop(old_eq_id, None)
     request.app["scenario_publications"].clear()
     request.app["scenario_publications"].update(scenario_publications)
+    # Front v3 (Lot 8) — scénarios dont le bouton (ou sa disponibilité) n'a pas pu être publié ou retiré à
+    # cette synchro : le statut les expose (`ha_pending`) tant qu'une synchro ne les a pas confirmés.
+    failed_memo = request.app.get("scenario_publication_failed_ids")
+    if isinstance(failed_memo, set):
+        failed_memo.clear()
+        failed_memo.update(scenario_publication_failed_ids)
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
@@ -3265,6 +3414,10 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
                 "auto": no_mapping_view,
                 "overridden": no_mapping_view,
                 "native_generic_types": native_generic_types,
+                # Front v2 Lot 3 (additif) : aucun mapping, donc aucune entité avant comme après.
+                "entities_before": [],
+                "entities_after": [],
+                "entity_id_changes": [],
             },
         })
 
@@ -3288,6 +3441,10 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
                 "auto": _view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id),
                 "overridden": None,
                 "native_generic_types": native_generic_types,
+                # Front v2 Lot 3 (additif) : commande non couverte, pas d'aperçu « après ».
+                "entities_before": ha_side.preview_entities(auto_evaluation, snapshot),
+                "entities_after": None,
+                "entity_id_changes": None,
             },
         })
 
@@ -3409,8 +3566,21 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
             "overridden": over_view,
             "native_generic_types": native_generic_types,
             "support_export": support_export,
+            # Front v2 Lot 3 (additif) : aperçu en entités, depuis les deux évaluations déjà calculées.
+            **_preview_entities_fields(auto_evaluation, over_evaluation, snapshot),
         },
     })
+
+
+def _preview_entities_fields(auto_evaluation, over_evaluation, snapshot) -> Dict[str, Any]:
+    """Front v2 Lot 3 — `entities_before` / `entities_after` / `entity_id_changes` (lecture seule)."""
+    before = ha_side.preview_entities(auto_evaluation, snapshot)
+    after = ha_side.preview_entities(over_evaluation, snapshot)
+    return {
+        "entities_before": before,
+        "entities_after": after,
+        "entity_id_changes": ha_side.entity_id_changes(before, after),
+    }
 
 
 def _resolve_data_dir(request: web.Request) -> str:
@@ -3471,6 +3641,7 @@ def _build_mapping_override_tree(
     overrides_cache=None,
     equipment_overrides_cache=None,
     include_override_types=True,
+    ha_side_fields=False,
 ):
     """Story 16.5 (AC4/AC5) — arbre par commande de l'état d'override courant (lecture seule).
 
@@ -3552,6 +3723,10 @@ def _build_mapping_override_tree(
         }
         if override_applied:
             row["override_source"] = entry.get("source", "user")
+        # Front v3 (Lot 7, champ additif, présent seulement s'il est posé) : réglage de publication porté par CETTE
+        # commande (valeur brute persistée). Sert à « Annuler » pour rétablir exactement l'état d'avant.
+        if entry.get("publication_override"):
+            row["publication_override_own"] = entry.get("publication_override")
         row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
         # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
         # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
@@ -3564,6 +3739,9 @@ def _build_mapping_override_tree(
                     overrides_cache, equipment_overrides_cache, cmd.id,
                 )
             row["override_types_allowed"] = list(allowed_by_mapping[group])
+        # Front v2 Lot 3 (additif, route unitaire seulement) : type, sous-type et état relié.
+        if ha_side_fields:
+            row.update(ha_side.command_fields(cmd))
         commands.append(row)
 
     current_should_publish = bool(
@@ -3618,6 +3796,9 @@ def _build_mapping_override_tree(
                 or applied_decision.reason != current_decision.reason
             ),
         })
+        # Front v2 Lot 3 (additif, route unitaire seulement) : champs `ha_*` lus dans le payload réel.
+        if ha_side_fields:
+            entity_rows[-1].update(ha_side.entity_ha_fields(mapping, snapshot))
 
     # Story 22.2 (Q1 A, champ additif) : une commande est « publiée » quand au moins une entité
     # présente dans HA la porte (forme 579 : principal refusé, secondaire publié).
@@ -3656,6 +3837,8 @@ def _build_mapping_override_tree(
             "published_in_ha": published_in_ha,
         },
         "commands": commands,
+        # Front v2 Lot 3 (additif, route unitaire seulement) : conseils prudents.
+        **({"hints": ha_side.build_hints(eq, evaluation)} if ha_side_fields else {}),
     }
 
 
@@ -3700,6 +3883,7 @@ async def _handle_mapping_overrides_get(request: web.Request) -> web.Response:
     payload = _build_mapping_override_tree(
         eq, snapshot, data_dir, confidence_policy, synced_decision, scope_included=scope_included,
         pending_discovery_unpublish=request.app.get("pending_discovery_unpublish") or {},
+        ha_side_fields=True,
     )
     return web.json_response({"status": "ok", "payload": payload})
 
@@ -4162,12 +4346,115 @@ async def _handle_mapping_override_revert(
     })
 
 
+def _publication_revert_command_only(request: web.Request, payload: dict) -> web.Response:
+    """Front v3 (Lot 7) : retire le SEUL réglage de publication posé sur UNE commande (`scope == "command"`).
+
+    Laisse intacts son type HA, les réglages (type et publication) des autres commandes de l'entité et le réglage
+    de l'équipement. Sert à « Annuler » après « Publier quand même » : le chemin canonique (sans `scope`) purge tous
+    les réglages des commandes de l'entité (CC-19), ce qui effacerait une correction de type préexistante.
+    """
+    eq_id = payload.get("jeedom_eq_id")
+    cmd_id = payload.get("jeedom_cmd_id")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    if not isinstance(cmd_id, int) or isinstance(cmd_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "scope=command exige jeedom_cmd_id (int)"}, status=400
+        )
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+    if not any(cmd.id == cmd_id for cmd in eq.cmds):
+        return web.json_response(
+            {"status": "error", "message": f"Commande {cmd_id} introuvable"}, status=404
+        )
+    data_dir = _resolve_data_dir(request)
+    removed = remove_override_fields(eq_id, cmd_id, ("publication_override",), data_dir)
+    _invalidate_equipment_states(request.app)
+    _LOGGER.info(
+        "[OVERRIDES] Retour mode auto (réglage de publication d'une commande seul) eq_id=%d cmd_id=%d removed=%s",
+        eq_id, cmd_id, removed,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "jeedom_cmd_id": cmd_id,
+            "scope": "command_publication",
+            "removed": removed,
+            "removed_commands": [cmd_id] if removed else [],
+        },
+    })
+
+
+async def _publication_revert_equipment_only(request: web.Request) -> Optional[web.Response]:
+    """Front v2 (Lot 6) : retour en automatique du SEUL réglage de publication d'équipement.
+
+    Rend None si la requête ne porte pas `scope == "equipment"` (le chemin canonique s'applique).
+    """
+    local_secret = request.app["local_secret"]
+    if not _check_secret(request, local_secret):
+        return None
+    try:
+        data = await request.json()
+    except Exception:
+        return None
+    payload = data.get("payload", {}) if isinstance(data, dict) else {}
+    if not isinstance(payload, dict) or payload.get("scope") is None:
+        return None
+    if payload.get("scope") == "command":
+        return _publication_revert_command_only(request, payload)
+    if payload.get("scope") != "equipment" or payload.get("jeedom_cmd_id") is not None:
+        return web.json_response(
+            {"status": "error", "message": "scope=equipment exige jeedom_eq_id seul"}, status=400
+        )
+    eq_id = payload.get("jeedom_eq_id")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+    data_dir = _resolve_data_dir(request)
+    removed = remove_equipment_override_fields(eq_id, ("publication_override",), data_dir)
+    _invalidate_equipment_states(request.app)
+    _LOGGER.info(
+        "[OVERRIDES] Retour mode auto (réglage d'équipement seul) eq_id=%d removed=%s", eq_id, removed,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "scope": "equipment_publication",
+            "removed": removed,
+            "removed_commands": [],
+        },
+    })
+
+
 async def _handle_publication_override_revert(request: web.Request) -> web.Response:
     """POST /action/publication_override_revert — dedicated automatic-mode endpoint.
 
     The canonical removal operation deliberately clears both override fields for
     the selected entity (or every entity of an equipment), as required by CC-19.
+
+    Front v2 (Lot 6) — ajout : `scope == "equipment"` (sans `jeedom_cmd_id`) retire SEULEMENT le
+    réglage de publication de l'équipement (`equipment_overrides[eq].publication_override`) et
+    laisse intacts les réglages des commandes (type HA, publication). Sans `scope`, comportement
+    canonique inchangé.
     """
+    scoped = await _publication_revert_equipment_only(request)
+    if scoped is not None:
+        return scoped
     return await _handle_mapping_override_revert(
         request, fields=("ha_entity_type", "publication_override"), entity_scope=True,
     )
@@ -5408,6 +5695,7 @@ def create_app(local_secret: str) -> web.Application:
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
+    app["scenario_publication_failed_ids"] = set()  # Front v3 (Lot 8) — scénarios non confirmés à la dernière synchro
     app["decision_memo"] = DecisionMemo()  # Story 24.2 — verdicts mémorisés au sync / « Publier »
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
@@ -5416,6 +5704,7 @@ def create_app(local_secret: str) -> web.Application:
     # Story 2.1 — Etat minimal de santé du pont
     app["derniere_operation_resultat"] = _build_operation_snapshot(resultat="aucun")
     app["derniere_synchro_terminee"] = None
+    app["ha_birth_seen_at"] = None  # Front v2 Lot 3 — dernier `online` de HA sur <prefix>/status
 
     # Story 5.1 — Warm-start cache (populated in on_start() before HTTP server starts)
     app["boot_cache"] = {}       # Dict[int, dict] — chargé du disque au boot, purgé après 1er sync

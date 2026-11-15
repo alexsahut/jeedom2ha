@@ -14,7 +14,9 @@ const compteurs = read('docs/fr_FR/compteurs.md');
 const changelog = read('docs/fr_FR/changelog_beta.md');
 const code = ['desktop/js', 'desktop/php'].flatMap((dir) => fs.readdirSync(path.join(root, dir)).filter((f) => /\.(js|php)$/.test(f)).map((f) => read(path.join(dir, f))))
   .join('\n').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'");
-const section = index.slice(index.indexOf('### Exclure une pièce'), index.indexOf('### Télécharger le diagnostic support'));
+// Garde levée (front v3, Lot 5) : doc réécrite par écran ; « Exclure une pièce » devient une sous-section de « Choisir ce qui est
+// publié », les cartes deviennent les tuiles de « La page maison et les puces », le détail de pièce « la pièce ouverte ».
+const section = index.slice(index.indexOf('#### Exclure une pièce'), index.indexOf('### Les scénarios'));
 
 describe('25.8 / AC18 — documentation de l\'exclusion de pièce', () => {
   it('index.md : la section « Exclure une pièce » existe, dans la table des matières par ancre, avec toutes les règles décidées', () => {
@@ -29,15 +31,21 @@ describe('25.8 / AC18 — documentation de l\'exclusion de pièce', () => {
   });
 
   it('index.md : les cartes et le détail de pièce mentionnent le menu, l\'encart et la mention « Pièce exclue »', () => {
-    assert.match(index, /Chaque carte \(sauf « Sans pièce »\) a un menu « ⋯ »/);
+    assert.match(index, /Le menu « ⋯ », au survol, propose « Choisir ce qui est publié… », « Republier la pièce » et, après un trait, « Exclure la pièce… »/);
+    assert.match(index, /La tuile « Sans pièce »[^\n]*elle n'a pas de menu/);
     assert.match(index, /« Pièce exclue : ses équipements ne sont pas publiés dans Home Assistant\. »/);
-    assert.match(index, /« Supprimer de Home Assistant… »\*\*, en rouge, dans le menu seulement/);
+    assert.match(index, /son menu « ⋯ » \(« Exclure la pièce… », puis « Supprimer de Home Assistant… » en rouge\)/);
   });
 
-  it('index.md : § Filtrage et publication indique que le champ de la configuration est retiré ; famille 7 mise à jour', () => {
-    const filtering = index.slice(index.indexOf('### Filtrage et publication'), index.indexOf('## Première synchronisation'));
+  // Garde levée (front v2, Lot 8) : § « Filtrage et publication » devient « Ce qui est publié » (titre du bloc à l'écran, E8) ; la
+  // phrase sur l'ancien champ (« Il n'y a plus de champ… ») est retirée (R24 : pas de renvoi aux anciennes versions).
+  it('index.md : § « Ce qui est publié » renvoie les pièces à la page du plugin ; famille 7 mise à jour', () => {
+    const filtering = index.slice(index.indexOf('#### Ce qui est publié, Avancé'), index.indexOf('### Vérifier l\'installation'));
+    assert.ok(filtering.length > 200, 'section présente');
     assert.doesNotMatch(filtering, /\| \*\*Pièces exclues\*\* \|/);
-    assert.match(filtering, /Il n'y a plus de champ de saisie des pièces/);
+    // Garde levée (front v3, Lot 3) : la configuration ne règle plus rien de ce qui est publié ; le § renvoie au panneau unique.
+    assert.match(filtering, /La configuration ne règle pas ce qui est publié/);
+    assert.match(filtering, /\[Choisir ce qui est publié\]\(#choisir-ce-qui-est-publié\)/);
     assert.match(index, /exclu de Jeedom2HA \(pièce dans la liste d’exclusions\) \| Exclusion de la pièce, posée depuis sa carte ou son détail/);
     assert.match(index, /« par la pièce » correspond à l'exclusion de la pièce/);
   });

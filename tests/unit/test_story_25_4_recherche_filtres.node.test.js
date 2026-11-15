@@ -59,15 +59,22 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
       const item = ui.$(`.j2ha-wv-room[data-object_id="${room.object_id}"]`);
       const card = ui.$(`#j2ha_roomCards .j2ha-room-card[data-object_id="${room.object_id}"]`);
       const ratio = plain(item.find('.j2ha-wv-ratio').first().text());
-      assert.equal(ratio, plain(card.find('.j2ha-room-ratio').text()).replace(/ publiés?$/, ''), 'ratio ' + room.object_id);
+      // Garde levée (front v3, Lot 1) : la tuile écrit « n/t » (sans espaces) ; comparé sans les espaces.
+      assert.equal(ratio.replace(/\s+/g, ''), plain(card.find('.j2ha-room-ratio').text()).replace(/ publiés?$/, '').replace(/\s+/g, ''), 'ratio ' + room.object_id);
       const treeMarks = item.find('.j2ha-wv-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text()));
-      const cardMarks = card.find('.j2ha-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text())).filter((t) => !/non lu|exclus?$/.test(t));
+      // Front v2 (Lot 9a) : les repères « N désactivés » / « N rien à publier » de la carte sont aussi dans l'arbre (le filtre
+      // ci-dessous ne les retire pas) ; « non lu » et « N exclus » restent propres à la carte.
+      // Front v3 (Lot 1, garde levée) : « N désactivés » / « N rien à publier » sont des marques de la tuile (la ligne d'arbre
+      // les écrit à part, `.j2ha-v2-wv-inactive`) : comparées hors des repères.
+      const cardMarks = card.find('.j2ha-room-marks .j2ha-mark').list.map((el) => plain(ui.$(el).text())).filter((t) => !/non lu|exclus?$|désactivés?$|rien à publier$/.test(t));
       assert.deepEqual(treeMarks, cardMarks, 'repères ' + room.object_id);
       if (room.counts.blocked === 0) assert.ok(!treeMarks.some((t) => /bloqué/.test(t)));
     }
   });
 
-  maybe('lignes d’équipement : état avant le nom (mot + icône), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
+  // Garde levée (front v3, Lot 2) : l'état se lit à l'icône seule ; le mot, « non lu », « désactivé dans Jeedom » et « N bloquées »
+  // sont dans l'info-bulle et le nom accessible de l'icône (toujours avant le nom).
+  maybe('lignes d’équipement : état avant le nom (icône, mot en nom accessible), désactivé atténué, non lu sans état, mention « N bloquées »', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 21, unread: 3 });
     openCardWide(ui, 10);
     for (const id of [11, 12]) ui.click('.j2ha-wv-room[data-object_id="' + id + '"] .j2ha-wv-toggle');
@@ -80,19 +87,23 @@ describe('25.4 / AC11 — l’arbre reprend l’ordre, les sous-titres de groupe
       const node = ui.$(el);
       const children = node.find('.j2ha-wv-row').children().list;
       const word = node.find('.j2ha-wv-state').first();
+      const label = plain(word.attr('aria-label') || '');
       assert.ok(children.length > 0);
+      assert.ok(children[0].classes.has('j2ha-wv-state'), 'icône avant le nom ' + eqId);
+      assert.equal(word.attr('title'), word.attr('aria-label'));
+      assert.equal(plain(word.text()).trim(), '', 'aucun mot affiché ' + eqId);
       if (model.state) {
-        assert.equal(plain(word.text()).trim(), M.EQUIPMENT_STATE_LABELS[model.state], 'mot d’état ' + eqId);
-        assert.ok(word.find('.j2ha-state-word').hasClass('j2ha-state-' + model.state));
-        if (model.blocked_mention > 0) assert.match(plain(node.find('.j2ha-mark-blocked').text()), /^\d+ bloquées?$/);
+        assert.equal(label.split(' · ')[0], M.EQUIPMENT_STATE_LABELS[model.state], 'mot d’état ' + eqId);
+        assert.ok(word.hasClass('j2ha-state-word') && word.hasClass('j2ha-state-' + model.state));
+        if (model.blocked_mention > 0) assert.match(label, /· \d+ bloquées?$/);
       } else {
-        assert.equal(word.find('.j2ha-state-word').length, 0, 'non lu : sans état');
-        assert.match(plain(node.find('.j2ha-wv-unread').text()), /non lu/);
+        assert.ok(!word.hasClass('j2ha-state-word'), 'non lu : sans état');
+        assert.match(label, /Non lu/);
       }
     }
     const disabled = ui.$('.j2ha-wv-eq-disabled');
     assert.ok(disabled.length > 0, 'au moins un équipement désactivé dans la scène');
-    assert.match(plain(disabled.first().text()), /\(désactivé dans Jeedom\)/);
+    assert.match(plain(disabled.first().find('.j2ha-wv-state').attr('aria-label')), /désactivé dans Jeedom/);
   });
 });
 
@@ -144,12 +155,17 @@ describe('25.4 / AC12 — recherche', () => {
 });
 
 describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
-  maybe('mêmes puces, mêmes libellés et effectifs que la page B ; une puce à zéro est désactivée', () => {
+  // Garde levée (front v2, Lot 7, spec E2/E3) : une puce à zéro n'est plus grisée mais masquée, dans la page et dans la vue.
+  maybe('mêmes puces, mêmes libellés et effectifs que la page B ; une puce à zéro est masquée', () => {
     const ui = startBig({ rooms: 3, equipments: 40, seed: 17, unread: 2 });
     openCardWide(ui, 10);
     const b = ui.$('#j2ha_houseChips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
     const c = ui.$('.j2ha-wv-chips .j2ha-chip-filter').list.map((el) => [el.attrs['data-filter'], plain(ui.$(el).text()), !!el.props.disabled]);
-    assert.deepEqual(c, b);
+    // Garde levée (front v3, Lot 1) : la page suit l'ordre du liseré (publiés, à appliquer, bloqués…) ; mêmes puces, mêmes
+    // libellés et effectifs, comparés sans l'ordre.
+    const byKey = (list) => [...list].sort((x, y) => x[0].localeCompare(y[0]));
+    assert.deepEqual(byKey(c), byKey(b));
+    assert.ok(c.every((entry) => !entry[2] && !/^0 /.test(entry[1])), 'aucune puce à zéro, aucune puce grisée');
     assert.ok(c.some((entry) => entry[0] === 'unread'), 'non lus > 0');
   });
 
@@ -162,7 +178,8 @@ describe('25.4 / AC13 — filtres d’état partagés avec la page B', () => {
     assert.equal(ui.page.filter(), 'to_apply');
     ui.click('.j2ha-wv-back');
     assert.equal(ui.$('#j2ha_houseChips .j2ha-chip-filter[data-filter="to_apply"]').attr('aria-pressed'), 'true');
-    assert.equal(ui.visible('#j2ha_filterPanel'), true);
+    // Front v3 (Lot 1) : le filtre « à appliquer » s'applique à la grille de la page (tuiles à 0 masquées).
+    assert.equal(ui.page.filter(), 'to_apply');
   });
 
   maybe('le nombre de lignes de l’arbre pour un filtre égale l’effectif de la puce ; ET logique avec la recherche ; aucune requête', () => {

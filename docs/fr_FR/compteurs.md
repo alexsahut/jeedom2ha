@@ -14,7 +14,7 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Champs du démon lus : sync_status.published_in_ha, sync_status.current_should_publish,
   sync_status.synced_should_publish, sync_status.override_pending, entities[].override_pending,
   commands[].published_in_ha, equipment_decision (GET /system/mapping_overrides/{eq_id}).
-- Story 25.3 : la page principale lit les états de tous les équipements en UN appel (action ajax getEquipmentStates,
+- Story 25.3 : la page du plugin lit les états de tous les équipements en UN appel (action ajax getEquipmentStates,
   route GET /system/equipment_states) et en dérive la jauge de la maison et les repères des cartes avec les MÊMES
   fonctions (resolveEquipmentState, summarizeRoom, puis summarizeHouse, desktop/js/jeedom2ha_mapping_override.js ;
   desktop/js/jeedom2ha_overview.js). Un équipement de Jeedom absent de la réponse est « non lu » (hors des six états).
@@ -24,14 +24,16 @@ En-tête de maintenance (invisible pour l'utilisateur) :
 - Règle de cloisonnement : aucun libellé de compteur (ligne des états de la pièce, ligne des commandes d'un équipement,
   « non lu », messages de chargement/indisponibilité) ne doit apparaître ailleurs que dans ce fichier. index.md renvoie
   ici par un simple lien. Les mots des états (badge) restent décrits dans index.md.
+- Front v2 (Lot 8) : « exclus et autres » devient « exclus ou inactifs » (glossaire 3.2) ; « page principale » devient « page du
+  plugin » ; la puce « conseils » (Lot 7) est dite hors des six états.
 - Quand la sémantique change de nouveau, remplacer tout ce fichier ; rien d'autre dans la documentation n'est à modifier.
 -->
 
-# Les états et les compteurs de la vue de travail
+# Les états et les compteurs
 
-Retour à la [documentation](index.md#la-vue-de-travail).
+Retour à la [documentation](index.md#la-pièce-et-la-fiche).
 
-Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la vue de travail, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
+Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, se lit dans l'arbre de la pièce, dans le badge à droite du nom de l'équipement affiché, dans la ligne de ce détail et dans les compteurs sous le titre de la pièce. Il n'y a plus de chiffres à rapprocher : si le badge dit « Publié », l'équipement est compté « publié » dans la pièce.
 <!-- CAPTURE: compteurs du détail de pièce -->
 ![Compteurs du détail de pièce](images/compteurs-detail-piece.png)
 
@@ -41,7 +43,7 @@ Chaque équipement porte **un seul état**. Le même mot, avec la même teinte, 
 |---|---|---|
 | **Publié** (vert) | L'équipement est **présent dans Home Assistant**, d'après l'état réel du démon. | Rien. Si des commandes sont bloquées, une mention orange l'indique (« 2 bloquées »). |
 | **À appliquer** (bleu) | Le plan courant et ce qui est dans Home Assistant **ne concordent pas encore** : un réglage a été posé mais pas appliqué, ou l'équipement doit être publié et ne l'est pas encore. | Cliquer sur « Appliquer » (ou lancer « Relire Jeedom »). |
-| **Bloqué** (orange) | Rien n'est dans Home Assistant et au moins une commande est **bloquée** par une cause que vous pouvez corriger. | Lire l'encart de cause du panneau. |
+| **Bloqué** (orange) | Rien n'est dans Home Assistant et au moins une commande est **bloquée** par une cause que vous pouvez corriger. | Lire la fiche de cause de l'équipement : elle dit pourquoi et propose le geste qui corrige. |
 | **Exclu** (gris) | L'équipement est volontairement écarté : réglage « Jamais », configuration du plugin (plugins, pièces) ou réglage propre à l'équipement dans Jeedom. | Rien, c'est un choix. |
 | **Désactivé** (gris, en italique) | L'équipement est désactivé dans Jeedom. | Réactivez-le dans Jeedom si vous le souhaitez. |
 | **Rien à publier** (gris) | Aucune commande n'est publiable ni bloquée : les commandes sont toutes ignorées, ou l'équipement n'a pas de commande. | Rien. |
@@ -84,23 +86,23 @@ Les commandes **ignorées** ne sont jamais comptées comme un défaut et ne sont
 
 ## La jauge de la maison
 
-Sur la page principale, le bloc de la maison reprend les mêmes états, **équipement par équipement**, pour toutes les pièces : « N publiés sur M » où M est le nombre d'équipements Jeedom de toutes les cartes (la carte « Sans pièce » comprise) et N ceux à l'état **Publié**. La jauge est découpée, dans cet ordre, en **publiés** (vert), **à appliquer** (bleu), **bloqués** (orange), **exclus et autres** (gris : exclus, désactivés et rien à publier) et **non lus** (hachuré). La somme des segments est toujours M, et celle des cartes de pièce est toujours celle de la maison.
+Sur la page du plugin, le bloc de la maison reprend les mêmes états, **équipement par équipement**, pour toutes les pièces : « N / M publiés » où M est le nombre d'équipements Jeedom de toutes les tuiles (la tuile « Sans pièce » comprise) et N ceux à l'état **Publié**. La jauge (le liseré) est découpée, dans cet ordre, en **publiés** (vert), **à appliquer** (bleu), **bloqués** (orange), **exclus ou inactifs** (gris : exclus, désactivés et rien à publier) et **non lus** (hachuré). Chaque segment donne son compte en info-bulle. La somme des segments est toujours M, et celle des tuiles de pièce est toujours celle de la maison.
 
 - **Non lu** n'est pas un septième état : c'est un équipement de Jeedom dont les chiffres n'ont pas pu être lus (le démon ne le connaît pas encore, ou sa lecture a échoué). Il n'est jamais compté publié, bloqué, exclu ni désactivé, et la jauge ne devient jamais « pleine de non lus » quand la lecture n'a pas eu lieu : elle reste neutre avec un message.
-- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît sur la ligne de la liste filtrée, dans l'arbre de la vue de travail et dans le détail de l'équipement, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés.
-- Les chiffres sont relus à l'ouverture de la page, après chaque action, au retour sur l'onglet après plus d'une minute et par « Actualiser ». « Chiffres relus à HH:MM » est l'heure de la dernière lecture par la page.
+- **Ce qui n'est pas un état** : la mention « N bloquées » d'un équipement publié n'est pas un équipement bloqué ; elle apparaît dans l'arbre de la pièce et dans le détail de l'équipement, jamais dans la jauge. Une maison à zéro bloqué peut donc contenir des commandes bloquées dans des équipements publiés. De même, la puce **« conseils »** (affichée seulement si leur nombre est connu sans lire chaque fiche) compte des équipements publiés qui pourraient faire mieux : un conseil n'est pas un état, ces équipements restent comptés dans leur état (« publié » ou « à appliquer »).
+- Les chiffres sont relus à l'ouverture de la page, après chaque action, au retour sur l'onglet après plus d'une minute et par ↻ (« Actualiser les chiffres »), dont l'info-bulle donne l'heure de la dernière lecture par la page.
 
 ## Les repères d'une carte de pièce
 
-La carte d'une pièce affiche « n / t publiés » (t = équipements de la pièce), une jauge fine construite comme celle de la maison, puis, **seulement s'ils sont non nuls**, les repères **« N bloqués »** (orange), **« N à appliquer »** (bleu) et **« N non lus »** (gris). Un liseré orange signale une pièce qui contient au moins un équipement bloqué. Ces chiffres sont **les mêmes** que ceux de l'arbre de la vue de travail (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
+La tuile d'une pièce affiche « n/t » (n publiés, t = équipements de la pièce), un liseré de 4 px construit comme celui de la maison, puis, **seulement s'ils sont non nuls**, des repères faits d'une icône et d'un nombre, le mot dans l'info-bulle : **bloqués** (orange), **à appliquer** (bleu), **désactivés**, **rien à publier**, **non lus** et **exclus** (gris). Sous un filtre de la maison, la tuile ne compte plus que l'état filtré. Ces chiffres sont **les mêmes** que ceux de l'arbre de la pièce (repères d'une pièce) et des compteurs du détail de pièce : tous sont calculés à partir de la même lecture, sans rien relire.
 
 ## La ligne des états (sous le titre de la pièce)
 
-Elle comporte un chiffre et un mot court pour chaque état **non nul**, toujours dans cet ordre : **publié**, **à appliquer**, **bloqué**, **exclu**, **désactivé**, **rien à publier**. Un état à zéro n'est pas affiché. Le mot est au singulier pour 1, au pluriel au-delà (« 1 publié », « 9 publiés », « 2 à appliquer »). La somme des chiffres est le nombre d'équipements lus : chaque équipement est compté une fois, dans son seul état. Chaque compteur est un filtre de l'arbre (un clic le pose, un second le retire), le même que celui de la page principale.
+Elle comporte un chiffre et un mot court pour chaque état **non nul**, toujours dans cet ordre : **publié**, **à appliquer**, **bloqué**, **exclu**, **désactivé**, **rien à publier**. Un état à zéro n'est pas affiché. Le mot est au singulier pour 1, au pluriel au-delà (« 1 publié », « 9 publiés », « 2 à appliquer »). La somme des chiffres est le nombre d'équipements lus : chaque équipement est compté une fois, dans son seul état. Chaque compteur est un filtre de l'arbre (un clic le pose, un second le retire), le même que celui de la page du plugin.
 
 Il n'y a **pas de compteur de commandes au niveau de la pièce** : l'unité de décision est l'équipement.
 
-Ces chiffres viennent de la lecture des états de la page principale : ils ne demandent aucune lecture de plus et sont présents dès l'ouverture de la vue. Tant que cette lecture n'a pas eu lieu ou a échoué, les compteurs ne sont pas affichés et la mention de la page principale (« Aucune synchronisation n'a encore eu lieu », « Mise à jour en cours… » ou « Chiffres indisponibles ») s'affiche aussi dans la vue ; jamais de « NaN » ni de faux « non lus ».
+Ces chiffres viennent de la lecture des états de la page du plugin : ils ne demandent aucune lecture de plus et sont présents dès l'ouverture de la vue. Tant que cette lecture n'a pas eu lieu ou a échoué, les compteurs ne sont pas affichés et la mention de la page du plugin (« Aucune synchronisation n'a encore eu lieu », « Mise à jour en cours… » ou « Chiffres indisponibles ») s'affiche aussi dans la vue ; jamais de « NaN » ni de faux « non lus ».
 
 Quand certains équipements de la pièce ne sont pas lus — le démon ne les connaît pas encore, ou leur lecture a échoué — la ligne se termine par « 1 équipement non lu » ou « 2 équipements non lus » : ils ne sont pas comptés. Si le démon est une version plus ancienne qui n'indique pas la présence dans Home Assistant, la ligne le dit (« … dont la présence dans Home Assistant est inconnue (démon plus ancien) ») et ces équipements ne sont jamais comptés « publiés ».
 
@@ -110,9 +112,9 @@ Sous les compteurs, la vue liste les équipements **bloqués** et **à appliquer
 
 ## La ligne d'un équipement affiché
 
-Quand vous choisissez un équipement, une ligne s'affiche au début de son détail : **son état** (le même mot que le badge), puis le détail de **ses commandes**, par exemple :
+Quand vous choisissez un équipement, **son état** est le badge de la ligne 1 de sa fiche (le même mot que partout), et la ligne 2 donne le plugin, le nombre de commandes puis le détail de **ses commandes**, par exemple :
 
-> Publié · 3 publiées · 1 bloquée · 5 ignorées
+> Virtuel · 9 commandes · 3 publiées · 1 bloquée · 5 ignorées
 
 Les zéros sont masqués, les pluriels accordés (« 1 publiée », « 3 publiées »). Les catégories apparaissent dans cet ordre : publiées, à appliquer (publiables mais pas encore dans Home Assistant), bloquées, ignorées, exclues. Seules les commandes **bloquées** comptent comme défaut : dans l'exemple, le défaut de l'équipement vaut 1, et les 5 commandes ignorées n'y comptent pas.
 <!-- CAPTURE: ligne de compteurs d'un équipement déplié -->

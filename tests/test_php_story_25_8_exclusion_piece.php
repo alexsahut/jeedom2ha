@@ -217,5 +217,20 @@ check('« Sans pièce » : excluded=false même si « 0 » figure dans la chaîn
 check('champs existants inchangés (noms et types), excluded ajouté en fin', array_keys($byId[5]) === array('object_id', 'object_name', 'parent_number', 'father_id', 'icon_classes', 'color', 'equipments', 'excluded') && is_int($byId[5]['object_id']) && is_string($byId[5]['object_name']));
 check('équipements inchangés', array_keys($byId[5]['equipments'][0]) === array('eq_id', 'eq_name', 'enabled', 'eq_type'));
 
+echo "Front v2 (Lot 6) — menu « ⋯ Autres actions » d'une carte de pièce\n";
+// Garde levée (front v2, Lot 6) : le menu porte « Choisir ce qui est publié… » (ouvre le panneau E6, aucune écriture, jamais grisé),
+// « Republier la pièce » (data-ha-action, grisé par le gating) puis, après un séparateur, l'exclusion inchangée ; libellé « Autres
+// actions » (glossaire 3.1) ; « Sans pièce » n'a toujours pas de menu.
+require_once $root . '/desktop/php/jeedom2ha_overview_helpers.php';
+$menu = j2ha_render_room_menu(array('object_id' => 7, 'object_name' => 'Pièce <b>fictive</b>', 'excluded' => false));
+$at = array_map(function ($needle) use ($menu) { return strpos($menu, $needle); }, array('j2ha-room-choose', 'j2ha-card-republish', 'j2ha-menu-sep', 'j2ha-room-exclude'));
+check('entrées dans l\'ordre : choisir, republier, séparateur, exclure', !in_array(false, $at, true) && $at[0] < $at[1] && $at[1] < $at[2] && $at[2] < $at[3]);
+check('libellé « Autres actions » et nom échappé', strpos($menu, 'aria-label="{{Autres actions}} Pièce &lt;b&gt;fictive&lt;/b&gt;"') !== false);
+check('« Republier la pièce » : data-ha-action="republier-piece", grisé au rendu', strpos($menu, 'data-ha-action="republier-piece" disabled') !== false);
+check('« Choisir ce qui est publié… » : aucune data-ha-action (lecture seule)', preg_match('/j2ha-room-choose"[^>]*data-ha-action/', $menu) === 0);
+check('exclusion inchangée : data-ha-action="exclure-piece", data-excluded="0"', strpos($menu, 'data-ha-action="exclure-piece" data-excluded="0" disabled') !== false);
+$card0 = j2ha_render_room_card(array('object_id' => 0, 'object_name' => 'Sans pièce', 'equipments' => array(), 'excluded' => false));
+check('« Sans pièce » : aucun menu', strpos($card0, 'j2ha-room-menu') === false && strpos($card0, 'j2ha-room-choose') === false);
+
 echo "\n{$passed} réussis, {$failed} échoués\n";
 exit($failed > 0 ? 1 : 0);

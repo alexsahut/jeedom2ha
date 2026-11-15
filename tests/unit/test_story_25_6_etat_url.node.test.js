@@ -45,42 +45,34 @@ describe('25.6 / D2 — encodage du fragment', () => {
   });
 });
 
+// Garde levée (front v3, Lot 2) : plus de portée « pièce seule » ni de bascule. Le fragment ne s'écrit plus avec `seule:1` ;
+// un ancien lien `seule:1` reste LU (validé comme avant) et s'ouvre sur toute la maison. Les historiques (état `null`,
+// « Précédent » / « Suivant ») gardent les garanties de 25.4.
 describe('25.6 / AC5 — historique, « Précédent » / « Suivant », état `null`', () => {
-  maybe('carte → équipement → élargir : fragments, remplacement, état d’historique null', () => {
+  maybe('carte → équipement : fragments sans seule:1, état d’historique null', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     openCard(ui, 10);
-    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10;seule:1');
+    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10');
     assert.equal(ui.win.history.state, null);
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
-    assert.equal(ui.win.location.hash, `#j2ha-vue=piece:10;eq:${eq};seule:1`);
-    assert.equal(ui.win.history.state, null);
-    const pushes = ui.win.historyWrites.push;
-    const depth = ui.win.historyIndex();
-    ui.click('.j2ha-wv-widen');
-    assert.equal(ui.win.location.hash, `#j2ha-vue=piece:10;eq:${eq}`, 'même fragment sans seule');
-    assert.equal(ui.win.historyWrites.push, pushes, 'remplacement, pas de nouvelle entrée');
-    assert.equal(ui.win.historyIndex(), depth);
+    assert.equal(ui.win.location.hash, `#j2ha-vue=piece:10;eq:${eq}`);
     assert.equal(ui.win.history.state, null);
   });
 
-  maybe('« Précédent » depuis l’équipement revient à la pièce dans la portée de l’entrée restaurée, puis à la page principale ; « Suivant » rejoue', () => {
+  maybe('« Précédent » depuis l’équipement revient à la pièce, puis à la page principale ; « Suivant » rejoue', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     let loads = 0;
     ui.win.addEventListener('popstate', (event) => { if (event.state !== null) loads += 1; });
     openCard(ui, 10);
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
-    ui.click('.j2ha-wv-widen');
-    assert.equal(scope(ui), 'toutes');
     ui.win.history.back();
     assert.equal(ui.isOpen(), true);
     assert.equal(ui.$('.j2ha-eq-panel').length, 0, 'retour à la pièce');
-    assert.equal(scope(ui), 'piece', 'portée de l’entrée restaurée');
-    assert.deepEqual(roomIds(ui), ['10']);
+    assert.equal(scope(ui), 'toutes');
     ui.win.history.forward();
     assert.equal(ui.$('.j2ha-eq-panel').length, 1, 'Suivant rejoue l’équipement');
-    assert.equal(scope(ui), 'toutes', 'avec la portée de l’entrée remplacée');
     ui.win.history.back();
     ui.win.history.back();
     assert.equal(ui.isOpen(), false);
@@ -88,36 +80,28 @@ describe('25.6 / AC5 — historique, « Précédent » / « Suivant », état `n
     assert.equal(loads, 0, 'le cœur ne recharge jamais la page (aucun jeedomUtils.loadPage)');
   });
 
-  maybe('élargir sans équipement : « Précédent » ramène à la page principale (profondeur de 25.4 conservée)', () => {
-    const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
-    openCard(ui, 10);
-    ui.click('.j2ha-wv-widen');
-    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10');
-    ui.win.history.back();
-    assert.equal(ui.isOpen(), false);
-  });
-
-  maybe('filtre en portée pièce : remplace l’entrée et garde seule:1', () => {
+  maybe('filtre : remplace l’entrée, sans seule:1', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     openCard(ui, 10);
     const pushes = ui.win.historyWrites.push;
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
-    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10;f:published;seule:1');
+    assert.equal(ui.win.location.hash, '#j2ha-vue=piece:10;f:published');
     assert.equal(ui.win.historyWrites.push, pushes);
     assert.equal(ui.win.history.state, null);
   });
 });
 
 describe('25.6 / AC5 — lien profond', () => {
-  maybe('piece:P;seule:1 rouvre en portée pièce : un getEquipmentStates, zéro arbre ; avec un équipement : un arbre', () => {
+  maybe('ancien lien piece:P;seule:1 : rouvre la pièce dans l’arbre complet ; un getEquipmentStates, zéro arbre ; avec un équipement : un arbre', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6, window: { hash: '#j2ha-vue=piece:10;seule:1' } });
     assert.equal(ui.isOpen(), true);
-    assert.equal(scope(ui), 'piece');
-    assert.deepEqual(roomIds(ui), ['10']);
+    assert.equal(scope(ui), 'toutes');
+    assert.equal(roomIds(ui).length, 3);
+    assert.equal(ui.wv.state().room, 10);
     assert.deepEqual(ui.reads(), { states: 1, trees: 0 });
     const eq = 1000;
     const deep = startBig({ rooms: 3, equipments: 30, seed: 6, window: { hash: `#j2ha-vue=piece:10;eq:${eq};seule:1` } });
-    assert.equal(scope(deep), 'piece');
+    assert.equal(scope(deep), 'toutes');
     assert.deepEqual(deep.reads(), { states: 1, trees: 1 });
     assert.equal(deep.$(`.j2ha-wv-eq[data-eq-id="${eq}"]`).attr('aria-selected'), 'true');
   });
@@ -139,7 +123,7 @@ describe('25.6 / AC5 — lien profond', () => {
 });
 
 describe('25.6 / AC5 — cohabitation avec le popstate du cœur (#302), nouvelles entrées', () => {
-  maybe('aucune entrée poussée ou remplacée (ouvrir, sélectionner, filtrer, élargir) n’a d’état non null', () => {
+  maybe('aucune entrée poussée ou remplacée (ouvrir, sélectionner, filtrer, revenir à la pièce) n’a d’état non null', () => {
     const ui = startBig({ rooms: 3, equipments: 30, seed: 6 });
     const states = [];
     for (const method of ['pushState', 'replaceState']) {
@@ -150,7 +134,7 @@ describe('25.6 / AC5 — cohabitation avec le popstate du cœur (#302), nouvelle
     const eq = Number(ui.$('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq').list[0].attrs['data-eq-id']);
     ui.selectEquipment(eq, ok(tree(eq, [READY])));
     ui.click('.j2ha-wv-chips .j2ha-chip-filter[data-filter="published"]');
-    ui.click('.j2ha-wv-widen');
+    ui.click('.j2ha-wv-crumb-room');
     assert.ok(states.length >= 4);
     assert.ok(states.every((state) => state === null), 'tous les états valent null');
   });

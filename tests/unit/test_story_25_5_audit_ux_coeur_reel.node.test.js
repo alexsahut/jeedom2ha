@@ -26,7 +26,9 @@ function sceneOptions(width) {
 }
 
 for (const width of [980, 1440]) {
-  test(`audit UX réel ${width} px — carte au nom sur deux lignes : jauge et repères entiers, jauges alignées sur la rangée`, async (t) => {
+  // Garde levée (front v3, Lot 1) : la tuile garde une hauteur fixe de 72 px ; un nom long tient sur UNE ligne, coupé par une
+  // ellipse, le nom entier en info-bulle. Le reste de l'audit (liseré et repères entiers, liserés alignés) est inchangé.
+  test(`audit UX réel ${width} px — tuile au nom long : une ligne (ellipse au besoin), liseré et repères entiers, liserés alignés sur la rangée`, async (t) => {
     const options = sceneOptions(width);
     if (!options) { t.skip('PHP indisponible'); return; }
     await withRealView(t, options, async (page) => {
@@ -41,6 +43,9 @@ for (const width of [980, 1440]) {
         const gaugeOf = (sel) => card(sel).querySelector('.j2ha-gauge');
         return {
           nameHeight: box(card(long).querySelector('.name')).height,
+          nameEllipsis: getComputedStyle(card(long).querySelector('.name')).textOverflow,
+          nameTitle: card(long).querySelector('.name').getAttribute('title'),
+          nameText: card(long).querySelector('.name').textContent,
           gaugeInside: box(gaugeOf(long)).bottom <= box(card(long)).bottom,
           gaugeVisible: visible(gaugeOf(long)),
           gaugeTops: [box(gaugeOf(long)).top, box(gaugeOf(short)).top],
@@ -48,7 +53,9 @@ for (const width of [980, 1440]) {
             text: el.textContent, height: box(el).height, inside: box(el).bottom <= box(el.closest('.j2ha-room-card')).bottom })),
         };
       }, [CARD(3), CARD(4)]);
-      assert.ok(m.nameHeight > 20, `le nom de la scène tient bien sur deux lignes (${m.nameHeight}px)`);
+      assert.ok(m.nameHeight <= 20, `le nom long tient sur une ligne (${m.nameHeight}px)`);
+      assert.equal(m.nameEllipsis, 'ellipsis', 'un nom trop long est coupé par une ellipse');
+      assert.equal(m.nameTitle, m.nameText, 'le nom entier en info-bulle');
       assert.ok(m.gaugeInside && m.gaugeVisible, 'la jauge de la carte au nom long est dans la carte et visible');
       assert.ok(Math.abs(m.gaugeTops[0] - m.gaugeTops[1]) <= 1, `jauges de la rangée alignées (${m.gaugeTops.join(' / ')})`);
       assert.ok(m.marks.length > 0, 'la scène a des repères');
@@ -59,29 +66,33 @@ for (const width of [980, 1440]) {
     });
   });
 
-  test(`audit UX réel ${width} px — vue C : cause d'exclusion et « (désactivé dans Jeedom) » entières, sous le nom`, async (t) => {
+  // Garde levée (front v3, Lot 2) : l'arbre n'affiche plus que l'icône d'état ; la cause d'exclusion et « désactivé dans
+  // Jeedom » sont ENTIÈRES dans l'info-bulle et le nom accessible de l'icône. Le nom de l'équipement garde toute la ligne.
+  test(`audit UX réel ${width} px — vue C : icône d'état, cause d'exclusion et « désactivé dans Jeedom » entières en info-bulle`, async (t) => {
     const options = sceneOptions(width);
     if (!options) { t.skip('PHP indisponible'); return; }
     await withRealView(t, options, async (page) => {
       await page.locator(`${CARD(5)}`).click();
       await page.locator('.j2ha-wv-eq[data-eq-id="501"]').waitFor();
       const m = await page.evaluate(() => {
-        const box = (el) => el.getBoundingClientRect();
-        const lineOf = (eqId, cls) => {
+        const lineOf = (eqId) => {
           const row = document.querySelector(`.j2ha-wv-eq[data-eq-id="${eqId}"] > .j2ha-wv-row`);
-          const el = row.querySelector(cls);
+          const icon = row.querySelector('.j2ha-wv-state-icon');
           const name = row.querySelector('.j2ha-wv-name');
-          return { text: el.textContent.trim(), truncated: el.scrollWidth > el.clientWidth + 1, height: box(el).height,
-            below: box(el).top >= box(name).bottom - 1, alignedLeft: Math.abs(box(el).left + parseFloat(getComputedStyle(el).paddingLeft) - box(name).left) <= 2 };
+          return { label: icon.getAttribute('aria-label'), title: icon.getAttribute('title'), text: icon.textContent.trim(),
+            iconWidth: icon.getBoundingClientRect().width, rowHeight: row.getBoundingClientRect().height,
+            nameTruncated: name.scrollWidth > name.clientWidth + 1 };
         };
-        return { nav: box(document.querySelector('.j2ha-wv-nav')).width, cause: [lineOf(501, '.j2ha-wv-cause'), lineOf(505, '.j2ha-wv-cause')], off: lineOf(503, '.j2ha-wv-off') };
+        return { nav: document.querySelector('.j2ha-wv-nav').getBoundingClientRect().width, cause: [lineOf(501), lineOf(505)], off: lineOf(503) };
       });
       for (const line of m.cause.concat([m.off])) {
-        assert.ok(!line.truncated, `« ${line.text} » non tronquée`);
-        assert.ok(line.below && line.alignedLeft, `« ${line.text} » sous le nom, alignée sur lui`);
+        assert.equal(line.text, '', 'aucun mot affiché');
+        assert.equal(line.title, line.label);
+        assert.ok(line.iconWidth <= 24, `icône seule (${line.iconWidth}px)`);
+        assert.ok(line.rowHeight <= 44, `ligne d'une hauteur (${line.rowHeight}px)`);
       }
-      assert.match(m.cause[1].text, /par le plugin Bêta Sécurité Maison$/);
-      assert.ok(m.off.height <= 18, `« ${m.off.text} » sur une ligne, sans mot coupé (${m.off.height}px)`);
+      assert.match(m.cause[1].label, /^Exclu · par le plugin Bêta Sécurité Maison$/);
+      assert.match(m.off.label, /désactivé dans Jeedom/);
       if (width >= 1440) assert.ok(m.nav >= 400, `arbre élargi en grand écran (${m.nav}px)`);
       // Disposition large : le bouton du tiroir « Pièces » reste masqué (aucune règle ajoutée ne le réaffiche).
       assert.equal(await page.locator('.j2ha-wv-drawer-toggle').isVisible(), false, 'tiroir masqué en disposition large');
@@ -108,7 +119,9 @@ test('audit UX réel — fil d\'Ariane : la pièce cliquable est un lien (pas de
   });
 });
 
-test('audit UX réel — configuration : 42 plugins, les cochés résumés au-dessus, au moins 24 cases visibles sans défiler', async (t) => {
+// Garde levée (front v3, Lot 3) : la liste des 42 plugins quitte la configuration (une seule source : le panneau « Choisir ce qui
+// est publié » de la page du plugin). Même scène de 42 plugins : la page tient sans défilement interne ni liste, aucune phrase.
+test('audit UX réel — configuration (42 plugins) : plus de liste ni de phrase, un lien vers « Choisir ce qui est publié »', async (t) => {
   if (!phpAvailable || !JQUERY) { t.skip('PHP ou jQuery indisponible'); return; }
   let playwright;
   try {
@@ -132,26 +145,16 @@ test('audit UX réel — configuration : 42 plugins, les cochés résumés au-de
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto('http://cfg.test/');
-    const measure = () => page.evaluate(() => {
-      const list = document.querySelector('#div_excludedPluginsList');
-      const lb = list.getBoundingClientRect();
-      const labels = [...list.querySelectorAll('.checkbox')];
-      const shown = labels.filter((el) => { const b = el.getBoundingClientRect(); return b.top >= lb.top - 1 && b.bottom <= lb.bottom + 1; }).length;
-      const summary = document.querySelector('#p_excludedPluginsSummary');
-      return { total: labels.length, shown, hscroll: list.scrollWidth > list.clientWidth, summary: summary.textContent,
-        summaryAbove: summary.getBoundingClientRect().bottom <= lb.top };
-    });
-    const before = await measure();
-    assert.equal(before.total, 42);
-    assert.ok(before.shown >= 24, `${before.shown} cases visibles sans défiler sur 42`);
-    assert.equal(before.hscroll, false, 'aucun défilement horizontal');
-    assert.ok(before.summaryAbove, 'résumé au-dessus de la liste');
-    assert.equal(before.summary, 'Plugins cochés (6) : Plugin fictif 07, Plugin fictif 15, Plugin fictif 23, Plugin fictif 31, Plugin fictif 38, Plugin fictif 41.');
-    await page.locator('input[value="plugin_15"]').uncheck();
-    await page.locator('input[value="plugin_02"]').check();
-    assert.equal((await measure()).summary, 'Plugins cochés (6) : Plugin fictif 02, Plugin fictif 07, Plugin fictif 23, Plugin fictif 31, Plugin fictif 38, Plugin fictif 41.');
-    await page.evaluate(() => { $('.configKey[data-l1key=excludedPlugins]').val('').trigger('change'); });
-    assert.equal((await measure()).summary, 'Aucun plugin coché.', 'le remplissage du champ par le cœur met le résumé à jour');
+    const m = await page.evaluate(() => ({
+      lists: document.querySelectorAll('#div_excludedPluginsList, input.j2ha-excluded-plugin').length,
+      helps: document.querySelectorAll('.help-block:not(#span_mqttPasswordStatus)').length,
+      link: (document.querySelector('#lnk_j2haChoosePublished') || {}).textContent || '',
+      hscroll: document.documentElement.scrollWidth > window.innerWidth + 1,
+    }));
+    assert.equal(m.lists, 0);
+    assert.equal(m.helps, 0, 'aucune phrase d’aide permanente');
+    assert.match(m.link, /Choisir ce qui est publié/);
+    assert.equal(m.hscroll, false, 'aucun défilement horizontal');
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

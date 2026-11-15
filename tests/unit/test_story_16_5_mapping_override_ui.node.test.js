@@ -37,17 +37,19 @@ function blockingView(type) {
 // ---------------------------------------------------------------------------
 
 describe('16.5 — options de type HA', () => {
-  it('expose exactement les 8 types supportés par le moteur, triés', () => {
+  // Garde levée (front v2, Lot 5) : 8 → 10 types. Le démon publie déjà vannes et serrures (PRODUCT_SCOPE, stories 24.8 /
+  // 24.9) et le sélecteur les cachait (critère G4 de l'audit 26-0). La liste reste triée et égale au périmètre du démon.
+  it('expose exactement les 10 types supportés par le moteur, triés', () => {
     assert.deepStrictEqual(M.getHaEntityTypeOptions(), [
       'alarm_control_panel', 'binary_sensor', 'button', 'climate',
-      'cover', 'light', 'sensor', 'switch',
+      'cover', 'light', 'lock', 'sensor', 'switch', 'valve',
     ]);
   });
 
   it('getHaEntityTypeOptions retourne une copie (pas la référence interne)', () => {
     const a = M.getHaEntityTypeOptions();
     a.push('poubelle');
-    assert.strictEqual(M.getHaEntityTypeOptions().length, 8);
+    assert.strictEqual(M.getHaEntityTypeOptions().length, 10);
   });
 });
 

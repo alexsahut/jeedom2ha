@@ -21,6 +21,7 @@ require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
 // Story 19.6 (AC1-AC5, AC8) — budget fixe du relais et orchestration pure (sans cœur Jeedom).
 require_once __DIR__ . '/../php/jeedom2ha_action_budget.php';
 require_once __DIR__ . '/../php/jeedom2ha_reevaluation.php'; // Story 24.14 — fonctions pures, sans cœur Jeedom
+require_once __DIR__ . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — fonctions pures
 
 /**
  * Story A1 — branche le relais borné sur le vrai callDaemon et le journal Jeedom.
@@ -40,6 +41,31 @@ function _jeedom2ha_run_parc_relay(string $relais, callable $call): array {
       return microtime(true);
     }
   );
+}
+
+/**
+ * Front v3 (Lot 4a) — relecture après un choix de publication de scénarios : même enchaînement que `scanTopology`
+ * (empreinte lue avant la topologie, invalidée avant l'envoi, mémorisée seulement si la synchro aboutit, écouteurs
+ * réalignés). Rend la réponse du démon, ou un tableau `status: error` s'il ne répond pas : le choix reste enregistré
+ * et sera appliqué à la prochaine synchro (cron, démarrage du démon).
+ */
+function _jeedom2ha_scenario_publication_rescan(): array {
+  $fingerprint = jeedom2ha::safeDecisionFingerprint();
+  $topology = jeedom2ha::getFullTopology();
+  $fingerprint = jeedom2ha_reevaluation_stable_fingerprint($fingerprint, jeedom2ha::safeDecisionFingerprint());
+  jeedom2ha::invalidateDecisionFingerprintBeforeSync();
+  $result = _jeedom2ha_run_parc_relay('TOPOLOGY', function (int $timeoutS) use ($topology) {
+    return jeedom2ha::callDaemon('/action/sync', $topology, 'POST', $timeoutS, null, array('X-Jeedom2ha-Sync-Mode' => 'rescan'));
+  });
+  jeedom2ha::rememberDecisionFingerprintAfterSync($fingerprint, $result);
+  if (isset($result['status']) && $result['status'] === 'ok') {
+    try {
+      jeedom2ha::syncStateListeners();
+    } catch (\Throwable $e) {
+      log::add('jeedom2ha', 'warning', '[STATE-LISTENER] Réenregistrement après choix des scénarios échoué : ' . $e->getMessage());
+    }
+  }
+  return is_array($result) ? $result : array('status' => 'error');
 }
 
 /**
@@ -655,6 +681,10 @@ try {
             'demon'  => array(),
             'broker' => array('state' => 'unknown', 'connected' => false, 'broker' => ''),
             'derniere_synchro_terminee' => null,
+            // Front v2 Lot 3 (additif) : birth de HA et dénombrement de la publication, null si absents.
+            'ha' => null,
+            'publication' => null,
+            'scenarios' => null,
             'derniere_operation_resultat' => 'aucun'
         ));
       }
@@ -663,12 +693,20 @@ try {
       $broker = (isset($status['payload']['broker'])) ? $status['payload']['broker'] : array('state' => 'disconnected', 'connected' => false, 'broker' => '');
       $derniere_synchro_terminee = (isset($status['payload']['derniere_synchro_terminee'])) ? $status['payload']['derniere_synchro_terminee'] : null;
       $derniere_operation_resultat = (isset($status['payload']['derniere_operation_resultat'])) ? $status['payload']['derniere_operation_resultat'] : 'aucun';
+      // Front v2 Lot 3 (additif) : relayés tels quels, null si le démon ne les fournit pas.
+      $ha = (isset($status['payload']['ha']) && is_array($status['payload']['ha'])) ? $status['payload']['ha'] : null;
+      $publication = (isset($status['payload']['publication']) && is_array($status['payload']['publication'])) ? $status['payload']['publication'] : null;
+      // Front v3 (Lot 4a, additif) : liste des scénarios et de leur publication, null si le démon ne la fournit pas.
+      $scenarios = (isset($status['payload']['scenarios']) && is_array($status['payload']['scenarios'])) ? $status['payload']['scenarios'] : null;
       ajax::success(array(
         'daemon' => true,
         'mqtt' => $mqtt,
         'demon' => $demon,
         'broker' => $broker,
         'derniere_synchro_terminee' => $derniere_synchro_terminee,
+        'ha' => $ha,
+        'publication' => $publication,
+        'scenarios' => $scenarios,
         'derniere_operation_resultat' => $derniere_operation_resultat
       ));
     }
@@ -891,6 +929,32 @@ try {
       );
       ajax::success($result);
     }
+    else if ($action == 'saveScenarioPublication') {
+      // Front v3 (Lot 4a, option B) — publier / ne plus publier des scénarios : `ids_to_publish` et `ids_to_unpublish`,
+      // listes JSON d'identifiants (ex. `[12,15]`). Met à jour `publishedScenarios` et `knownScenarioIds` (migration
+      // faite d'abord si besoin), puis relit Jeedom : le démon publie les nouveaux et retire les autres par le chemin
+      // `unpublish` existant. Rien n'est écrit si la demande est invalide.
+      $saved = jeedom2ha_save_scenario_publication(
+        init('ids_to_publish', ''),
+        init('ids_to_unpublish', ''),
+        jeedom2ha::scenarioPublicationDeps()
+      );
+      // Choix enregistré : empreinte invalidée AVANT toute extraction qui peut échouer, pour que la tâche périodique
+      // resynchronise quoi qu'il arrive à la relecture ci-dessous (revue P2 #399).
+      jeedom2ha::invalidateDecisionFingerprintBeforeSync();
+      try {
+        $rescan = _jeedom2ha_scenario_publication_rescan();
+      } catch (\Throwable $e) {
+        log::add('jeedom2ha', 'warning', '[SCENARIO] Relecture après le choix des scénarios échouée : ' . $e->getMessage());
+        $rescan = array('status' => 'error', 'message' => 'Relecture échouée : le choix est enregistré, il sera appliqué à la prochaine synchro');
+      }
+      ajax::success(array(
+        'saved' => true,
+        'ids_to_publish' => $saved['ids_to_publish'],
+        'ids_to_unpublish' => $saved['ids_to_unpublish'],
+        'rescan' => $rescan,
+      ));
+    }
     else if ($action == 'executeHaAction') {
       // Story 5.1 — Relay strict de la façade backend unique /action/execute.
       // Aucun calcul local : les paramètres sont transmis au daemon tel quel.
@@ -1093,6 +1157,28 @@ try {
       $payload = array('jeedom_eq_id' => (int)$eqId);
       if ($cmdId !== '') {
         $payload['jeedom_cmd_id'] = (int)$cmdId;
+      }
+      // Front v3 (Lot 7) : `scope=command` (cmdId obligatoire) ne retire que le réglage de publication de CETTE commande ;
+      // types HA et réglages des autres commandes intacts (« Annuler » après « Publier quand même »).
+      if (init('scope', '') === 'command') {
+        if ($cmdId === '') {
+          throw new Exception(__('Override de publication invalide', __FILE__));
+        }
+        $payload['scope'] = 'command';
+        $result = jeedom2ha::callDaemon('/action/publication_override_revert', $payload, 'POST', 15);
+        if ($result === null) {
+          throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+        }
+        ajax::success($result);
+      }
+      // Front v2 (Lot 6) : `scope=equipment` (sans cmdId) ne retire que le réglage de publication de l'équipement ;
+      // absent, comportement inchangé (retour complet en automatique, CC-19).
+      $revertScope = init('scope', '');
+      if ($revertScope !== '') {
+        if ($revertScope !== 'equipment' || $cmdId !== '') {
+          throw new Exception(__('Override de publication invalide', __FILE__));
+        }
+        $payload['scope'] = 'equipment';
       }
       $result = jeedom2ha::callDaemon('/action/publication_override_revert', $payload, 'POST', 15);
       if ($result === null) {

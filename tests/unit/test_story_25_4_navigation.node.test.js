@@ -27,21 +27,26 @@ describe('25.4 / D2, AC10 — chaque événement et ses lectures réseau', () =>
     ['clic sur une carte de pièce', (ui) => openCardWide(ui, 10), { states: 0, trees: 0 }],
     ['clic sur une puce du bloc maison', (ui) => ui.click('#j2ha_houseChips .j2ha-chip-filter[data-filter="published"]'), { states: 0, trees: 0 }],
     ['clic sur un segment de la jauge maison', (ui) => ui.click('#j2ha_houseGauge .j2ha-seg-published'), { states: 0, trees: 0 }],
-    ['clic sur une ligne de la liste filtrée', (ui) => {
-      ui.page.setFilter('published');
-      ui.click('#j2ha_filterList .j2ha-frow-btn');
+    // Garde levée (front v3, Lot 1, P8) : plus de liste filtrée ; une ligne de la liste « À faire » (puce « Bloqués ») ouvre la
+    // fiche de l'équipement, avec les mêmes lectures (aucun état, un arbre).
+    ['clic sur une ligne de la liste « À faire »', (ui) => {
+      ui.page.setFilter('blocked');
+      ui.click('#j2ha_v2_todo .j2ha-v3-todo-open');
     }, { states: 0, trees: 1 }],
     ['sélection d’une pièce dans l’arbre', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="11"] .j2ha-wv-row'); }, { states: 0, trees: 0 }],
     ['dépliage d’une pièce', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="12"] .j2ha-wv-toggle'); }, { states: 0, trees: 0 }],
     ['sélection d’un équipement dans l’arbre', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-room[data-object_id="10"] .j2ha-wv-eq .j2ha-wv-row'); }, { states: 0, trees: 1 }],
     ['retour à la page principale', (ui) => { openCardWide(ui, 10); ui.click('.j2ha-wv-back'); }, { states: 0, trees: 0 }],
   ];
+  // Garde levée (front v2, Lot 7, spec E2) : une puce ou un segment de la jauge filtre SUR PLACE (liste de la page
+  // principale) ; la vue de travail ne s'ouvre plus. Les lectures réseau restent nulles.
+  const STAYS_ON_PAGE = ['retour à la page principale', 'clic sur une puce du bloc maison', 'clic sur un segment de la jauge maison'];
   for (const [name, run, expected] of rows) {
     maybe(name, () => {
       const ui = startBig({ rooms: 3, equipments: 30, seed: 4 });
       const got = delta(ui, () => run(ui));
       assert.deepEqual(got, expected, name);
-      assert.equal(ui.isOpen(), name !== 'retour à la page principale');
+      assert.equal(ui.isOpen(), !STAYS_ON_PAGE.includes(name));
     });
   }
 

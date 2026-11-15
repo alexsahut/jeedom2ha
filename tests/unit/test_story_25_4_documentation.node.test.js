@@ -32,25 +32,24 @@ describe('25.4 / AC30 — vocabulaire', () => {
 });
 
 describe('25.4 / AC30 — index.md décrit la vue de travail', () => {
+// Garde levée (front v2, Lot 7, spec E2/E3) : la puce filtre sur place, « Toutes les pièces » devient la bascule « Cette pièce | Toute la maison », la recherche est « Rechercher dans toute la maison » ; index.md suit.
+  // Garde levée (front v3, Lot 5) : doc réécrite par écran ; « La vue de travail », « Le détail d'un équipement », « Le
+  // tableau des commandes », « Réglages en attente et Appliquer » et « Les actions de publication » deviennent une seule section
+  // courte « La pièce et la fiche ». Les faits vérifiés restent les mêmes, sous leur nouvelle forme.
   it('section dédiée : ouverture, retour, adresse, arbre, recherche, filtres, détail de pièce, détail d’équipement, tablette', () => {
-    assert.ok(index.includes('\n### La vue de travail\n'));
-    for (const needle of ['**La vue de travail**'.replace(/\*\*/g, '**'), '« Toutes les pièces »', '« Précédent »', '#j2ha-vue=', 'Rechercher une pièce ou un équipement', 'Aucun résultat',
-      'À traiter dans cette pièce', 'Rien à traiter dans cette pièce', 'Republier la pièce', 'Ouvrir les types génériques', '« Pièces »', 'Échap']) {
-      assert.ok(index.includes(needle.replace('**La vue de travail**', 'vue de travail')), needle);
+    assert.ok(index.includes('\n### La pièce et la fiche\n'));
+    for (const needle of ['Maison › Niveau › Pièce', '« Précédent »', '« Rechercher »', '« n résultats »', 'Aucun résultat',
+      'À traiter dans cette pièce', 'Rien à faire', 'Republier la pièce', 'Ouvrir les types génériques', '« Pièces »', 'Échap']) {
+      assert.ok(index.includes(needle), needle);
     }
-    assert.match(index, /carte de pièce, sur une puce ou un segment de la jauge/);
-    assert.match(index, /La lecture de la configuration|ne lit la configuration \*\*que de cet équipement\*\*/);
-    assert.match(index, /partagé\*\* avec la page principale/);
-    assert.match(index, new RegExp(`en dessous de ${W.LAYOUT_SPLIT_MIN_WIDTH} pixels`));
+    assert.match(index, /Un clic ouvre \[la pièce\]\(#la-pièce-et-la-fiche\)/);
+    assert.match(index, /pour cet équipement seulement/);
+    assert.match(index, /les mêmes puces que la page maison/);
+    assert.match(index, new RegExp(`En dessous de ${W.LAYOUT_SPLIT_MIN_WIDTH} pixels`));
   });
 
-  it('la liste filtrée et les cartes décrivent l’ouverture de la vue', () => {
-    assert.match(index, /ouvre la \[vue de travail\]\(#la-vue-de-travail\)/);
-    assert.match(index, /ouvre la vue de travail sur la pièce/);
-  });
-
-  it('le détail d’équipement est décrit sous son nouveau titre ; les anciennes sections sont conservées', () => {
-    for (const heading of ['### Le détail d\'un équipement', '### Le tableau des commandes', '### Les causes de blocage', '### Réglages en attente et Appliquer', '### Les actions de publication']) {
+  it('le détail d’équipement est décrit dans sa section ; les sections de référence sont conservées', () => {
+    for (const heading of ['### La pièce et la fiche', '#### Quand un bouton est grisé', '### Les causes de blocage', '### Les conseils']) {
       assert.ok(index.includes('\n' + heading + '\n'), heading);
     }
   });
@@ -82,9 +81,11 @@ describe('25.4 / AC30 — libellés cités = libellés du code', () => {
     .map((file) => fs.readFileSync(file, 'utf8').replace(/\{\{|\}\}/g, '').replace(/\\'/g, "'")).join('\n');
 
   it('chaque libellé de la vue cité entre « » dans index.md existe tel quel dans desktop/ ou core/', () => {
-    for (const label of ['Toutes les pièces', 'Rechercher une pièce ou un équipement', 'À traiter dans cette pièce', 'Rien à traiter dans cette pièce',
+    // Garde levée (front v3, Lot 2) : « Toute la maison », « Cette pièce », « Rechercher dans toute la maison », « Dans les autres
+    // pièces », « Rien à traiter dans cette pièce », « (désactivé dans Jeedom) » et « non lu » ont quitté l'écran ; leurs successeurs.
+    for (const label of ['Maison', 'Rechercher', 'résultats', 'À traiter dans cette pièce', 'Rien à faire',
       'Pièces', 'Aucun résultat', 'Republier la pièce', 'Supprimer de Home Assistant…', 'Ouvrir les types génériques', 'Appliquer',
-      '(désactivé dans Jeedom)', 'non lu', 'Chargement…', 'Impossible de lire la configuration de cet équipement.',
+      'désactivé dans Jeedom', 'Non lu', 'Chargement…', 'Impossible de lire la configuration de cet équipement.',
       'Impossible de charger la configuration HA (démon indisponible).',
       'Republication et suppression de pièce indisponibles pour les équipements sans pièce : utilisez les actions de chaque équipement.']) {
       assert.ok(index.includes(label), `« ${label} » cité dans index.md`);

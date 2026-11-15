@@ -135,7 +135,9 @@ describe('25.1 / AC5 — commandes ignorées hors des défauts', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const panel = ui.$('.j2ha-eq-panel[data-eq-id="1"]');
     assert.equal(panel.find('.j2ha-eq-counter').list.map((el) => ui.$(el).text()).join(' · '), '3 publiées · 1 bloquée · 5 ignorées');
-    assert.match(panel.find('.j2ha-eq-blocked-mention').text(), /1 bloquée/);
+    // Garde levée (front v3, Lot 2) : la mention n'est plus un texte de l'en-tête ; une icône la porte (info-bulle, nom accessible),
+    // le décompte reste sur la ligne 2 (« 3 publiées · 1 bloquée · 5 ignorées »).
+    assert.match(panel.find('.j2ha-eq-blocked-mention i').attr('aria-label'), /1 bloquée/);
     assert.equal(M.summarizeEquipmentCounters(t).defects, 1);
   });
 
@@ -217,6 +219,40 @@ describe('25.1 / AC10 — réglage de publication segmenté', () => {
     const call = ui.pending('savePublicationOverride')[0];
     assert.ok(call, 'écriture attendue après confirmation');
     assert.deepEqual([call.data.eqId, call.data.publicationPolicy], [1, 'force_publish']);
+  });
+
+  // Front v3 (Lot 2, revue Codex #400) : « Toujours » n'est plus grisé sur un équipement « Automatique » déjà publié. Rien ne
+  // change maintenant, mais le réglage garde l'équipement publié si le plugin hésite plus tard : la confirmation est permise
+  // (aperçu d'une ligne) et enregistre « Toujours » par la même requête ; « Annuler » laisse « Automatique », sans écriture.
+  it('équipement déjà publié : « Toujours » confirmable (« Rien ne change maintenant… »), même écriture ; Annuler garde Automatique', () => {
+    const preview = { state: 'ok', result: { payload: { overridden: {
+      ha_entity_type: 'light', projection_validity: { is_valid: true }, should_publish: true, command_ids: [100],
+      entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY }],
+    } } } };
+    const start = () => {
+      const published = tree(1, [READY], { present: true, entities: [{ ha_entity_type: 'light', command_ids: [100], decision: READY, override_command_id: 100, present_in_ha: true }] });
+      const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(published)]);
+      assert.equal(ui.$(EQ + ' .j2ha-seg-auto').attr('aria-checked'), 'true');
+      assert.notEqual(ui.$(EQ + ' .j2ha-seg-always').prop('disabled'), true, '« Toujours » n’est pas grisé');
+      ui.click(EQ + ' .j2ha-seg-always');
+      assert.equal(ui.pending('previewMappingOverride')[0].data.publicationPolicy, 'force_publish');
+      ui.respond('previewMappingOverride', preview);
+      return ui;
+    };
+    // Annuler : aucune écriture, « Automatique » reste la position courante, les segments sont rendus.
+    const cancelled = start();
+    const dialog = cancelled.lastConfirmation();
+    assert.match(plain(cancelled.$(dialog.options.message).text()), /^Rien ne change maintenant · restera publié si le plugin hésite plus tard$/);
+    dialog.options.buttons.cancel.callback();
+    assert.equal(cancelled.pending('savePublicationOverride').length, 0);
+    assert.equal(cancelled.$(EQ + ' .j2ha-seg-auto').attr('aria-checked'), 'true');
+    assert.notEqual(cancelled.$(EQ + ' .j2ha-seg-always').prop('disabled'), true, 'boutons libérés après Annuler');
+    // Confirmer : la confirmation n'est pas désactivée, l'écriture est celle de « Toujours » (équipement, force_publish).
+    const confirmed = start();
+    confirmed.lastConfirmation().options.buttons.confirm.callback();
+    const call = confirmed.pending('savePublicationOverride')[0];
+    assert.ok(call, 'écriture attendue après confirmation');
+    assert.deepEqual([call.data.eqId, call.data.publicationPolicy, call.data.cmdId], [1, 'force_publish', undefined]);
   });
 
   it('le segment actif n’écrit jamais (clic et clavier) ; « Tout remettre en automatique… » demande confirmation', () => {
@@ -359,6 +395,8 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
     assert.deepEqual(entries, [
       { role: 'none', text: 'Republier', danger: false },
       { role: 'none', text: 'Tout remettre en automatique…', danger: false },
+      // Front v3 (Lot 2) : « Détails techniques » passe dans le menu (aucune écriture).
+      { role: 'none', text: 'Détails techniques', danger: false },
       { role: 'separator', text: '', danger: false },
       { role: 'none', text: 'Supprimer de Home Assistant…', danger: true },
     ]);
@@ -413,7 +451,8 @@ describe('25.1 / AC12 — menu d’actions secondaires « ⋯ »', () => {
       if (selector === '.j2ha-room-recreate') showRoom(ui); else ui.show(1);
       ui.click(selector);
       const { options } = ui.lastConfirmation();
-      for (const word of ['historique', 'dashboards', 'automatisations', 'Rien n\'est recréé automatiquement']) {
+      // Garde levée (front v2, Lot 9a, point 8) : « dashboards » → « tableaux de bord » (glossaire, mot d'utilisateur).
+      for (const word of ['historique', 'tableaux de bord', 'automatisations', 'Rien n\'est recréé automatiquement']) {
         assert.ok(options.message.includes(word), word);
       }
       options.buttons.cancel.callback();
@@ -431,10 +470,11 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
   }
   const PANEL = '.j2ha-eq-panel[data-eq-id="1"] ';
 
-  it('colonnes Commande | Dans Home Assistant | Type Jeedom | Type HA, en-têtes sans majuscules forcées', () => {
+  // Front v2 (Lot 2) : « Type Jeedom » devient « Rôle dans Jeedom » (libellé français du type générique, code en infobulle).
+  it('colonnes Commande | Dans Home Assistant | Rôle dans Jeedom | Type HA, en-têtes sans majuscules forcées', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(multi())]);
     assert.deepEqual(ui.$(PANEL + '.j2ha-cmd-table th').list.map((el) => plain(ui.$(el).text())),
-      ['Commande', 'Dans Home Assistant', 'Type Jeedom', 'Type HA']);
+      ['Commande', 'Dans Home Assistant', 'Rôle dans Jeedom', 'Type HA']);
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     assert.doesNotMatch(css, /text-transform:\s*uppercase/);
   });
@@ -469,20 +509,24 @@ describe('25.1 / AC13 — tableau regroupé par entité', () => {
     assert.doesNotMatch(ui.$(PANEL + '.j2ha-cmd-table').text(), /Sera publié|dans Home Assistant\./);
   });
 
-  it('« Type HA » : lien « auto » / « imposé (sensor) » ; sélecteur seulement après clic ; jamais pour une ignorée', () => {
+  // Garde levée (front v2, Lot 5, spec 3.2) : « imposé (sensor) » devient « Personnalisé : Capteur (sensor) » ; le clic
+  // ouvre le panneau « Corriger le type » (jamais rendu en permanence).
+  // Garde levée (front v2, Lot 9a, regard neuf v2) : « auto » devient « Automatique » (mot du réglage, lisible comme lien).
+  it('« Type HA » : lien « Automatique » / « Personnalisé : Capteur (sensor) » ; panneau seulement après clic ; jamais pour une ignorée', () => {
     const t = tree(1, [READY, READY], { entities: [entity('sensor', [100, 101])] });
     t.commands[1].override_applied = true;
     t.commands[1].effective_ha = 'sensor';
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const links = ui.$(PANEL + '.j2ha-type-link').list.map((el) => plain(ui.$(el).text()));
-    assert.deepEqual(links, ['auto', 'imposé (sensor)']);
+    assert.deepEqual(links, ['Automatique', 'Personnalisé : Capteur (sensor)']);
     assert.ok(ui.$(PANEL + '.j2ha-type-forced').length === 1, 'surligné quand un type est imposé');
-    assert.equal(ui.$(PANEL + 'select').length, 0, 'sélecteur non rendu en permanence');
+    assert.equal(ui.$(PANEL + 'select').length, 0, 'aucun sélecteur dans la cellule');
+    assert.equal(ui.$('.j2ha-v3-type-modal .j2ha-v2-type-panel').length, 0, 'panneau non rendu en permanence');
     const ignored = openRoomWith([room(7, 'Zone', [1])], 7, [ok(tree(1, [READY, IGNORED], { entities: [entity('light', [100])] }))]);
     assert.equal(ignored.$(PANEL + '.j2ha-type-link').length, 1, 'aucun réglage de type pour la commande ignorée');
   });
 
-  it('« Type Jeedom » en texte normal (pas de monospace)', () => {
+  it('« Rôle dans Jeedom » en texte normal (pas de monospace)', () => {
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
     assert.doesNotMatch(css, /font-family:\s*monospace/);
   });
@@ -497,9 +541,13 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
     const notices = ui.$(PANEL + '.j2ha-notice');
     assert.equal(notices.length, 1);
-    assert.match(notices.find('.j2ha-notice-text').text(), /11 commandes bloquées : types génériques non configurés dans Jeedom/);
+    // Garde levée (front v3, Lot 2) : la bande dit la cause en 4 mots au plus ; la phrase avec le nombre de commandes est dans
+    // « Détails techniques » (menu ⋯), une seule fois. Le bouton s'appelle « Types génériques » (« Ouvrir… » en info-bulle).
+    assert.equal(plain(notices.find('.j2ha-eq-band-what').text()).trim(), 'Sans type générique');
+    assert.match(ui.$(PANEL + '.j2ha-eq-tech').text(), /11 commandes bloquées : types génériques non configurés dans Jeedom/);
     const button = notices.find('.j2ha-open-generic-types');
-    assert.equal(plain(button.text()), 'Ouvrir les types génériques');
+    assert.equal(plain(button.text()).trim(), 'Types génériques');
+    assert.equal(plain(button.attr('title')), 'Ouvrir les types génériques');
     assert.equal(button.attr('href'), 'index.php?v=d&p=types');
     const occurrences = ui.$(PANEL).text().split(CAUSE).length - 1;
     assert.equal(occurrences, 1, 'la phrase de cause apparaît exactement une fois');
@@ -512,8 +560,13 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const t = tree(1, [BLOCKED, BLOCKED, view('ha_missing_state_topic', false, false), READY], { present: true });
     t.commands[3].published_in_ha = true;
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(t)]);
-    const notices = ui.$(PANEL + '.j2ha-notice-text').list.map((el) => ui.$(el).text().trim());
-    assert.deepEqual(notices, ['2 commandes bloquées : types génériques non configurés dans Jeedom', '1 commande bloquée : pas de retour d’état exploitable']);
+    // Garde levée (front v3, Lot 2) : une bande par cause (libellé court), le décompte de chacune dans « Détails techniques ».
+    const notices = ui.$(PANEL + '.j2ha-eq-band-what').list.map((el) => plain(ui.$(el).text()).trim());
+    assert.deepEqual(notices, ['Sans type générique', 'Pas d’état']);
+    const tech = ui.$(PANEL + '.j2ha-eq-tech').text();
+    for (const line of ['2 commandes bloquées : types génériques non configurés dans Jeedom', '1 commande bloquée : pas de retour d’état exploitable']) {
+      assert.equal(tech.split(line).length - 1, 1, line);
+    }
     assert.equal(ui.$(PANEL + '.j2ha-open-generic-types').length, 1, 'le lien seulement pour la cause qui le justifie');
   });
 
@@ -523,7 +576,8 @@ describe('25.1 / AC14 — la cause est dite une fois, avec un lien', () => {
     const mixed = tree(1, [READY, BLOCKED], { present: true });
     const ui = openRoomWith([room(7, 'Zone', [1])], 7, [ok(mixed)]);
     assert.equal(ui.$(PANEL + '.j2ha-goto-blocking').length, 1);
-    assert.match(ui.$(PANEL + '.j2ha-goto-blocking').text(), /Voir la première commande bloquée/);
+    // Front v3 (Lot 2) : icône seule dans la bande, le libellé en nom accessible et en info-bulle.
+    assert.match(ui.$(PANEL + '.j2ha-goto-blocking').attr('aria-label'), /Voir la première commande bloquée/);
   });
 });
 
@@ -611,7 +665,11 @@ describe('25.1 / AC16 — un seul détail d’équipement, en-tête collant, un 
       assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /max-height|overflow-y|aria-multiselectable/, file);
     }
     const css = fs.readFileSync('desktop/css/jeedom2ha.css', 'utf8');
-    assert.match(css, /\.j2ha-wv \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0[^}]*background-color:\s*var\(--bg-color, var\(--j2ha-menu-bg\)\)/);
+    // Garde ajustée (front v3, Lot 0) : `var(--bg-color, …)` était un fond TRANSPARENT (--bg-color du cœur est un triplet,
+    // valeur invalide à l'exécution). Le fond opaque s'écrit rgb(var(--bg-color, var(--j2ha-page-rgb))) ; vérifié en vrai
+    // Chromium par test_front_v3_lot0_correctifs.
+    assert.match(css, /\.j2ha-wv \.j2ha-eq-head\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0[^}]*background-color:\s*rgb\(var\(--bg-color, var\(--j2ha-page-rgb\)\)\)/);
+    assert.doesNotMatch(css, /background-color:\s*var\(--bg-color/);
     assert.doesNotMatch(css, /\.j2ha-eq-cmdlist[^{]*\{[^}]*overflow/);
   });
 });
@@ -693,7 +751,7 @@ describe('25.1 / revue R1 (ClaudeBox) — P2-2, P2-3, P3-2, P3-3', () => {
     assert.deepEqual([save.data.eqId, save.data.publicationPolicy, save.data.cmdId], [1, 'force_publish', undefined]);
   });
 
-  it('P3-3 : « Voir la première commande bloquée » et l’icône « Retirer le type imposé » répondent à Entrée et Espace', () => {
+  it('P3-3 : « Voir la première commande bloquée » et l’icône « Revenir au type automatique » répondent à Entrée et Espace', () => {
     const t = tree(1, [READY, BLOCKED], { present: true });
     t.commands[0].override_applied = true;
     t.commands[0].effective_ha = 'light';

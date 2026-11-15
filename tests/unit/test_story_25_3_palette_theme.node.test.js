@@ -31,7 +31,9 @@ describe('25.3 / AC15 — aucune couleur littérale ajoutée', () => {
   it('lignes CSS ajoutées : ni #hex, ni rgb()/rgba()/hsl(), ni nom de couleur', () => {
     const added = addedCssLines();
     if (added === null) return;
-    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/;
+    // Garde levée (front v3, Lot 0) : `rgb(var(--bg-color, …))` n'est pas une couleur littérale ; c'est la seule façon de lire
+    // le TRIPLET --bg-color du cœur (« 245, 245, 245 »). Un rgb() qui ne commence pas par var( reste interdit.
+    const literal = /#[0-9a-fA-F]{3,8}\b|\brgba?\((?!var\()|\bhsla?\(/;
     const named = /(?<![\w-])(red|blue|green|yellow|orange|purple|pink|black|white|gray|grey|silver|maroon|navy|teal|olive|lime|aqua|fuchsia|brown|gold|crimson|coral|salmon)(?![\w-])/i;
     const code = stripComments(added.join('\n'));
     assert.doesNotMatch(code, literal);
@@ -146,12 +148,14 @@ describe('25.3 / AC15 — contrastes des nouveaux éléments dans les deux thèm
     });
   }
 
-  it('les segments portent un mot dans la légende et un aria-label : l’état n’est jamais porté par la seule couleur', () => {
+  // Garde levée (front v3, Lot 1) : la légende est retirée ; chaque segment porte son compte en `title` et `aria-label`, chaque
+  // puce associe une icône FA5, un nombre et un mot (plus de point de couleur seul).
+  it('les segments portent leur compte (title, aria-label) et les puces une icône + un mot : l’état n’est jamais porté par la seule couleur', () => {
     const js = newSources['jeedom2ha_overview.js'];
     assert.match(js, /role="img"/);
-    assert.match(js, /aria-label/);
+    assert.match(js, /\.attr\('title', label\)\.attr\('aria-label', label\)/);
     assert.match(js, /aria-pressed/);
-    assert.match(js, /j2ha-chip-dot/);
+    assert.match(js, /j2ha-v3-chip-word/);
   });
 });
 

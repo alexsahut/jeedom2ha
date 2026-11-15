@@ -44,7 +44,9 @@ $.fn.sortable = function () { return this; };
 $.fn.showAlert = function () { return this; };
 `;
 
-const SCRIPTS = ['jeedom2ha_mapping_override', 'jeedom2ha_mapping_surface', 'jeedom2ha_action_budget', 'jeedom2ha_overview', 'jeedom2ha_workview', 'jeedom2ha'];
+// Ordre réel de la page (include_file de jeedom2ha.php).
+// Front v3 (Lot 6) : jeedom2ha_infotip (info-bulles ⓘ), juste après mapping_override comme dans jeedom2ha.php.
+const SCRIPTS = ['jeedom2ha_mapping_override', 'jeedom2ha_infotip', 'jeedom2ha_lexique', 'jeedom2ha_ha_side', 'jeedom2ha_mapping_surface', 'jeedom2ha_type_panel', 'jeedom2ha_action_budget', 'jeedom2ha_overview', 'jeedom2ha_workview', 'jeedom2ha_guide', 'jeedom2ha_exclusions', 'jeedom2ha_scenarios', 'jeedom2ha'];
 
 /** Corps d'un arbre unitaire pour `eqId` (le contrôleur exige que l'identifiant corresponde). */
 function treeBody(eqId, source) {
@@ -93,7 +95,10 @@ async function withRealView(t, options, fn) {
     const bodies = [];
     const errors = [];
     const withCore = opts.coreCss !== undefined ? opts.coreCss !== false : opts.css === undefined;
-    const css = (withCore ? CORE_CSS : '') + (opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css')) + (opts.extraCss || '');
+    // Front v3 (Lot 1) : par défaut, les DEUX feuilles du plugin, dans l'ordre de la page (jeedom2ha.css puis jeedom2ha_v2.css,
+    // `include_file` de jeedom2ha.php) — la page maison v3 est stylée par la seconde.
+    const pluginCss = opts.css !== undefined ? opts.css : read('desktop/css/jeedom2ha.css') + read('desktop/css/jeedom2ha_v2.css');
+    const css = (withCore ? CORE_CSS : '') + pluginCss + (opts.extraCss || '');
     // Les scripts sont SERVIS (balises <script src>) pour que `page.reload()` rejoue la page entière, lien profond compris.
     const scriptTags = ['/assets/jquery.js', '/assets/bootbox-stub.js', ...SCRIPTS.map((file) => `/assets/${file}.js`)]
       .map((src) => `<script src="${src}"></script>`).join('');
@@ -130,7 +135,11 @@ async function withRealView(t, options, fn) {
           return;
         }
         let body = { state: 'error', result: 'écriture interdite en test' };
-        if (action === 'getBridgeStatus') body = { state: 'ok', result: { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } };
+        // Front v3 (Lot 4b) : `opts.bridgeStatus()` remplace l'état du démon (liste des scénarios) ; `opts.respond(action, params)`
+        // répond à une action précise (corps JSON) ou rend undefined pour garder la réponse par défaut.
+        const custom = opts.respond ? opts.respond(action, params) : undefined;
+        if (custom !== undefined) body = custom;
+        else if (action === 'getBridgeStatus') body = { state: 'ok', result: opts.bridgeStatus ? opts.bridgeStatus() : { daemon: true, broker: { state: 'connected' }, derniere_operation_resultat: 'aucun' } };
         else if (action === 'getEquipmentStates') body = states;
         else if (action === 'getMappingOverrides') body = opts.treeFor ? opts.treeFor(eqId) : unitTreeFor(equipments, eqId);
         const wait = opts.delay ? opts.delay(action, eqId) : 0;

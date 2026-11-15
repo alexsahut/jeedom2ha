@@ -15,21 +15,32 @@
  * along with Jeedom2HA. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* Statut du pont MQTT et santé globale (Story 2.2) */
+/* Statut du pont MQTT et santé globale (Story 2.2).
+ * Front v3 (Lot 1) : pastilles « point + mot » (Démon, MQTT, Home Assistant), le détail en info-bulle ; « Relu HH:MM » ;
+ * « Dernière opération » seulement si elle a échoué. Rouge = panne d'infrastructure SEULEMENT (démon arrêté, broker
+ * déconnecté, Jeedom illisible) ; non confirmé = gris avec « ? ». */
 function refreshBridgeStatus() {
   // Story 25.8 : compteur d'appels, pour qu'une fin de relecture enchaînée ne relise pas deux fois la santé du pont.
   window.jeedom2haBridgeRefreshes = (window.jeedom2haBridgeRefreshes || 0) + 1;
+  // Front v2 (Lot 1) : le rafraîchissement périodique ne relance pas une lecture tant que la précédente n'est pas revenue.
+  window.jeedom2haBridgeInflight = true;
   $.ajax({
     type: 'POST',
     url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php',
     data: {action: 'getBridgeStatus'},
     dataType: 'json',
+    complete: function() {
+      window.jeedom2haBridgeInflight = false;
+    },
     success: function(data) {
       if (data.state !== 'ok') {
         window.jeedom2haLastBridgeStatus = null;
-        $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur Jeedom}}');
-        $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+        j2haSetPill($('#span_healthBridge'), 'danger', '{{Erreur Jeedom}}');
+        j2haSetPill($('#span_healthMqtt'), 'unknown', '{{Inconnu}}');
+        renderHaHealth(null);
+        renderOperationHealth(null);
         applyHAGating(null);
+        notifyGuideStatus(null);
         return;
       }
       var r = data.result;
@@ -38,84 +49,188 @@ function refreshBridgeStatus() {
       var $mqtt = $('#span_healthMqtt');
       var $broker = $('#span_healthMqttBroker');
       var $sync = $('#span_healthSync');
-      var $op = $('#span_healthOp');
-      var $opMsg = $('#span_healthOpMsg');
 
       // 1. Démon
       if (!r.daemon) {
         // Incident d'infrastructure -> ROUGE
-        $bridge.removeClass().addClass('label label-danger').text('{{Arrêté}}');
-        $mqtt.removeClass().addClass('label label-default').text('{{Inconnu}}');
+        j2haSetPill($bridge, 'danger', '{{Arrêté}}');
+        j2haSetPill($mqtt, 'unknown', '{{Inconnu}}');
         $broker.text('');
-        $sync.text('{{Inconnue}}');
-        $op.removeClass().addClass('label label-default').text('{{Inconnue}}');
-        $opMsg.text('');
+        $sync.text('{{Relu}} : {{inconnu}}').attr('data-j2ha-tip', '{{Dernière relecture inconnue}}').attr('aria-label', '{{Dernière relecture inconnue}}');
+        renderOperationHealth(null);
+        renderHaHealth(r);
         applyHAGating(r);
+        notifyGuideStatus(r);
         return;
-      } else {
-        $bridge.removeClass().addClass('label label-success').text('{{Actif}}');
       }
+      j2haSetPill($bridge, 'ok', '{{Actif}}');
 
-      // 2. MQTT
+      // 2. MQTT (le broker est donné en info-bulle)
       var brokerInfo = r.broker || r.mqtt || {};
+      var brokerName = typeof brokerInfo.broker === 'string' ? brokerInfo.broker : '';
+      $broker.text(brokerName);
+      var withBroker = function(word) { return brokerName ? word + ' (' + brokerName + ')' : word; };
       switch (brokerInfo.state) {
         case 'connected':
-          $mqtt.removeClass().addClass('label label-success').text('{{Connecté}}');
+          j2haSetPill($mqtt, 'ok', withBroker('{{Connecté}}'));
           break;
         case 'reconnecting':
-          $mqtt.removeClass().addClass('label label-warning').text('{{Reconnexion...}}');
+          j2haSetPill($mqtt, 'unknown', withBroker('{{Reconnexion...}}'));
           break;
         case 'connecting':
-          $mqtt.removeClass().addClass('label label-warning').text('{{Connexion...}}');
+          j2haSetPill($mqtt, 'unknown', withBroker('{{Connexion...}}'));
           break;
         case 'disconnected':
           // Incident d'infrastructure -> ROUGE absolument (Guardrail Story 2.2)
-          $mqtt.removeClass().addClass('label label-danger').text('{{Déconnecté}}');
+          j2haSetPill($mqtt, 'danger', withBroker('{{Déconnecté}}'));
           break;
         default:
-          $mqtt.removeClass().addClass('label label-default').text('{{Non configuré}}');
-      }
-      $broker.text(brokerInfo.broker || '');
-
-      // 3. Dernière synchro
-      if (r.derniere_synchro_terminee) {
-        var d = new Date(r.derniere_synchro_terminee);
-        var dateStr = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2);
-        $sync.text(dateStr);
-      } else {
-        $sync.text('{{Jamais}}');
+          j2haSetPill($mqtt, 'unknown', '{{Non configuré}}');
       }
 
-      // 4. Dernière opération
-      var _opObj = Jeedom2haMappingOverride.readOperationSnapshot(r.derniere_operation_resultat);
-      switch (_opObj.resultat) {
-        case 'succes':
-          $op.removeClass().addClass('label label-success').text('{{Succès}}');
-          break;
-        case 'partiel':
-          // Problème de configuration -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Partiel}}');
-          break;
-        case 'echec':
-          // Problème de configuration complet -> NON ROUGE (Warning orange)
-          $op.removeClass().addClass('label label-warning').addClass('j2ha-op-warn').text('{{Échec}}');
-          break;
-        case 'aucun':
-          $op.removeClass().addClass('label label-default').text('{{Aucune}}');
-          break;
-        default:
-          $op.removeClass().addClass('label label-default').text('{{' + _opObj.resultat + '}}');
-      }
-      $opMsg.text(_opObj.message || '');
+      // 3. « Relu HH:MM » (date complète et résultat en info-bulle)
+      $sync.text(relectureShort(r.derniere_synchro_terminee)).attr('data-j2ha-tip', relectureTitle(r)).attr('aria-label', relectureTitle(r));
+
+      // 4. Dernière opération : pastille ambre seulement si elle a échoué.
+      renderOperationHealth(r);
+      renderHaHealth(r);
       applyHAGating(r);
+      notifyGuideStatus(r);
     },
     error: function() {
       window.jeedom2haLastBridgeStatus = null;
-      $('#span_healthBridge').removeClass().addClass('label label-danger').text('{{Erreur de communication}}');
-      $('#span_healthMqtt').removeClass().addClass('label label-default').text('{{Inconnu}}');
+      j2haSetPill($('#span_healthBridge'), 'danger', '{{Erreur de communication}}');
+      j2haSetPill($('#span_healthMqtt'), 'unknown', '{{Inconnu}}');
+      renderHaHealth(null);
+      renderOperationHealth(null);
       applyHAGating(null);
+      notifyGuideStatus(null);
     }
   });
+}
+
+/* Pastille « point + mot » : niveau (ok, unknown, warn, danger) et détail en info-bulle / nom accessible. */
+function j2haSetPill($pill, level, detail) {
+  if (!$pill || $pill.length === 0) return;
+  // Le mot (« Démon », « MQTT »…) est porté par `data-word` dans la page ; le détail ne remplace jamais le mot.
+  var word = $pill.attr('data-word') || '';
+  var text = detail ? word + ' : ' + detail : word;
+  // Front v3 (Lot 6) : le détail est lu par la bulle d'aide au clic (`data-j2ha-tip`, jeedom2ha_infotip.js) et par le nom
+  // accessible ; plus de `title` (sinon l'info-bulle du navigateur, ou celle du cœur, double la bulle).
+  $pill.attr('data-level', level).attr('data-j2ha-tip', text).attr('aria-label', text).removeAttr('title');
+}
+
+/* « Relu 15:58 » (aujourd'hui), « Relu le 12/11 » (avant), « Jamais relu » (aucune relecture). */
+function relectureShort(iso) {
+  var d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return '{{Jamais relu}}';
+  var now = new Date();
+  var pad = function(n) { return ('0' + n).slice(-2); };
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+    return '{{Relu}} ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  return '{{Relu le}} ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+}
+
+function relectureTitle(r) {
+  var fusion = relectureFusionOf(r);
+  return fusion.text ? '{{Dernière relecture}} : ' + fusion.text : '{{Dernière relecture}} : {{jamais}}';
+}
+
+var J2HA_OPERATION_WORDS = {
+  sync: {partiel: '{{Relecture partielle}}', echec: '{{Relecture échouée}}'},
+  publier: {partiel: '{{Publication partielle}}', echec: '{{Publication échouée}}'},
+  supprimer: {partiel: '{{Suppression partielle}}', echec: '{{Suppression échouée}}'},
+};
+
+/* « Dernière opération » : visible SEULEMENT si elle a échoué (partielle ou échouée), en ambre (erreur de configuration, jamais
+ * rouge) ; le message du démon est en info-bulle. */
+function renderOperationHealth(r) {
+  var $op = $('#span_healthOp');
+  var $item = $op.closest('.j2ha-health-item');
+  var op = r ? Jeedom2haMappingOverride.readOperationSnapshot(r.derniere_operation_resultat) : {resultat: 'aucun'};
+  var words = J2HA_OPERATION_WORDS[op.intention] || J2HA_OPERATION_WORDS.sync;
+  var word = words[op.resultat];
+  if (!word) {
+    $item.hide();
+    $('#span_healthOpMsg').text('');
+    return;
+  }
+  var message = relectureMessage(op.message, '');
+  $('#span_healthOpMsg').text(message);
+  $op.attr('data-word', word);
+  $op.find('.j2ha-v3-pill-word').text(word);
+  j2haSetPill($op, 'warn', message);
+  $item.show();
+}
+
+/* Front v2 (Lot 1) — glossaire 3.2 : « relecture » à la place des messages « synchronisation » du démon (textes du démon
+ * inchangés ; seul l'affichage les traduit). Un message inconnu est affiché tel quel. */
+var J2HA_RELECTURE_MESSAGES = {
+  'Synchronisation terminée.': '{{Relecture terminée.}}',
+  'Synchronisation terminée avec avertissements.': '{{Relecture terminée avec avertissements.}}',
+  'Synchronisation échouée.': '{{Relecture échouée.}}',
+  'Synchronisation échouée — erreur inattendue.': '{{Relecture échouée : erreur inattendue.}}',
+};
+
+function relectureMessage(message, fallback) {
+  if (typeof message === 'string' && message !== '') {
+    return Object.prototype.hasOwnProperty.call(J2HA_RELECTURE_MESSAGES, message) ? J2HA_RELECTURE_MESSAGES[message] : message;
+  }
+  return fallback;
+}
+
+/* Date de « Dernière relecture » et fusion avec « Dernière opération » (module du guide ; repli : date seule). */
+function relectureFusionOf(r) {
+  if (typeof Jeedom2haGuide !== 'undefined' && Jeedom2haGuide && typeof Jeedom2haGuide.relectureFusion === 'function') {
+    return Jeedom2haGuide.relectureFusion(r);
+  }
+  var d = new Date(r && r.derniere_synchro_terminee);
+  if (!r || !r.derniere_synchro_terminee || isNaN(d.getTime())) return {text: '', fused: false};
+  var dateStr = ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+  return {text: dateStr, fused: false};
+}
+
+/* Item « Home Assistant » de la barre d'état (E0) : visible seulement si le démon fournit `ha.birth_seen_at` (Lot 3). */
+function renderHaHealth(r) {
+  var $item = $('#div_healthHa');
+  if ($item.length === 0) return;
+  var bar = (typeof Jeedom2haGuide !== 'undefined' && Jeedom2haGuide && typeof Jeedom2haGuide.haBarItem === 'function')
+    ? Jeedom2haGuide.haBarItem(r, undefined, haConfirmedByUser())
+    : {visible: false};
+  // Front v3 (Lot 1) : la pastille est TOUJOURS visible. État inconnu (démon arrêté, démon qui ne fournit pas l'information,
+  // état illisible) : gris avec « ? », la raison en info-bulle.
+  if (!bar.visible) {
+    var unknown = !r ? '{{état inconnu (état du démon illisible)}}' : (!r.daemon ? '{{état inconnu (démon arrêté)}}' : '{{état inconnu (le démon ne fournit pas cette information)}}');
+    j2haSetPill($('#span_healthHa'), 'unknown', unknown);
+    $('#span_healthHa').removeClass('j2ha-v3-pill-confirmed');
+    $item.show();
+    return;
+  }
+  // Front v3 (Lot 1) : pastille « Home Assistant » — vert si vu (« Vu à HH:MM ») ou confirmé par l'utilisateur ; sinon gris avec
+  // « ? » (état neutre, jamais une alerte : Home Assistant qui tourne déjà ne se signale pas de nouveau). Détail en info-bulle.
+  var $ha = $('#span_healthHa');
+  var detail = bar.seen ? bar.text : bar.text + ' — ' + (bar.confirmed ? Jeedom2haGuide.HA_CONFIRMED_TOOLTIP : Jeedom2haGuide.HA_TOOLTIP);
+  j2haSetPill($ha, bar.seen || bar.confirmed ? 'ok' : 'unknown', detail);
+  $ha.toggleClass('j2ha-v3-pill-confirmed', !bar.seen && bar.confirmed === true);
+  $item.show();
+}
+
+/* Front v2 (Lot 9a) : « Je l'ai vu » mémorisé par le guide (mémoire de la page), sinon lu dans le stockage local (au mieux). */
+function haConfirmedByUser() {
+  var guide = typeof window !== 'undefined' ? window.Jeedom2haGuideInstance : null;
+  if (guide && typeof guide.haConfirmed === 'function') return guide.haConfirmed();
+  if (typeof Jeedom2haGuide === 'undefined' || !Jeedom2haGuide || typeof Jeedom2haGuide.readLocal !== 'function') return false;
+  var storage = null;
+  try { storage = window.localStorage; } catch (e) { storage = null; }
+  return Jeedom2haGuide.readLocal(storage).haSeen === true;
+}
+
+/* Le guide de démarrage suit l'état du pont (instance créée au chargement de la page, absente sinon). */
+function notifyGuideStatus(r) {
+  if (typeof window !== 'undefined' && window.Jeedom2haGuideInstance && typeof window.Jeedom2haGuideInstance.onStatus === 'function') {
+    window.Jeedom2haGuideInstance.onStatus(r);
+  }
 }
 
 /* Story 25.3 (AC6) : une action terminée (succès ou échec) peut avoir changé les états ; la page principale
@@ -189,13 +304,32 @@ function syncRoomExclusionHints(reason) {
 }
 
 function confirmTopologyRescan(onConfirm, onCancel) {
-  confirmHaPublishAction(
-    '{{Relire Jeedom}}',
-    '{{Une relecture complète peut publier ou retirer des entités Home Assistant et applique les réglages enregistrés. Confirmer ?}}',
-    '{{Relire}}',
-    onConfirm,
-    onCancel
-  );
+  // Front v2 (Lot 6, E9) : le texte annonce les réglages en attente lus dans la copie des états en mémoire (aucune requête).
+  var dlg = j2haExclusionsModule() ? j2haExclusionsModule().rescanDialog(j2haPageSnapshot()) : {
+    title: '{{Relire Jeedom}}',
+    lines: ['{{Le plugin relit vos équipements et met Home Assistant à jour.}}', '{{Rien n\'est supprimé sans que vous l\'ayez exclu.}}'],
+    confirmLabel: '{{Relire Jeedom}}',
+  };
+  confirmHaPublishAction(escapeRoomExclusionText(dlg.title), j2haDialogMessage(dlg.lines), dlg.confirmLabel, onConfirm, onCancel);
+}
+
+/* Front v2 (Lot 6) — module de l'exclusion unifiée et des confirmations chiffrées (jeedom2ha_exclusions.js), absent = repli. */
+function j2haExclusionsModule() {
+  if (typeof window !== 'undefined' && window.Jeedom2haExclusions) return window.Jeedom2haExclusions;
+  return typeof Jeedom2haExclusions !== 'undefined' ? Jeedom2haExclusions : null;
+}
+
+/* Copie des états déjà en mémoire (page du plugin) : les confirmations y lisent leurs nombres, sans requête de plus. */
+function j2haPageSnapshot() {
+  var page = typeof window !== 'undefined' ? window.Jeedom2haOverviewPage : null;
+  return page && typeof page.snapshot === 'function' ? page.snapshot() : null;
+}
+
+/* Lignes de texte brut (noms libres compris) rendues en paragraphes échappés. */
+function j2haDialogMessage(lines) {
+  return (lines || []).map(function(line) {
+    return '<p>' + escapeRoomExclusionText(line) + '</p>';
+  }).join('');
 }
 
 function buildHaActionUserMessage(payload) {
@@ -205,6 +339,12 @@ function buildHaActionUserMessage(payload) {
   var impactedName = payload && payload.perimetre_impacte && typeof payload.perimetre_impacte.nom === 'string'
     ? payload.perimetre_impacte.nom
     : '';
+  // Front v2 (Lot 9a, point 8) : mots du démon traduits à l'affichage (« Parc global » → « Toute la maison »…).
+  var L = typeof window !== 'undefined' && window.Jeedom2haLexique && typeof window.Jeedom2haLexique.userWords === 'function' ? window.Jeedom2haLexique : null;
+  if (L) {
+    impactedName = L.userWords(impactedName);
+    message = L.userWords(message);
+  }
   return impactedName !== '' ? (impactedName + ' — ' + message) : message;
 }
 
@@ -355,7 +495,7 @@ function executeHaAction(intention, portee, selection, handlers) {
         : null;
       if (!payload) {
         if (handlers && typeof handlers.onError === 'function') {
-          handlers.onError('{{Réponse backend incomplète pour l\'action Home Assistant.}}');
+          handlers.onError('{{Réponse incomplète du démon pour l\'action Home Assistant.}}');
         }
         return;
       }
@@ -364,7 +504,7 @@ function executeHaAction(intention, portee, selection, handlers) {
       }
     },
     error: function(request, status, error) {
-      var message = '{{Erreur de communication avec le backend Home Assistant.}}';
+      var message = '{{Erreur de communication avec le démon du plugin.}}';
       if (handlers && typeof handlers.onError === 'function') {
         handlers.onError(message);
       }
@@ -396,11 +536,11 @@ function triggerTopologyRescan($button, snapshot, owner, chain) {
       }
       if (result && result.status === 'ok') {
         if (result.operation_result === 'succes') {
-          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée.}}', level: 'success'});
+          $('#div_alert').showAlert({message: relectureMessage(result.operation_message, '{{Relecture terminée.}}'), level: 'success'});
         } else if (result.operation_result === 'echec') {
-          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation échouée.}}', level: 'danger'});
+          $('#div_alert').showAlert({message: relectureMessage(result.operation_message, '{{Relecture échouée.}}'), level: 'danger'});
         } else if (typeof result.operation_result === 'string') {
-          $('#div_alert').showAlert({message: result.operation_message || '{{Synchronisation terminée avec avertissements.}}', level: 'warning'});
+          $('#div_alert').showAlert({message: relectureMessage(result.operation_message, '{{Relecture terminée avec avertissements.}}'), level: 'warning'});
         } else {
           $('#div_alert').showAlert({message: '{{Résultat inconnu, relire Dernière opération.}}', level: 'warning'});
         }
@@ -414,7 +554,7 @@ function triggerTopologyRescan($button, snapshot, owner, chain) {
     },
     error: function() {
       outcome.failed = true;
-      $('#div_alert').showAlert({message: '{{Erreur de communication : relire Dernière synchro avant de relancer.}}', level: 'danger'});
+      $('#div_alert').showAlert({message: '{{Erreur de communication : vérifiez l\'heure « Relu » de la barre d\'état avant de relancer.}}', level: 'danger'});
     },
     complete: function() {
       releaseTopologyRescanReservation($button, snapshot, owner);
@@ -550,14 +690,300 @@ function triggerSupprimerAction($button, portee, selection, reservation) {
   });
 }
 
+/* Front v2 (Lot 1) — étape 4 du guide : « Publier dans Home Assistant » = la relecture existante (scanTopology), même
+ * réservation que « Relire Jeedom », même budget client, mêmes messages, SANS la confirmation qui parle de retirer des
+ * entités : le guide ne propose ce bouton que tant que rien n'a encore été publié. `onDone(failed)` à la fin.
+ * Retourne false si une opération est déjà en cours (rien n'est envoyé). */
+function publishFromGuide(onDone) {
+  var $rescan = $('#bt_rescanTopology');
+  if ($rescan.length === 0 || window.jeedom2haRescanInProgress === true) return false;
+  var snapshot = setHaActionPendingState($rescan, '{{Relecture en cours…}}');
+  var owner = {};
+  window.jeedom2haRescanInProgress = true;
+  window.jeedom2haRescanOwner = owner;
+  triggerTopologyRescan($rescan, snapshot, owner, {
+    onComplete: function(failed) {
+      if (typeof onDone === 'function') onDone(failed);
+    },
+  });
+  return true;
+}
+
+/* Front v2 (Lot 1) — barre d'état relue toutes les 30 s tant que l'onglet est visible (lecture getBridgeStatus seule).
+ * S'arrête seul quand la page du plugin n'est plus affichée (navigation Jeedom sans rechargement). */
+var J2HA_BRIDGE_REFRESH_MS = 30000;
+function startBridgeStatusAutoRefresh() {
+  if (typeof window === 'undefined' || typeof window.setInterval !== 'function') return;
+  if (window.jeedom2haBridgeTimer) window.clearInterval(window.jeedom2haBridgeTimer);
+  window.jeedom2haBridgeTimer = window.setInterval(function() {
+    if ($('#span_healthBridge').length === 0) {
+      window.clearInterval(window.jeedom2haBridgeTimer);
+      window.jeedom2haBridgeTimer = null;
+      return;
+    }
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (window.jeedom2haBridgeInflight === true) return;
+    refreshBridgeStatus();
+  }, J2HA_BRIDGE_REFRESH_MS);
+}
+
+/* Front v2 (Lot 1) — démarrage guidé (E1), « Vérifier l'installation… » (E7), ligne d'aide et nouvelles entrées du menu. */
+function setupGuide() {
+  if (typeof Jeedom2haGuide === 'undefined' || !Jeedom2haGuide || typeof Jeedom2haGuide.createGuide !== 'function') return;
+  if ($('#j2ha_v2_guide').length === 0) return;
+  var storage = null;
+  try { storage = window.localStorage; } catch (e) { storage = null; }
+  var openConfig = function() {
+    var $conf = $('.eqLogicAction[data-action="gotoPluginConf"]').first();
+    if ($conf.length) $conf.trigger('click');
+  };
+  var guide = Jeedom2haGuide.createGuide({
+    $: $,
+    bootbox: typeof bootbox !== 'undefined' ? bootbox : null,
+    storage: storage,
+    rooms: window.j2haRoomsTree || [],
+    // Une vue de travail ouverte par l'adresse (#j2ha-vue=…) n'est jamais recouverte par le guide.
+    canAutoShow: function() {
+      return !(window.location && typeof window.location.hash === 'string' && window.location.hash.indexOf('j2ha-vue=') !== -1);
+    },
+    // Front v2 (Lot 9a) : « Je l'ai vu » → la barre d'état passe à « Confirmé par vous » sans attendre la prochaine lecture.
+    onHaConfirmed: function() {
+      if (window.jeedom2haLastBridgeStatus !== undefined) renderHaHealth(window.jeedom2haLastBridgeStatus);
+    },
+    actions: {
+      openConfig: openConfig,
+      openChoose: function() {
+        var $choose = $('#bt_j2haChoosePublished');
+        if ($choose.length && !$choose.prop('hidden')) $choose.trigger('click');
+        else openConfig();
+      },
+      openFilter: function(key) {
+        var view = window.Jeedom2haWorkviewInstance;
+        if (view && typeof view.open === 'function' && view.open({filter: key}) !== false) return;
+        var page = window.Jeedom2haOverviewPage;
+        if (page && typeof page.setFilterExact === 'function') page.setFilterExact(key);
+      },
+      publish: publishFromGuide,
+      rescan: function() { $('#bt_rescanTopology').trigger('click'); },
+    },
+  });
+  window.Jeedom2haGuideInstance = guide;
+  var page = window.Jeedom2haOverviewPage;
+  if (page && typeof page.subscribe === 'function' && typeof page.snapshot === 'function') {
+    page.subscribe(function() { guide.onSnapshot(page.snapshot()); });
+    guide.onSnapshot(page.snapshot());
+  }
+  if (window.jeedom2haLastBridgeStatus !== undefined) guide.onStatus(window.jeedom2haLastBridgeStatus);
+  $('#bt_j2haOpenGuide').on('click', function() { guide.open(); });
+  $('#bt_j2haCheckInstall').on('click', function() { guide.openCheck(); });
+}
+
+/* Front v2 (Lot 6, E6) — « Choisir ce qui est publié… » : exécution d'un lot de changements d'exclusion.
+ * Écritures EXISTANTES, corps inchangés, une à la fois et dans l'ordre (`saveFilteringConfig` avec la `confidencePolicy` courante,
+ * `saveRoomExclusion`, `savePublicationOverride` / `revertPublicationOverride`), puis UNE seule relecture par le chemin de
+ * « Relire Jeedom » (`triggerTopologyRescan` : même réservation, même budget client, mêmes messages). Une écriture refusée arrête
+ * le lot : message chiffré, AUCUNE relecture (comme l'exclusion d'une pièce). `isUndo` : écritures inverses du bandeau « Annuler ».
+ * Retourne false si rien n'est envoyé (opération en cours, pont indisponible). */
+var J2HA_EXCLUSION_TOAST_MS = 10000;
+
+function j2haExclusionWriteError(write, data) {
+  if (!data || data.state !== 'ok') {
+    return (data && typeof data.result === 'string' && data.result) || '{{Le changement n\'a pas été enregistré.}}';
+  }
+  if (write.kind === 'plugins') {
+    return data.result && data.result.saved === true ? null : '{{Les plugins exclus n\'ont pas été enregistrés.}}';
+  }
+  if (write.kind === 'room') {
+    return data.result && Array.isArray(data.result.excluded_objects) ? null : '{{L\'exclusion de la pièce n\'a pas été enregistrée.}}';
+  }
+  var M = (typeof window !== 'undefined' && window.Jeedom2haMappingOverride) || (typeof Jeedom2haMappingOverride !== 'undefined' ? Jeedom2haMappingOverride : null);
+  return M && typeof M.readPublicationRequestError === 'function' ? M.readPublicationRequestError(data) : null;
+}
+
+function applyExclusionChanges(writes, info, isUndo) {
+  var $rescan = $('#bt_rescanTopology');
+  if (!writes || writes.length === 0 || $rescan.length === 0) return false;
+  if (window.jeedom2haRescanInProgress === true) {
+    $('#div_alert').showAlert({message: '{{Une opération est déjà en cours : réessayez dans un instant.}}', level: 'warning'});
+    return false;
+  }
+  if (!isHABridgeAvailable(window.jeedom2haLastBridgeStatus || null)) {
+    $('#div_alert').showAlert({message: '{{Démon ou MQTT indisponible : les changements ne peuvent pas être appliqués maintenant.}}', level: 'warning'});
+    return false;
+  }
+  var snapshot = setHaActionPendingState($rescan, '{{Enregistrement…}}');
+  var owner = {};
+  window.jeedom2haRescanInProgress = true;
+  window.jeedom2haRescanOwner = owner;
+  applyHAGating(window.jeedom2haLastBridgeStatus || null);
+  var page = window.Jeedom2haOverviewPage;
+  var done = 0;
+  var excludedObjects = null;
+  var syncRooms = function() {
+    if (excludedObjects && page && typeof page.setExcludedObjects === 'function') page.setExcludedObjects(excludedObjects);
+  };
+  var fail = function(text) {
+    syncRooms();
+    var counted = done + ' {{sur}} ' + writes.length + ' ' + (writes.length > 1 ? '{{changements enregistrés.}}' : '{{changement enregistré.}}');
+    $('#div_alert').showAlert({message: text + ' ' + counted + ' ' + '{{Rien n\'a été relu : vérifiez vos choix, puis lancez « Relire Jeedom ».}}', level: 'danger'});
+    releaseTopologyRescanReservation($rescan, snapshot, owner);
+    notifyStatesChanged();
+  };
+  var finish = function() {
+    syncRooms();
+    var refreshesBefore = window.jeedom2haBridgeRefreshes || 0;
+    triggerTopologyRescan($rescan, snapshot, owner, {
+      onComplete: function(failed) {
+        if (failed) {
+          $('#div_alert').showAlert({message: '{{Changements enregistrés, mais la relecture a échoué : relancez « Relire Jeedom ».}}', level: 'warning'});
+        } else {
+          showExclusionToast(info, isUndo);
+        }
+        if ((window.jeedom2haBridgeRefreshes || 0) === refreshesBefore) refreshBridgeStatus();
+      },
+    });
+  };
+  var next = function() {
+    if (done === writes.length) { finish(); return; }
+    var write = writes[done];
+    $.ajax({
+      type: 'POST', url: 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php', data: write.data, dataType: 'json', timeout: 20000,
+      success: function(data) {
+        var error = j2haExclusionWriteError(write, data);
+        if (error) { fail(error); return; }
+        if (write.kind === 'room') excludedObjects = data.result.excluded_objects;
+        if (write.kind === 'plugins') {
+          window.j2haExcludedPlugins = write.data.excludedPlugins;
+          // Front v3 (Lot 3) : « En cas de doute » se règle dans le panneau ; la page garde la valeur enregistrée.
+          window.j2haConfidencePolicy = write.data.confidencePolicy;
+        }
+        done += 1;
+        next();
+      },
+      error: function() {
+        fail('{{Erreur de communication : le changement n\'a pas pu être confirmé.}}');
+      },
+    });
+  };
+  next();
+  return true;
+}
+
+/* Bandeau de résultat (règle 3 : « Annuler » pendant 10 s). L'annulation rejoue les écritures inverses, puis une relecture. */
+function showExclusionToast(info, isUndo) {
+  var X = j2haExclusionsModule();
+  var $toast = $('#j2ha_v2_toast');
+  if (!X || $toast.length === 0 || !info) return;
+  if (window.jeedom2haExclusionToastTimer) window.clearTimeout(window.jeedom2haExclusionToastTimer);
+  $toast.empty();
+  var text = isUndo ? '{{Changement annulé.}}' : X.resultText(info.diff) + '.';
+  // Revue Codex (#394) : les équipements que « Annuler » ne rétablirait pas exactement sont nommés par leur nombre.
+  var blocked = info.diff && info.diff.undoBlocked ? info.diff.undoBlocked.length : 0;
+  var note = !isUndo && blocked > 0 ? ' ' + X.undoBlockedText(blocked) + '.' : '';
+  $toast.append($('<span></span>').text('✔ ' + text + ' ' + '{{Home Assistant est à jour.}}' + note));
+  var policy = window.j2haConfidencePolicy || 'sure_probable';
+  var inverse = isUndo ? [] : X.inverseWrites(info.model, info.changes, policy);
+  if (inverse.length > 0) {
+    var $undo = $('<button type="button" class="j2ha-v2-excl-undo"></button>').text('{{Annuler}}');
+    $undo.on('click', function() {
+      if (applyExclusionChanges(inverse, info, true) !== false) {
+        window.clearTimeout(window.jeedom2haExclusionToastTimer);
+        $toast.empty();
+      }
+    });
+    $toast.append($undo);
+  }
+  window.jeedom2haExclusionToastTimer = window.setTimeout(function() { $toast.empty(); }, J2HA_EXCLUSION_TOAST_MS);
+}
+
+/* Ouvre le panneau (une seule instance), positionné sur une pièce ou un équipement si demandé. */
+function openChoosePublished(opts) {
+  var X = j2haExclusionsModule();
+  if (!X || typeof X.createPanel !== 'function' || typeof bootbox === 'undefined') return false;
+  if (!window.Jeedom2haExclusionsPanel) {
+    window.Jeedom2haExclusionsPanel = X.createPanel({
+      $: $,
+      bootbox: bootbox,
+      rooms: function() { return window.j2haRoomsTree || []; },
+      snapshot: j2haPageSnapshot,
+      excludedPlugins: function() { return window.j2haExcludedPlugins || ''; },
+      confidencePolicy: function() { return window.j2haConfidencePolicy || 'sure_probable'; },
+      pluginNames: window.j2haPluginNames || {},
+      apply: function(writes, info) { return applyExclusionChanges(writes, info, false); },
+    });
+  }
+  return window.Jeedom2haExclusionsPanel.open(opts || {});
+}
+
+/* Points d'ouverture : bouton près des puces de la page, menu « ⋯ » d'une carte (avec « Republier la
+ * pièce », confirmation chiffrée, même route que la vue de la pièce). */
+function setupChoosePublished() {
+  var $choose = $('#bt_j2haChoosePublished');
+  $choose.prop('hidden', false).removeAttr('hidden');
+  $choose.on('click', function() { openChoosePublished({}); });
+  // Front v3 (Lot 3) : lien « Choisir ce qui est publié ↗ » de la configuration (`#j2ha-choisir`) : le panneau s'ouvre une fois,
+  // dès la première lecture des états (les nombres du pied en dépendent), puis l'adresse redevient celle de la page.
+  if (typeof window !== 'undefined' && window.location && window.location.hash === '#j2ha-choisir') {
+    var page = window.Jeedom2haOverviewPage;
+    var opened = false;
+    var openOnce = function() {
+      var snap = j2haPageSnapshot();
+      if (opened || !snap || !snap.kind || snap.kind === 'loading') return;
+      opened = true;
+      if (window.history && typeof window.history.replaceState === 'function') {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      openChoosePublished({});
+    };
+    if (page && typeof page.subscribe === 'function') page.subscribe(openOnce);
+    openOnce();
+  }
+  // Front v3 (Lot 1) : une seule entrée « Choisir ce qui est publié… », le bouton près des puces (plus d'entrée dans le menu ⋯).
+  var cardOf = function(el) { return $(el).closest('.j2ha-room-card'); };
+  var roomIdOf = function(el) { return parseInt(cardOf(el).attr('data-object_id'), 10); };
+  var roomNameOf = function(id) {
+    var room = (window.j2haRoomsTree || []).filter(function(r) { return r && r.object_id === id; })[0];
+    return room ? String(room.object_name) : '';
+  };
+  $('#j2ha_roomCards .j2ha-room-choose').on('click', function(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    openChoosePublished({roomId: roomIdOf(this)});
+  });
+  $('#j2ha_roomCards .j2ha-card-republish').on('click', function(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    var $button = $(this);
+    if ($button.prop('disabled')) return;
+    var id = roomIdOf(this);
+    var X = j2haExclusionsModule();
+    var dlg = X ? X.republishRoomDialog(j2haPageSnapshot(), window.j2haRoomsTree || [], id, roomNameOf(id)) : {
+      title: '{{Republier la pièce}}', lines: ['{{Renvoie les équipements publiés de cette pièce à Home Assistant, sans relire Jeedom.}}'], confirmLabel: '{{Republier la pièce}}',
+    };
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    var $toggle = cardOf(this).find('.j2ha-menu-toggle').first();
+    confirmHaPublishAction(
+      escapeRoomExclusionText(dlg.title),
+      j2haDialogMessage(dlg.lines),
+      dlg.confirmLabel,
+      function() { triggerPublierAction($button, 'piece', [id], reservation); },
+      function() {
+        restoreHaActionPendingState($button, reservation);
+        if ($toggle.length) $toggle.focus();
+      }
+    );
+  });
+}
+
 // Confirmation forte (bouton rouge) ; `onCancel` libère le bouton réservé à l'ouverture (R1-C).
 function confirmHaSupprimerAction(title, message, confirmLabel, onConfirm, onCancel) {
   confirmHaPublishAction(title, message, confirmLabel, onConfirm, onCancel, 'btn-danger');
 }
 
 $(function() {
-  // Refresh MQTT badge on page load (no auto-refresh)
+  // Barre d'état lue au chargement, puis toutes les 30 s tant que l'onglet est visible (front v2, Lot 1).
   refreshBridgeStatus();
+  startBridgeStatusAutoRefresh();
+  setupGuide();
+  setupChoosePublished();
 
   $('#bt_rescanTopology').on('click', function() {
     var $button = $(this);
@@ -573,6 +999,37 @@ $(function() {
     });
   });
 
+  // Front v3 (Lot 1) — « Appliquer (n) » : envoie à Home Assistant les n équipements « À appliquer ». Aucune action nouvelle :
+  // c'est la route de « Appliquer » de la fiche d'un équipement (`executeHaAction`, intention « publier », portée
+  // « equipement »), avec la liste des équipements en attente lue dans la copie des états (aucune requête de plus).
+  // Le démon y prend la même décision que la relecture (réglages relus au clic) : publication, mise à jour ou retrait.
+  // Confirmation chiffrée (publiés / retirés) ; même réservation, même budget client, mêmes messages que « Republier tout ».
+  $('#bt_j2haApply').on('click', function(event) {
+    event.preventDefault();
+    var $button = $(this);
+    var page = window.Jeedom2haOverviewPage;
+    if ($button.prop('disabled') || window.jeedom2haRescanInProgress === true || !page || typeof page.toApplyIds !== 'function') {
+      return;
+    }
+    var ids = page.toApplyIds();
+    if (ids.length === 0) {
+      return;
+    }
+    var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    var dlg = page.applyDialog();
+    confirmHaPublishAction(
+      escapeRoomExclusionText(dlg.title),
+      j2haDialogMessage(dlg.lines),
+      escapeRoomExclusionText(dlg.confirmLabel),
+      function() {
+        triggerPublierAction($button, 'equipement', ids, reservation);
+      },
+      function() {
+        restoreHaActionPendingState($button, reservation);
+      }
+    );
+  });
+
   // Story 20.3 (Q2b=A) — boutons globaux : confirmations sans nombre (aucune synthèse ne
   // fournit de décompte, et l'interface ne recalcule jamais une décision).
   $('.j2ha-ha-action[data-ha-action="republier"]').on('click', function(event) {
@@ -583,10 +1040,14 @@ $(function() {
     }
     // R1-C : le bouton est réservé dès l'ouverture de la confirmation (pas deux boîtes).
     var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    // Front v2 (Lot 6, E9) : bouton chiffré par le nombre d'équipements publiés (copie des états en mémoire, aucune requête).
+    var dlg = j2haExclusionsModule() ? j2haExclusionsModule().republishAllDialog(j2haPageSnapshot()) : {
+      title: '{{Republier tout}}', lines: ['{{Renvoie les équipements publiés à Home Assistant, sans relire Jeedom.}}'], confirmLabel: '{{Republier tout}}',
+    };
     confirmHaPublishAction(
-      '{{Republier dans Home Assistant}}',
-      '{{Republier tous les équipements inclus ?}}',
-      '{{Republier}}',
+      escapeRoomExclusionText(dlg.title),
+      j2haDialogMessage(dlg.lines),
+      dlg.confirmLabel,
       function() {
         triggerPublierAction($button, 'global', ['all'], reservation);
       },
@@ -604,12 +1065,17 @@ $(function() {
       return;
     }
     var reservation = setHaActionPendingState($button, '{{Confirmation en cours…}}');
+    // Front v2 (Lot 6, E9) : équipements et entités présents dans Home Assistant comptés depuis la copie des états en mémoire ;
+    // bouton rouge « Supprimer N entités ». L'identifiant `data-ha-action="supprimer-recreer"` est conservé (gate).
+    var dlg = j2haExclusionsModule() ? j2haExclusionsModule().deleteAllDialog(j2haPageSnapshot()) : {
+      title: '{{Supprimer tout de Home Assistant}}',
+      lines: ['{{Nombre d\'entités inconnu pour l\'instant : la lecture des états n\'est pas disponible.}}', '{{L\'historique, les tableaux de bord et les automatisations qui les utilisent seront touchés.}}', '{{Rien n\'est recréé automatiquement : utilisez « Republier tout » pour les remettre. Cette action ne s\'annule pas.}}'],
+      confirmLabel: '{{Supprimer tout}}',
+    };
     confirmHaSupprimerAction(
-      '{{Supprimer de Home Assistant}}',
-      '{{Supprimer de Home Assistant tout le parc publié ?}}'
-        + '<br><br><strong>{{Attention}}</strong> : {{l\'historique, les dashboards, les automatisations et l\'entity_id liés à ces entités peuvent être impactés.}}'
-        + '<br>{{Rien n\'est recréé automatiquement : utilisez « Republier » pour remettre les équipements dans Home Assistant.}}',
-      '{{Supprimer}}',
+      escapeRoomExclusionText(dlg.title),
+      j2haDialogMessage(dlg.lines),
+      dlg.confirmLabel,
       function() {
         triggerSupprimerAction($button, 'global', ['all'], reservation);
       },
