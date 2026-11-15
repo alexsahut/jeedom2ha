@@ -41,6 +41,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
 _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$")
+# story/select-mode — topic de commande d'un select (espace de noms propre : jamais celui d'un capteur).
+_SELECT_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/select_(?P<cmd_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 # Story 24.15 — climate orders: setpoint, mode (heat / off), preset.
@@ -322,6 +324,11 @@ class CommandSynchronizer:
                 channel="set",
                 cmd_id=int(match.group("cmd_id")),
             ), None
+
+        match = _SELECT_SET_TOPIC_RE.match(topic)
+        if match:
+            # story/select-mode — routé seulement si un select publié de l'équipement le déclare.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel="set"), None
 
         match = _BRIGHTNESS_TOPIC_RE.match(topic)
         if match:

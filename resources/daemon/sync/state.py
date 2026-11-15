@@ -60,6 +60,7 @@ from sync.readback import (  # Story 24.15
     climate_number,
     climate_preset,
 )
+from mapping.select import normalize_option_value  # story/select-mode
 from mapping.climate import (  # Story 24.15
     CHANNEL_ACTION,
     CHANNEL_CURRENT_TEMPERATURE,
@@ -903,9 +904,11 @@ class StateSynchronizer:
         raw = str(value)
         if raw in options:
             return raw
-        labels = reason_details.get("option_labels") or {}
-        if raw in labels and labels[raw] in options:
-            return labels[raw]
+        # Liste Jeedom (listValue) : l'info renvoie la valeur, ramenée à son libellé (nombres normalisés).
+        value_to_option = reason_details.get("value_to_option") or {}
+        option = value_to_option.get(normalize_option_value(raw))
+        if option in options:
+            return option
         return SELECT_UNKNOWN_PAYLOAD
 
     def _translate_climate_value(

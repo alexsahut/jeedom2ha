@@ -22,7 +22,13 @@ Règles (pas de devinette) :
   de select pour cette info ;
 - le select est une entité SECONDAIRE de l'équipement : il s'ajoute aux entités existantes, n'en
   remplace aucune et ne change aucun de leurs topics (``MapperRegistry.map_all``) ;
-- identité par commande d'état : ``jeedom2ha_eq_<eq>_cmd_<info>``, topics ``jeedom2ha/<eq>/<info>/…``.
+- le select n'est publié que si NI son info NI aucune de ses actions n'est déjà portée par une entité
+  de l'équipement (``MapperRegistry.map_all`` : une info déjà publiée en capteur, un ordre de volet,
+  de lumière, de serrure… restent à leur entité, sans select en double) ;
+- familles sensibles exclues, comme pour les boutons (serrure, alarme, sirène, portail, vanne,
+  arrosage) et commandes d'actionneurs (volet, lumière, chauffage, thermostat) ;
+- identité dans un espace de noms propre, sans collision possible avec un capteur par commande :
+  ``jeedom2ha_eq_<eq>_select_<info>``, topics ``jeedom2ha/<eq>/select_<info>/state|set``.
 
 Dépendances : models uniquement.
 """
@@ -49,12 +55,36 @@ SOURCE_LINKED = "linked_actions"
 
 # Les trois sources reposent sur un lien explicite de Jeedom (type générique, liste, info mise à jour)
 # et sur des valeurs constantes : « sure ». L’ordre des sources ne sert qu’à la priorité.
+# Familles jamais publiées en select (gardes des boutons, story 24.12, et ordres d'actionneurs).
+SENSITIVE_GENERIC_TYPE_PREFIXES = (
+    "GB_", "LOCK_", "ALARM_", "SIREN_", "IRRIG_", "FAUCET_", "VALVE_", "BARRIER_", "GARAGE_",
+    "FLAP_", "LIGHT_", "THERMOSTAT_", "HEATING_",
+)
+
 _CONFIDENCE_BY_SOURCE = {SOURCE_GENERIC: "sure", SOURCE_ACTION_SELECT: "sure", SOURCE_LINKED: "sure"}
 
 # Valeur du plugin virtual : évaluée par ``jeedom::evaluateExpression`` ; seule une constante
 # simple (mot, nombre) est sûre. Tout opérateur, guillemet, parenthèse ou tag la rend non constante.
 _VIRTUAL_FORBIDDEN = set("#\"'()+-*/%<>=!&|?:$[]{}\\;")
 _NUMBER_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+
+
+def is_sensitive(cmd: JeedomCmd) -> bool:
+    return bool(cmd.generic_type) and str(cmd.generic_type).startswith(SENSITIVE_GENERIC_TYPE_PREFIXES)
+
+
+def normalize_option_value(value: str) -> str:
+    """Valeur comparée d'une liste : un nombre entier écrit « 2.0 » vaut « 2 » ; le reste tel quel."""
+    text = str(value).strip()
+    if _NUMBER_RE.fullmatch(text):
+        try:
+            number = float(text.replace(",", "."))
+        except ValueError:
+            return str(value)
+        if number.is_integer():
+            return str(int(number))
+        return repr(number)
+    return str(value)
 
 
 def _kind(cmd: JeedomCmd) -> Tuple[str, str]:
@@ -141,6 +171,13 @@ def _has_manual_role(snapshot: TopologySnapshot, info: JeedomCmd, options) -> bo
     return int(info.id) in roles or any(int(o.action.id) in roles for o in options)
 
 
+def _warn_not_constant(eq: JeedomEqLogic, info: JeedomCmd, action: JeedomCmd) -> None:
+    _LOGGER.warning(
+        "[MAPPING] eq_id=%d: action %s reliée à l'info %s sans valeur constante → pas une option",
+        eq.id, action.id, info.id,
+    )
+
+
 class _Option:
     __slots__ = ("value", "action", "select_value")
 
@@ -153,7 +190,20 @@ class _Option:
 class SelectMapper:
     """Reconnaît les modes d'un équipement et les publie en ``select`` secondaires."""
 
-    def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+    def map_all(
+        self,
+        eq: JeedomEqLogic,
+        snapshot: TopologySnapshot,
+        carried_cmd_ids: Optional[set] = None,
+        taken_unique_ids: Optional[set] = None,
+    ) -> List[MappingResult]:
+        """Selects de l'équipement. ``carried_cmd_ids`` : commandes déjà portées par une entité de la
+        projection (aucun select n'en reprend une) ; ``taken_unique_ids`` : identifiants déjà pris."""
+        carried = set(carried_cmd_ids or ())
+        taken_ids = set(taken_unique_ids or ())
+        # Exclues : commandes déjà portées par une entité, familles sensibles. Un select dont l'info OU
+        # UNE SEULE de ses actions est exclue n'est pas publié du tout (jamais un select partiel).
+        excluded = carried | {int(c.id) for c in eq.cmds if is_sensitive(c)}
         infos = {int(c.id): c for c in eq.cmds if (c.type or "").lower() == "info"}
         taken_infos: set = set()
         taken_actions: set = set()
@@ -164,9 +214,22 @@ class SelectMapper:
             (SOURCE_LINKED, self._linked),
         ):
             for info, options, labels in finder(eq, snapshot, infos, taken_infos, taken_actions):
+                touched = {int(info.id)} | {int(o.action.id) for o in options}
+                if touched & excluded:
+                    _LOGGER.info(
+                        "[MAPPING] eq_id=%d: info %s, commandes %s déjà portées par une entité ou sensibles "
+                        "→ pas de select", eq.id, info.id, sorted(touched & excluded),
+                    )
+                    continue
+                if any(int(o.action.id) in taken_actions for o in options):
+                    continue
                 manual = _has_manual_role(snapshot, info, options)
                 result = self._result(eq, snapshot, info, options, labels, source, min_options=1 if manual else 2)
                 if result is None:
+                    continue
+                if result.ha_unique_id in taken_ids:
+                    _LOGGER.warning("[MAPPING] eq_id=%d: identifiant %s déjà pris → pas de select",
+                                    eq.id, result.ha_unique_id)
                     continue
                 taken_infos.add(int(info.id))
                 taken_actions.update(int(o.action.id) for o in options)
@@ -181,19 +244,25 @@ class SelectMapper:
 
     @staticmethod
     def _generic(eq, snapshot, infos, taken_infos, taken_actions):
-        states = [c for c in eq.cmds if role_of(c, snapshot) == ROLE_STATE and (c.type or "").lower() == "info"]
-        orders = [c for c in eq.cmds if role_of(c, snapshot) == ROLE_COMMAND and _is_order(c)]
+        states = [c for c in eq.cmds if role_of(c, snapshot) == ROLE_STATE and int(c.id) in infos]
+        orders = [c for c in eq.cmds if role_of(c, snapshot) == ROLE_COMMAND and _is_order(c)
+                  and int(c.id) not in taken_actions]
         for state in states:
             state_id = int(state.id)
+            linked = [a for a in orders if state_id in a.linked_info_ids()]
             options: List[_Option] = []
-            for action in orders:
-                links = action.linked_info_ids()
-                if len(states) > 1 and state_id not in links:
-                    continue  # plusieurs modes : seule une action reliée à CE mode compte
-                if links and state_id not in links:
-                    continue  # reliée à une autre info : pas pour ce mode
-                value = written_value(action, state_id)
-                options.append(_Option(value if value is not None else action.name, action))
+            if linked:
+                # Au moins une action reliée à ce mode : seules les actions reliées comptent (une
+                # action « Rejouer » ou « Mode suivant » non reliée n'est jamais une option).
+                for action in linked:
+                    value = written_value(action, state_id)
+                    if value is None:
+                        _warn_not_constant(eq, state, action)
+                        continue
+                    options.append(_Option(value, action))
+            elif len(states) == 1:
+                # Aucune action reliée : convention du type générique « Mode », l'option est le nom.
+                options = [_Option(a.name, a) for a in orders if not a.linked_info_ids()]
             yield state, options, {}
 
     @staticmethod
@@ -214,9 +283,11 @@ class SelectMapper:
                 continue
             action = actions[0]
             pairs = parse_list_value(getattr(action, "list_value", None))
-            options = [_Option(value, action, select_value=value) for value, _label in pairs]
-            labels = {label: value for value, label in pairs if label != value}
-            yield infos[info_id], options, labels
+            # Options = libellés (ce que l'utilisateur lit) ; l'ordre envoie la valeur, l'état
+            # (une valeur, normalisée « 2.0 » → « 2 ») est ramené à son libellé.
+            options = [_Option(label, action, select_value=value) for value, label in pairs]
+            value_to_option = {normalize_option_value(value): label for value, label in pairs}
+            yield infos[info_id], options, value_to_option
 
     @staticmethod
     def _linked(eq, snapshot, infos, taken_infos, taken_actions):
@@ -228,16 +299,21 @@ class SelectMapper:
             for action in eq.cmds:
                 if not _is_order(action) or int(action.id) in taken_actions:
                     continue
+                if not ({action.update_cmd_id, action.virtual_info_id} & {info_id}):
+                    continue
                 value = written_value(action, info_id)
-                if value is not None:
-                    options.append(_Option(value, action))
+                if value is None:
+                    _warn_not_constant(eq, info, action)
+                    continue
+                options.append(_Option(value, action))
             if options:
                 yield info, options, {}
 
     # --- Résultat ------------------------------------------------------------------------------
 
     @staticmethod
-    def _result(eq, snapshot, info, options: List[_Option], labels, source, min_options=2) -> Optional[MappingResult]:
+    def _result(eq, snapshot, info, options: List[_Option], value_to_option, source,
+                min_options=2) -> Optional[MappingResult]:
         values = [o.value for o in options]
         if len(values) < min_options or not values:
             if values:
@@ -268,7 +344,7 @@ class SelectMapper:
             confidence=_CONFIDENCE_BY_SOURCE[source],
             reason_code=f"select_{source}",
             jeedom_eq_id=eq.id,
-            ha_unique_id=f"jeedom2ha_eq_{eq.id}_cmd_{info_id}",
+            ha_unique_id=f"jeedom2ha_eq_{eq.id}_select_{info_id}",
             ha_name=info.name,
             suggested_area=snapshot.get_suggested_area(eq.id),
             commands=commands,
@@ -277,13 +353,13 @@ class SelectMapper:
             ),
             reason_details={
                 "cmd_id": info_id,
-                "object_id": f"jeedom2ha_{eq.id}_{info_id}",
-                "node_id": f"jeedom2ha_{eq.id}_{info_id}",
-                "state_topic": f"jeedom2ha/{eq.id}/{info_id}/state",
-                "command_topic": f"jeedom2ha/{eq.id}/{info_id}/set",
+                "object_id": f"jeedom2ha_{eq.id}_select_{info_id}",
+                "node_id": f"jeedom2ha_{eq.id}_select_{info_id}",
+                "state_topic": f"jeedom2ha/{eq.id}/select_{info_id}/state",
+                "command_topic": f"jeedom2ha/{eq.id}/select_{info_id}/set",
                 "options": list(values),
                 "option_commands": option_commands,
-                "option_labels": dict(labels),
+                "value_to_option": dict(value_to_option),
                 "select_source": source,
             },
         )

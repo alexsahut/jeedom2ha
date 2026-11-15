@@ -150,8 +150,8 @@
   "retain": true
  },
  {
-  "topic": "homeassistant/select/jeedom2ha_554_5489/config",
-  "payload": "{\"name\": \"etat\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5489\", \"object_id\": \"jeedom2ha_554_5489\", \"command_topic\": \"jeedom2ha/554/5489/set\", \"state_topic\": \"jeedom2ha/554/5489/state\", \"options\": [\"Absence\", \"manu\", \"auto\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_554_5489\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+  "topic": "homeassistant/select/jeedom2ha_554_select_5489/config",
+  "payload": "{\"name\": \"etat\", \"unique_id\": \"jeedom2ha_eq_554_select_5489\", \"object_id\": \"jeedom2ha_554_select_5489\", \"command_topic\": \"jeedom2ha/554/select_5489/set\", \"state_topic\": \"jeedom2ha/554/select_5489/state\", \"options\": [\"Absence\", \"manu\", \"auto\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_554_select_5489\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
   "qos": 1,
   "retain": true
  },

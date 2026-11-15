@@ -20,6 +20,13 @@ CLIM_ID = 9821            # action « liste » (listValue) reliée à l'info, + 
 DOUBLON_ID = 9822         # deux actions écrivent la même valeur : refusé
 EXPRESSION_ID = 9823      # valeur calculée : refusée
 SEUL_ETAT_ID = 9824       # MODE_STATE sans action : rien
+# Formes réelles relevées en relecture (identifiants fictifs) : aucune ne doit gagner un select en double.
+VOLET_ID = 9830           # volet : info texte 1/0 posée par FLAP_UP / FLAP_DOWN reliées
+VOITURE_ID = 9831         # lumière : info texte « OnOff fictif » posée par LIGHT_ON / LIGHT_OFF reliées
+ROUTEUR_ID = 9832         # routeur solaire : actions « liste » reliées à des infos numériques publiées en capteurs
+MODES_ID = 9833           # « Modes » : 7 actions MODE_SET_STATE reliées par infoId/value, 3 non reliées
+BORNE_ID = 9834           # borne : info « action_ev » de sous-type other, actions à deux liens
+SERRURE_ID = 9835         # serrure virtuelle : état texte posé par LOCK_OPEN / LOCK_CLOSE reliées
 
 
 def _load(name: str):
@@ -76,7 +83,53 @@ def mode_eq_logics() -> List[Dict[str, Any]]:
     ]
 
 
+def real_shape_eq_logics() -> List[Dict[str, Any]]:
+    routeur_list = "0|bal-off_rad-off;1|bal-manu_rad-off;2|bal-auto_rad-off;4|baloff_rad-manu;5|bal-manu_rad-manu"
+    modes = ["Jour", "Nuit", "Absent", "Vacances", "Soirée", "Cinéma", "Réveil"]
+    return [
+        _eq(VOLET_ID, "Volet bassin", [
+            _cmd(983001, "Etat", "FLAP_STATE", "info", "string"),
+            _cmd(983002, "Monter", "FLAP_UP", "action", "other", virtual_info_id="983001", virtual_value="1"),
+            _cmd(983003, "Descendre", "FLAP_DOWN", "action", "other", virtual_info_id="983001", virtual_value="0"),
+        ]),
+        _eq(VOITURE_ID, "Voiture", [
+            _cmd(983101, "Etat lumière", "LIGHT_STATE", "info", "binary"),
+            _cmd(983102, "OnOff fictif", None, "info", "string"),
+            _cmd(983103, "Allumer", "LIGHT_ON", "action", "other", virtual_info_id="983102", virtual_value="1"),
+            _cmd(983104, "Eteindre", "LIGHT_OFF", "action", "other", virtual_info_id="983102", virtual_value="0"),
+        ]),
+        _eq(ROUTEUR_ID, "Routeur", [
+            _cmd(983201, "Puissance panneaux", "POWER", "info", "numeric", unit="W"),
+            _cmd(983202, "Etat sortie 1", None, "info", "numeric", unit="%"),
+            _cmd(983203, "Etat sortie 2", None, "info", "numeric", unit="%"),
+            _cmd(983204, "Commande 1", None, "action", "select", linked_value="983202", list_value=routeur_list),
+            _cmd(983205, "Commande 2", None, "action", "select", linked_value="983203", list_value=routeur_list),
+        ], eq_type="msunpv"),
+        _eq(MODES_ID, "Modes maison", [
+            _cmd(983301, "Mode", "MODE_STATE", "info", "string"),
+            *[_cmd(983310 + i, name, "MODE_SET_STATE", "action", "other",
+                   virtual_info_id="983301", virtual_value=name) for i, name in enumerate(modes)],
+            _cmd(983320, "Rejouer", "MODE_SET_STATE", "action", "other"),
+            _cmd(983321, "Retour mode précédent", "MODE_SET_STATE", "action", "other"),
+            _cmd(983322, "Aller au mode suivant", "MODE_SET_STATE", "action", "other"),
+        ]),
+        _eq(BORNE_ID, "Borne garage", [
+            _cmd(983401, "Charge", "ENERGY_STATE", "info", "binary"),
+            _cmd(983402, "action_ev", None, "info", "other"),
+            _cmd(983403, "Démarrer", "ENERGY_ON", "action", "other",
+                 update_cmd_id="983401", update_cmd_to_value="1", virtual_info_id="983402", virtual_value="start"),
+            _cmd(983404, "Arrêter", "ENERGY_OFF", "action", "other",
+                 update_cmd_id="983401", update_cmd_to_value="0", virtual_info_id="983402", virtual_value="stop"),
+        ]),
+        _eq(SERRURE_ID, "Serrure portillon", [
+            _cmd(983501, "Etat", "LOCK_STATE", "info", "string"),
+            _cmd(983502, "Ouvrir", "LOCK_OPEN", "action", "other", virtual_info_id="983501", virtual_value="0"),
+            _cmd(983503, "Fermer", "LOCK_CLOSE", "action", "other", virtual_info_id="983501", virtual_value="1"),
+        ]),
+    ]
+
+
 def load_scene() -> Dict[str, Any]:
     corpus = _base.load_scene(links=True)
-    corpus["eq_logics"] = list(corpus["eq_logics"]) + mode_eq_logics()
+    corpus["eq_logics"] = list(corpus["eq_logics"]) + mode_eq_logics() + real_shape_eq_logics()
     return corpus

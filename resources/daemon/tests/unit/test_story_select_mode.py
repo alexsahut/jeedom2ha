@@ -37,7 +37,13 @@ from validation.ha_component_registry import HA_COMPONENT_REGISTRY, PRODUCT_SCOP
 
 from .select_mode_corpus import (
     BASELINE_PATH,
+    BORNE_ID,
     CLIM_ID,
+    MODES_ID,
+    ROUTEUR_ID,
+    SERRURE_ID,
+    VOITURE_ID,
+    VOLET_ID,
     DOUBLON_ID,
     EXPRESSION_ID,
     SEUL_ETAT_ID,
@@ -133,15 +139,15 @@ def test_water_heater_mode_becomes_a_secondary_select():
     selects = _selects(primary.additional_mappings)
     assert len(selects) == 1
     select = selects[0]
-    assert select.ha_unique_id == "jeedom2ha_eq_554_cmd_5489"
+    assert select.ha_unique_id == "jeedom2ha_eq_554_select_5489"
     assert select.ha_name == "etat"
     assert select.confidence == "sure"
     assert select.reason_details["options"] == ["Absence", "manu", "auto"]  # casse gardée
     assert {o: e["cmd_id"] for o, e in select.reason_details["option_commands"].items()} == {
         "Absence": 5372, "manu": 5490, "auto": 5491,
     }
-    assert select.reason_details["state_topic"] == "jeedom2ha/554/5489/state"
-    assert select.reason_details["command_topic"] == "jeedom2ha/554/5489/set"
+    assert select.reason_details["state_topic"] == "jeedom2ha/554/select_5489/state"
+    assert select.reason_details["command_topic"] == "jeedom2ha/554/select_5489/set"
     assert validate_projection("select", select.capabilities).is_valid is True
 
 
@@ -163,13 +169,40 @@ def test_generic_mode_types_use_the_action_names_as_options():
     assert select.reason_details["options"] == ["Confort", "Eco", "Hors-gel"]
 
 
-def test_generic_mode_prefers_the_written_value_when_jeedom_gives_it():
-    raw = next(e for e in mode_eq_logics() if e["id"] == THERMOSTAT_ID)
-    raw["cmds"][2]["update_cmd_id"] = "982002"
-    raw["cmds"][2]["update_cmd_to_value"] = "comfort"
-    snapshot = _snapshot([raw])
-    select = _selects(MapperRegistry().map_all(snapshot.eq_logics[THERMOSTAT_ID], snapshot))[0]
-    assert select.reason_details["options"] == ["comfort", "Eco", "Hors-gel"]
+def test_generic_mode_keeps_only_the_linked_actions_when_some_are_linked():
+    """Forme « Modes » : 7 actions MODE_SET_STATE reliées par infoId/value, 3 non reliées (« Rejouer »,
+    « Retour mode précédent », « Aller au mode suivant ») : seules les reliées sont des options, avec
+    la valeur qu'elles écrivent ; le nom n'est utilisé que si aucune action n'est reliée."""
+    names = ["Jour", "Nuit", "Absent", "Vacances", "Soirée", "Cinéma", "Réveil"]
+    cmds = [
+        {"id": 70, "name": "Température", "generic_type": "TEMPERATURE", "type": "info", "sub_type": "numeric"},
+        {"id": 71, "name": "Mode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string"},
+        *[{"id": 72 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+           "virtual_info_id": "71", "virtual_value": n.lower()} for i, n in enumerate(names)],
+        *[{"id": 90 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"}
+          for i, n in enumerate(["Rejouer", "Retour mode précédent", "Aller au mode suivant"])],
+    ]
+    snapshot = _snapshot([_raw(69, cmds, name="Modes maison", eq_type="mode")])
+    select = _selects(MapperRegistry().map_all(snapshot.eq_logics[69], snapshot))[0]
+    assert select.reason_details["options"] == [n.lower() for n in names]
+
+
+def test_linked_action_without_constant_value_is_not_an_option(caplog):
+    cmds = [
+        {"id": 70, "name": "Température", "generic_type": "TEMPERATURE", "type": "info", "sub_type": "numeric"},
+        {"id": 71, "name": "Mode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string"},
+        {"id": 72, "name": "Jour", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+         "virtual_info_id": "71", "virtual_value": "jour"},
+        {"id": 73, "name": "Nuit", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+         "virtual_info_id": "71", "virtual_value": "nuit"},
+        {"id": 74, "name": "Calcul", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+         "virtual_info_id": "71", "virtual_value": "#71# + 1"},
+    ]
+    snapshot = _snapshot([_raw(69, cmds, name="Modes maison", eq_type="mode")])
+    with caplog.at_level("WARNING"):
+        select = _selects(MapperRegistry().map_all(snapshot.eq_logics[69], snapshot))[0]
+    assert select.reason_details["options"] == ["jour", "nuit"]  # jamais « Calcul » par repli sur le nom
+    assert any("sans valeur constante" in r.message and r.levelname == "WARNING" for r in caplog.records)
 
 
 # --- Source 2 : action « liste » -------------------------------------------------------------
@@ -180,8 +213,8 @@ def test_list_action_gives_its_values_as_options():
     assert results[0].ha_entity_type == "switch" and results[0].ha_name == "Prise climatiseur"  # inchangé
     select = _selects(results)[0]
     assert select.reason_code == "select_action_select"
-    assert select.reason_details["options"] == ["cool", "heat", "auto"]
-    assert select.reason_details["option_labels"] == {"Froid": "cool", "Chaud": "heat", "Auto": "auto"}
+    assert select.reason_details["options"] == ["Froid", "Chaud", "Auto"]  # les libellés
+    assert select.reason_details["value_to_option"] == {"cool": "Froid", "heat": "Chaud", "auto": "Auto"}
 
 
 @pytest.mark.parametrize("raw,expected", [
@@ -241,13 +274,13 @@ async def test_select_discovery_payload_and_topic():
     bridge = _B()
     assert await DiscoveryPublisher(bridge).publish_select(select, snapshot) is True
     topic, payload, retain = bridge.calls[0]
-    assert topic == "homeassistant/select/jeedom2ha_554_5489/config" and retain is True
-    assert payload["unique_id"] == "jeedom2ha_eq_554_cmd_5489"
+    assert topic == "homeassistant/select/jeedom2ha_554_select_5489/config" and retain is True
+    assert payload["unique_id"] == "jeedom2ha_eq_554_select_5489"
     assert payload["options"] == ["Absence", "manu", "auto"]
-    assert payload["state_topic"] == "jeedom2ha/554/5489/state"
-    assert payload["command_topic"] == "jeedom2ha/554/5489/set"
+    assert payload["state_topic"] == "jeedom2ha/554/select_5489/state"
+    assert payload["command_topic"] == "jeedom2ha/554/select_5489/set"
     assert payload["optimistic"] is False
-    assert payload["default_entity_id"] == "select.jeedom2ha_554_5489"
+    assert payload["default_entity_id"] == "select.jeedom2ha_554_select_5489"
     assert payload["device"]["identifiers"] == ["jeedom2ha_554"]
 
 
@@ -278,16 +311,31 @@ async def test_state_is_the_exact_option_or_unknown(value, expected):
     sync = StateSynchronizer(app={"publications": {CHAUFFE_EAU_ID: primary.publication_decision_ref}}, mqtt_bridge=bridge)
     assert sync.streams_actionable_type("select") is True
     assert await sync.handle_state_message(CHAUFFE_EAU_ID, 5489, value) is True
-    assert bridge.published == [("jeedom2ha/554/5489/state", expected)]
+    assert bridge.published == [("jeedom2ha/554/select_5489/state", expected)]
 
 
 def test_list_label_is_read_as_its_value():
     eq, snapshot = _mode_eq(CLIM_ID)
     select = _selects(MapperRegistry().map_all(eq, snapshot))[0]
     sync = StateSynchronizer(app={}, mqtt_bridge=_StateBridge())
-    assert sync._translate_value(select, "Froid") == "cool"
-    assert sync._translate_value(select, "heat") == "heat"
+    assert sync._translate_value(select, "heat") == "Chaud"  # valeur → libellé
+    assert sync._translate_value(select, "Froid") == "Froid"
     assert sync._translate_value(select, "dry") == SELECT_UNKNOWN_PAYLOAD
+
+
+def test_list_numbers_are_normalised():
+    cmds = [
+        {"id": 81, "name": "Programme", "type": "info", "sub_type": "string"},
+        {"id": 82, "name": "Choisir", "type": "action", "sub_type": "select", "linked_value": "81",
+         "list_value": "0|Arrêt;1|Marche;2|Auto"},
+        {"id": 83, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info", "sub_type": "binary"},
+    ]
+    snapshot = _snapshot([_raw(80, cmds)])
+    select = _selects(MapperRegistry().map_all(snapshot.eq_logics[80], snapshot))[0]
+    sync = StateSynchronizer(app={}, mqtt_bridge=_StateBridge())
+    assert sync._translate_value(select, "2.0") == "Auto"
+    assert sync._translate_value(select, 1) == "Marche"
+    assert sync._translate_value(select, "3") == SELECT_UNKNOWN_PAYLOAD
 
 
 # --- Ordres --------------------------------------------------------------------------------------
@@ -309,7 +357,7 @@ def _cmd_sync(primary):
 async def test_an_option_runs_its_own_action(payload, cmd_id):
     eq, snapshot = _heater()
     sync, bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))
-    assert await sync.handle_command_message("jeedom2ha/554/5489/set", payload) is True
+    assert await sync.handle_command_message("jeedom2ha/554/select_5489/set", payload) is True
     sync._execute_exec_cmd.assert_awaited_once_with(cmd_id, {})
     assert bridge.published == []  # jamais d'état supposé
 
@@ -319,7 +367,7 @@ async def test_an_option_runs_its_own_action(payload, cmd_id):
 async def test_other_payloads_are_refused(payload):
     eq, snapshot = _heater()
     sync, _bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))
-    assert await sync.handle_command_message("jeedom2ha/554/5489/set", payload) is False
+    assert await sync.handle_command_message("jeedom2ha/554/select_5489/set", payload) is False
     sync._execute_exec_cmd.assert_not_awaited()
 
 
@@ -335,7 +383,7 @@ async def test_the_switch_still_drives_the_relay_next_to_the_select():
 async def test_a_list_option_is_sent_as_select():
     eq, snapshot = _mode_eq(CLIM_ID)
     sync, _bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))
-    assert await sync.handle_command_message("jeedom2ha/9821/982104/set", "heat") is True
+    assert await sync.handle_command_message("jeedom2ha/9821/select_982104/set", "Chaud") is True
     sync._execute_exec_cmd.assert_awaited_once_with(982105, {"select": "heat"})
 
 
@@ -465,13 +513,13 @@ async def _project(aiohttp_client):
 
 @pytest.mark.asyncio
 async def test_existing_installation_only_gains_selects(aiohttp_client):
-    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (50214ff), même scène."""
+    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (b81d81d), même scène, formes réelles comprises."""
     base = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     _app, _cli, now = await _project(aiohttp_client)
     assert len(base["entities"]) > 80, "scène trop pauvre pour être une preuve"
     changed = {u for u in set(base["entities"]) | set(now["entities"])
                if base["entities"].get(u) != now["entities"].get(u)}
-    assert changed == {"jeedom2ha_eq_554_cmd_5489", "jeedom2ha_eq_9820_cmd_982002", "jeedom2ha_eq_9821_cmd_982104"}
+    assert changed == {"jeedom2ha_eq_554_select_5489", "jeedom2ha_eq_9820_select_982002", "jeedom2ha_eq_9821_select_982104"}
     assert all(u not in base["entities"] and now["entities"][u]["type"] == "select" for u in changed)
 
     def key(call):
@@ -480,11 +528,17 @@ async def test_existing_installation_only_gains_selects(aiohttp_client):
     assert list((b - a).elements()) == []  # aucun message existant ne change ni ne disparaît
     added = [json.loads(k) for k in (a - b).elements()]
     assert sorted(c["topic"] for c in added) == [
-        "homeassistant/select/jeedom2ha_554_5489/config",
-        "homeassistant/select/jeedom2ha_9820_982002/config",
-        "homeassistant/select/jeedom2ha_9821_982104/config",
+        "homeassistant/select/jeedom2ha_554_select_5489/config",
+        "homeassistant/select/jeedom2ha_9820_select_982002/config",
+        "homeassistant/select/jeedom2ha_9821_select_982104/config",
     ]
     assert [c for c in now["mqtt"] if c not in added] == base["mqtt"]  # ordre identique pour le reste
+    # Formes réelles (volet, lumière, routeur à listes sur infos numériques, « Modes » dont les actions
+    # sont des boutons, borne à info « other », serrure à état texte) : aucun select, aucun doublon.
+    for eq_id in (VOLET_ID, VOITURE_ID, ROUTEUR_ID, MODES_ID, BORNE_ID, SERRURE_ID):
+        mine = [u for u in now["entities"] if u == f"jeedom2ha_eq_{eq_id}" or u.startswith(f"jeedom2ha_eq_{eq_id}_")]
+        assert mine and all(now["entities"][u]["type"] != "select" for u in mine), eq_id
+    assert not any(c["topic"].startswith("homeassistant/select/") and c not in added for c in now["mqtt"])
 
 
 @pytest.mark.asyncio
@@ -502,9 +556,9 @@ async def test_4d_contract_is_unchanged_for_the_scene(aiohttp_client):
     assert (clim["statut"], clim["ha_type"]) == ("publie", "switch")
 
 
-def test_a_select_is_added_next_to_the_existing_buttons():
-    """MODE_SET_STATE seuls : la projection d'avant (bouton, nom de l'équipement) est gardée telle
-    quelle ; le select s'ajoute avec le nom de son info."""
+def test_no_select_when_its_actions_are_already_buttons():
+    """MODE_SET_STATE déjà publiées en bouton : la projection d'avant est gardée telle quelle, et aucun
+    select ne reprend ces actions (jamais deux entités qui pilotent la même commande)."""
     cmds = [
         {"id": 51, "name": "Mode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string"},
         {"id": 52, "name": "Jour", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"},
@@ -513,7 +567,12 @@ def test_a_select_is_added_next_to_the_existing_buttons():
     snapshot = _snapshot([_raw(50, cmds, name="Programmateur", eq_type="zwavejs")])
     registry = MapperRegistry()
     before = registry._map_all_base(snapshot.eq_logics[50], snapshot)
-    results = registry.map_all(snapshot.eq_logics[50], snapshot)
-    assert results[:len(before)] == before and before
-    assert [(r.ha_entity_type, r.ha_name) for r in results[len(before):]] == [("select", "Mode")]
-    assert isinstance(results[-1], MappingResult)
+    assert before and before[0].ha_entity_type == "button"
+    assert registry.map_all(snapshot.eq_logics[50], snapshot) == before
+
+
+def test_a_taken_unique_id_is_never_reused():
+    eq, snapshot = _heater()
+    assert SelectMapper().map_all(eq, snapshot, taken_unique_ids={"jeedom2ha_eq_554_select_5489"}) == []
+    assert SelectMapper().map_all(eq, snapshot, carried_cmd_ids={5490}) == []  # une action portée : rien
+    assert SelectMapper().map_all(eq, snapshot, carried_cmd_ids={5489}) == []  # l'info portée : rien

@@ -84,7 +84,14 @@ class MapperRegistry:
         sans entité d'avant, les select suivent la règle du nom (un seul : nom de l'équipement).
         """
         before = self._map_all_base(eq, snapshot)
-        selects = self._select_mapper.map_all(eq, snapshot)
+        # Une commande déjà portée par une entité (info d'un capteur, ordre d'un volet, d'une lumière,
+        # d'une serrure…) ne passe jamais dans un select ; un identifiant déjà pris non plus.
+        carried = set()
+        for result in before:
+            carried |= self._result_cmd_ids(result)
+        selects = self._select_mapper.map_all(
+            eq, snapshot, carried_cmd_ids=carried, taken_unique_ids={r.ha_unique_id for r in before},
+        )
         if not selects:
             return before
         if not before:

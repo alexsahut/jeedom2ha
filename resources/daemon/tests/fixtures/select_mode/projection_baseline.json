@@ -792,6 +792,70 @@
    },
    "confidence": "sure",
    "type": "sensor"
+  },
+  "jeedom2ha_eq_9830": {
+   "commands": {
+    "FLAP_DOWN": 983003,
+    "FLAP_STATE": 983001,
+    "FLAP_UP": 983002
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_9831": {
+   "commands": {
+    "LIGHT_OFF": 983104,
+    "LIGHT_ON": 983103,
+    "LIGHT_STATE": 983101
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_9832_cmd_983201": {
+   "commands": {
+    "983201": 983201
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9832_cmd_983202": {
+   "commands": {
+    "983202": 983202
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9832_cmd_983203": {
+   "commands": {
+    "983203": 983203
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9833": {
+   "commands": {
+    "MODE_SET_STATE": 983310
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9834": {
+   "commands": {
+    "ENERGY_OFF": 983404,
+    "ENERGY_ON": 983403,
+    "ENERGY_STATE": 983401
+   },
+   "confidence": "ambiguous",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9835_cmd_983501": {
+   "commands": {
+    "LOCK_CLOSE": 983503,
+    "LOCK_OPEN": 983502,
+    "LOCK_STATE": 983501
+   },
+   "confidence": "sure",
+   "type": "lock"
   }
  },
  "mqtt": [
@@ -1688,6 +1752,78 @@
    "qos": 1,
    "retain": true,
    "topic": "jeedom2ha/9824/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9830\", \"object_id\": \"jeedom2ha_9830\", \"command_topic\": \"jeedom2ha/9830/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9830/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_9830\"], \"name\": \"Volet bassin\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9830\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9830/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9830/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9830/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9831\", \"object_id\": \"jeedom2ha_9831\", \"state_topic\": \"jeedom2ha/9831/state\", \"command_topic\": \"jeedom2ha/9831/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9831\"], \"name\": \"Voiture\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_9831\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9831/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_9831/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9831/availability"
+  },
+  {
+   "payload": "{\"name\": \"Puissance panneaux\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983201\", \"object_id\": \"jeedom2ha_9832_983201\", \"state_topic\": \"jeedom2ha/9832/983201/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983201\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983201/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9832/availability"
+  },
+  {
+   "payload": "{\"name\": \"Etat sortie 1\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983202\", \"object_id\": \"jeedom2ha_9832_983202\", \"state_topic\": \"jeedom2ha/9832/983202/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983202\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983202/config"
+  },
+  {
+   "payload": "{\"name\": \"Etat sortie 2\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983203\", \"object_id\": \"jeedom2ha_9832_983203\", \"state_topic\": \"jeedom2ha/9832/983203/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983203\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983203/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9833\", \"object_id\": \"jeedom2ha_9833\", \"command_topic\": \"jeedom2ha/9833/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9833\"], \"name\": \"Modes maison\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9833\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9833/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9833/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9833/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9835_cmd_983501\", \"object_id\": \"jeedom2ha_9835_983501\", \"command_topic\": \"jeedom2ha/9835/983501/set\", \"payload_lock\": \"LOCK\", \"payload_unlock\": \"UNLOCK\", \"state_topic\": \"jeedom2ha/9835/983501/state\", \"state_locked\": \"LOCKED\", \"state_unlocked\": \"UNLOCKED\", \"state_jammed\": \"JAMMED\", \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9835\"], \"name\": \"Serrure portillon\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"lock.jeedom2ha_9835_983501\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9835/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/lock/jeedom2ha_9835_983501/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9835/availability"
   }
  ]
 }

@@ -418,14 +418,14 @@
     "mapping": {
       "confidence": "sure",
       "ha_entity_type": "select",
-      "ha_unique_id": "jeedom2ha_eq_554_cmd_5489",
+      "ha_unique_id": "jeedom2ha_eq_554_select_5489",
       "jeedom_eq_id": 554,
       "reason_code": "select_linked_actions",
       "reason_details": {
         "cmd_id": 5489,
-        "command_topic": "jeedom2ha/554/5489/set",
-        "node_id": "jeedom2ha_554_5489",
-        "object_id": "jeedom2ha_554_5489",
+        "command_topic": "jeedom2ha/554/select_5489/set",
+        "node_id": "jeedom2ha_554_select_5489",
+        "object_id": "jeedom2ha_554_select_5489",
         "option_commands": {
           "Absence": {
             "cmd_id": 5372,
@@ -440,13 +440,13 @@
             "select": null
           }
         },
-        "option_labels": {},
         "options": [
           "Absence",
           "manu",
           "auto"
         ],
-        "select_source": "linked_actions"
+        "select_source": "linked_actions",
+        "value_to_option": {}
       }
     },
     "op": "publish"
