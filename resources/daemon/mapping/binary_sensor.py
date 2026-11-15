@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Tuple
 
+from mapping.pairing import energy_state_of  # fix/switch-appariement-etat
 from models.mapping import MappingResult, SensorCapabilities
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 
@@ -194,6 +195,9 @@ def _switch_readback_cmd_ids(eq: JeedomEqLogic) -> set[int]:
                     by_family.setdefault(family, {}).setdefault(cmd.generic_type, []).append(cmd)
                     break
 
+    # fix/switch-appariement-etat — même état retenu que le switch (``energy_state_of``), plus le
+    # dernier ENERGY_STATE vu, qui dépendait de l'ordre des commandes dans Jeedom.
+    energy_state = energy_state_of(eq) if energy_state is not None else None
     if energy_state is not None and has_energy_on and has_energy_off:
         consumed.add(int(energy_state.id))
 

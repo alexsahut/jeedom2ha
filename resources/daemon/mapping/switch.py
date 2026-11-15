@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import SwitchCapabilities, MappingResult, PublicationDecision
 from models.decide_publication import DEFAULT_CONFIDENCE_POLICY
-from mapping.pairing import PAIRING_AMBIGUOUS, PAIRING_LINKED, SWITCH_PAIRING_AMBIGUOUS, choose_state, pair_on_off
+from mapping.pairing import PAIRING_AMBIGUOUS, PAIRING_LINKED, SWITCH_PAIRING_AMBIGUOUS, energy_state_of, pair_on_off
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -126,15 +126,12 @@ class SwitchMapper:
         anti_switch_cmds: Set[str] = set()
         # fix/switch-appariement-etat — toutes les actions de chaque sens, dans l'ordre Jeedom.
         energy_orders: Dict[str, List[JeedomCmd]] = {"ENERGY_ON": [], "ENERGY_OFF": []}
-        energy_states: List[JeedomCmd] = []
 
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF"}:
                 energy_cmds[cmd.generic_type] = cmd
                 if cmd.generic_type in energy_orders:
                     energy_orders[cmd.generic_type].append(cmd)
-                else:
-                    energy_states.append(cmd)
             elif cmd.generic_type and cmd.generic_type in _ANTI_SWITCH_GENERIC_TYPES:
                 anti_switch_cmds.add(cmd.generic_type)
 
@@ -182,10 +179,9 @@ class SwitchMapper:
 
         # fix/switch-appariement-etat — plusieurs paires et plusieurs états candidats : l'état retenu
         # est celui que visent les actions reliées (indépendant de l'ordre des commandes dans Jeedom).
-        if energy_states:
-            energy_cmds["ENERGY_STATE"] = choose_state(
-                energy_states, energy_orders["ENERGY_ON"], energy_orders["ENERGY_OFF"],
-            )
+        # Source unique (``energy_state_of``), lue aussi par les mappers de capteurs.
+        if "ENERGY_STATE" in energy_cmds:
+            energy_cmds["ENERGY_STATE"] = energy_state_of(eq)
         # fix/switch-appariement-etat — plusieurs ordres de même sens : on garde la paire reliée à
         # l'info d'état retenue, jamais « la dernière vue » ; sans lien univoque, pas de switch.
         pairing = pair_on_off(

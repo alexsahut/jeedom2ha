@@ -77,11 +77,11 @@ _EXPECTED_BINARY_CMD_ID = 5510  # #5708 (ENERGY_STATE) volontairement exclu
 # fix/switch-appariement-etat — liens exportés par le PHP (updateCmdId du cœur, infoId du virtual) :
 # la paire On/Off du relais est reliée à l'état « activé », la paire Manu/auto au mode « etat ».
 _EQ554_LINKS = {
-    5706: {"update_cmd_id": 5708, "update_cmd_to_value": "1"},
-    5707: {"update_cmd_id": 5708, "update_cmd_to_value": "0"},
-    5490: {"virtual_info_id": 5489, "virtual_value": "manu"},
-    5491: {"virtual_info_id": 5489, "virtual_value": "auto"},
-    5372: {"virtual_info_id": 5489, "virtual_value": "Absence"},
+    5706: {"update_cmd_id": 5708},
+    5707: {"update_cmd_id": 5708},
+    5490: {"virtual_info_id": 5489},
+    5491: {"virtual_info_id": 5489},
+    5372: {"virtual_info_id": 5489},
 }
 
 

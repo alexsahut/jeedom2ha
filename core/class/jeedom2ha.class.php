@@ -22,7 +22,7 @@ require_once __DIR__  . '/../php/jeedom2ha_state_listeners.php';
 require_once __DIR__  . '/../php/jeedom2ha_homekit_exposure.php';
 require_once __DIR__  . '/../php/jeedom2ha_reevaluation.php';
 require_once __DIR__  . '/../php/jeedom2ha_command_bounds.php'; // correctif fix/daemon-sync-body-limit
-require_once __DIR__  . '/../php/jeedom2ha_command_links.php'; // fix/switch-appariement-etat — info mise à jour par une action
+require_once __DIR__  . '/../php/jeedom2ha_command_links.php'; // fix/switch-appariement-etat — info reliée à une action
 require_once __DIR__  . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — publication des scénarios
 
 class jeedom2ha extends eqLogic {
@@ -1064,8 +1064,8 @@ class jeedom2ha extends eqLogic {
         );
         // Correctif fix/daemon-sync-body-limit — pas de clé de borne vide sur chaque commande (payload de synchro allégé).
         $cmds[count($cmds) - 1] = jeedom2ha_drop_empty_bounds($cmds[count($cmds) - 1]);
-        // fix/switch-appariement-etat — info mise à jour par l'action (updateCmdId / updateCmdToValue du cœur,
-        // infoId / value du plugin virtual), ajoutée seulement si renseignée.
+        // fix/switch-appariement-etat — info reliée à l'action (updateCmdId du cœur, infoId du plugin virtual),
+        // ajoutée seulement si renseignée.
         $cmds[count($cmds) - 1] += jeedom2ha_action_links(
           strval($cmd->getType()),
           strval($eq->getEqType_name()),

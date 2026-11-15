@@ -7,10 +7,10 @@ Règles (pas de devinette) :
 
 - au plus une action par sens : comportement d'avant, inchangé (rétrocompatibilité), que l'action
   soit reliée à une info ou non ;
-- plusieurs actions d'un même sens : pour chaque sens en double, on garde l'unique action reliée à
-  l'info d'état retenue (zéro ou plusieurs reliées → ``ambiguous``) ; un sens qui n'a qu'une action
-  la garde si elle est reliée à l'état, ou si elle n'est reliée à rien alors que l'autre sens a été
-  retenu par son lien (une action unique reliée à une AUTRE info → ``ambiguous``) ;
+- plusieurs actions d'un même sens : pour chaque sens présent, on garde l'unique action reliée à
+  l'info d'état retenue ; zéro ou plusieurs actions reliées dans un sens → ``ambiguous`` (règle
+  « fail-closed » : une action non reliée peut être un ordre de mode, un switch absent vaut mieux
+  qu'un mauvais ordre) ;
 - plusieurs infos d'état candidates (cas « plusieurs paires » seulement) : l'état retenu est celui
   que visent les actions reliées, s'il est unique (``choose_state``), sinon le dernier vu (avant).
 
@@ -72,25 +72,26 @@ def pair_on_off(
 
     state_id = int(state.id)
     chosen: Dict[str, Optional[JeedomCmd]] = {}
-    by_link: Dict[str, bool] = {}
     for key, cmds in ((on_key, ons), (off_key, offs)):
         if not cmds:
             chosen[key] = None
             continue
         linked = [c for c in cmds if _linked_to(c, state_id)]
-        if len(linked) == 1:
-            chosen[key], by_link[key] = linked[0], True
-            continue
-        if len(cmds) == 1 and not cmds[0].linked_info_ids():
-            chosen[key], by_link[key] = cmds[0], False  # sens unique, non relié : décidé ci-dessous
-            continue
-        return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
-    # Une action unique non reliée n'est gardée que si l'autre sens a été retenu par son lien.
-    if by_link and not any(by_link.values()):
-        return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
+        if len(linked) != 1:
+            return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
+        chosen[key] = linked[0]
     return OnOffPairing(
         on=chosen[on_key], off=chosen[off_key], status=PAIRING_LINKED, candidates=candidates
     )
+
+
+def energy_state_of(eq) -> Optional[JeedomCmd]:
+    """Info ``ENERGY_STATE`` retenue pour le switch d'un équipement — source unique, lue par le
+    ``SwitchMapper`` et par les mappers de capteurs (qui ne republient pas l'état du switch)."""
+    states = [c for c in eq.cmds if c.generic_type == "ENERGY_STATE"]
+    ons = [c for c in eq.cmds if c.generic_type == "ENERGY_ON"]
+    offs = [c for c in eq.cmds if c.generic_type == "ENERGY_OFF"]
+    return choose_state(states, ons, offs)
 
 
 def choose_state(states: List[JeedomCmd], ons: List[JeedomCmd], offs: List[JeedomCmd]) -> Optional[JeedomCmd]:

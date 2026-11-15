@@ -107,15 +107,6 @@ def normalize_finite_number(value: Any) -> Optional[float]:
     return number if math.isfinite(number) else None
 
 
-def _normalize_raw_text(value: Any) -> Optional[str]:
-    """fix/switch-appariement-etat — valeur écrite par une action, gardée telle quelle (casse et
-    espaces compris) ; None si absente, vide ou non scalaire. Un nombre devient son texte."""
-    if value is None or isinstance(value, (bool, dict, list, tuple)):
-        return None
-    text = str(value)
-    return text if text.strip() else None
-
-
 _SCENARIO_MODES = ("provoke", "schedule", "all")
 
 
@@ -197,16 +188,13 @@ class JeedomCmd:
     # cœur) ; None si absentes ou non numériques (jamais devinées).
     min_value: Optional[float] = None
     max_value: Optional[float] = None
-    # fix/switch-appariement-etat — info mise à jour par une action, lue en lecture seule :
+    # fix/switch-appariement-etat — info reliée à une action, lue en lecture seule :
     # - cœur Jeedom, toute commande action : configuration ``updateCmdId`` (id de l'info mise à
-    #   jour après l'exécution) et ``updateCmdToValue`` (valeur écrite, texte brut) ;
-    # - plugin virtual : configuration ``infoId`` (id de l'info virtuelle écrite par l'action) et
-    #   ``value`` (valeur écrite, expression Jeedom brute).
+    #   jour après l'exécution) ;
+    # - plugin virtual : configuration ``infoId`` (id de l'info virtuelle écrite par l'action).
     # None si absent ou illisible : jamais deviné.
     update_cmd_id: Optional[int] = None
-    update_cmd_to_value: Optional[str] = None
     virtual_info_id: Optional[int] = None
-    virtual_value: Optional[str] = None
 
     def linked_info_ids(self) -> frozenset:
         """Ids des infos auxquelles cette action est reliée (« Valeur », ``updateCmdId``, ``infoId``)."""
@@ -341,9 +329,7 @@ class TopologySnapshot:
                             min_value=normalize_finite_number(cmd_raw.get("min_value")),
                             max_value=normalize_finite_number(cmd_raw.get("max_value")),
                             update_cmd_id=normalize_linked_cmd_id(cmd_raw.get("update_cmd_id")),
-                            update_cmd_to_value=_normalize_raw_text(cmd_raw.get("update_cmd_to_value")),
                             virtual_info_id=normalize_linked_cmd_id(cmd_raw.get("virtual_info_id")),
-                            virtual_value=_normalize_raw_text(cmd_raw.get("virtual_value")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue

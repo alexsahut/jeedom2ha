@@ -1,7 +1,7 @@
 <?php
 // ARTEFACT — fix/switch-appariement-etat : l'info mise à jour par une action est exportée en ajout seulement
-// (updateCmdId / updateCmdToValue du cœur, infoId / value du plugin virtual), sans clé vide, jamais pour une info,
-// et `value` n'est lu que pour le plugin virtual. Données fictives uniquement (CC-48).
+// (updateCmdId du cœur, infoId du plugin virtual), sans clé vide, jamais pour une info, jamais la valeur écrite,
+// et `infoId` n'est lu que pour le plugin virtual. Données fictives uniquement (CC-48).
 // Exécution : php tests/test_php_command_links.php
 
 $root = dirname(__DIR__);
@@ -29,20 +29,20 @@ function config_of(array $values) {
 
 // Action du cœur qui met une info à jour après exécution (« On » d'un relais suivi d'un état virtuel).
 $out = jeedom2ha_action_links('action', 'virtual', config_of(array('updateCmdId' => '108', 'updateCmdToValue' => '1')));
-check('cœur : updateCmdId et updateCmdToValue exportés', $out === array('update_cmd_id' => '108', 'update_cmd_to_value' => '1'));
+check('cœur : updateCmdId exporté, jamais la valeur écrite', $out === array('update_cmd_id' => '108'));
 
 $out = jeedom2ha_action_links('action', 'zwavejs', config_of(array('updateCmdId' => '#108#', 'updateCmdToValue' => '0')));
-check('cœur : tout plugin, valeur « 0 » gardée', $out === array('update_cmd_id' => '#108#', 'update_cmd_to_value' => '0'));
+check('cœur : tout plugin, lien gardé tel quel', $out === array('update_cmd_id' => '#108#'));
 
 // Action virtuelle qui écrit une constante dans une info virtuelle.
 $out = jeedom2ha_action_links('action', 'virtual', config_of(array('infoId' => '207', 'value' => 'Absence')));
-check('virtual : infoId et value exportés, casse gardée', $out === array('virtual_info_id' => '207', 'virtual_value' => 'Absence'));
+check('virtual : infoId exporté, jamais value', $out === array('virtual_info_id' => '207'));
 
 $out = jeedom2ha_action_links('action', 'zwavejs', config_of(array('infoId' => '207', 'value' => 'x')));
 check('hors virtual : infoId / value jamais lus', $out === array());
 
 $out = jeedom2ha_action_links('action', 'virtual', config_of(array('updateCmdId' => '', 'infoId' => '  ', 'value' => 'manu', 'updateCmdToValue' => '1')));
-check('lien vide : aucune clé, valeur orpheline non exportée', $out === array());
+check('lien vide : aucune clé', $out === array());
 
 $out = jeedom2ha_action_links('action', 'virtual', config_of(array('updateCmdId' => array(1), 'infoId' => true)));
 check('lien non scalaire ou booléen : aucune clé', $out === array());

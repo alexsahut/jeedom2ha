@@ -74,9 +74,8 @@ def _roles(mapping):
 def test_links_are_read_from_the_topology_payload():
     eq, _ = _chauffe_eau()
     by_id = {c.id: c for c in eq.cmds}
-    assert by_id[5706].update_cmd_id == 5708 and by_id[5706].update_cmd_to_value == "1"
-    assert by_id[5490].virtual_info_id == 5489 and by_id[5490].virtual_value == "manu"
-    assert by_id[5372].virtual_value == "Absence"  # casse gardée
+    assert by_id[5706].update_cmd_id == 5708
+    assert by_id[5490].virtual_info_id == 5489
     assert by_id[5706].linked_info_ids() == frozenset({5708})
     assert by_id[5490].linked_info_ids() == frozenset({5489})
     assert by_id[5708].linked_info_ids() == frozenset()
@@ -97,7 +96,6 @@ def test_payload_without_link_fields_keeps_the_defaults():
     eq, _ = _chauffe_eau(links=False)
     for cmd in eq.cmds:
         assert cmd.update_cmd_id is None and cmd.virtual_info_id is None
-        assert cmd.update_cmd_to_value is None and cmd.virtual_value is None
         assert cmd.linked_info_ids() == frozenset()
 
 
@@ -394,10 +392,18 @@ def _two_on_one_off(off_extra):
     return snapshot.eq_logics[30], snapshot
 
 
-@pytest.mark.parametrize("off_extra", [{}, {"update_cmd_id": "31"}])
-def test_single_order_kept_when_the_other_side_is_chosen_by_its_link(off_extra):
-    """Deux On (un relié à l'état), un seul Off non relié (ou relié) : le switch existant est gardé."""
-    eq, snapshot = _two_on_one_off(off_extra)
+def test_single_unlinked_order_is_ambiguous_fail_closed():
+    """Deux On (un relié à l'état), un seul Off NON relié : il peut être un ordre de mode (un virtuel qui
+    renvoie vers une autre action) ; « OFF » changerait alors le mode au lieu de couper le relais.
+    Fail-closed : pas de switch, cause dédiée (un switch absent vaut mieux qu'un mauvais ordre)."""
+    eq, snapshot = _two_on_one_off({})
+    switch = MapperRegistry().map(eq, snapshot)
+    assert (switch.confidence, switch.reason_code) == ("ambiguous", SWITCH_PAIRING_AMBIGUOUS)
+    assert not {"ENERGY_ON", "ENERGY_OFF"} & set(switch.commands)
+
+
+def test_single_order_linked_to_the_state_is_kept():
+    eq, snapshot = _two_on_one_off({"update_cmd_id": "31"})
     switch = MapperRegistry().map(eq, snapshot)
     assert (switch.confidence, switch.reason_code) == ("sure", "switch_on_off_state")
     assert _roles(switch) == {"ENERGY_STATE": 31, "ENERGY_ON": 33, "ENERGY_OFF": 35}
@@ -418,9 +424,16 @@ def test_state_targeted_by_linked_actions_whatever_the_order(state_order):
     others = [c for c in cmds if c["id"] not in state_order]
     ordered = [states[state_order[0]], *others, states[state_order[1]]]
     snapshot = _snapshot_of([_eq_raw(CHAUFFE_EAU_ID, ordered)])
-    switch = MapperRegistry().map(snapshot.eq_logics[CHAUFFE_EAU_ID], snapshot)
+    results = MapperRegistry().map_all(snapshot.eq_logics[CHAUFFE_EAU_ID], snapshot)
+    switch = results[0]
     assert (switch.confidence, switch.reason_code) == ("sure", "switch_on_off_state")
     assert _roles(switch) == {"ENERGY_STATE": 5708, "ENERGY_ON": 5706, "ENERGY_OFF": 5707}
+    # Capteurs : même état retenu que le switch, quel que soit l'ordre — « Routage réel » (5530) reste un
+    # capteur, « activé » (5708) n'est jamais publié une seconde fois.
+    unique_ids = [r.ha_unique_id for r in results]
+    assert "jeedom2ha_eq_554_cmd_5530" in unique_ids
+    assert not any(u.endswith("_cmd_5708") for u in unique_ids)
+    assert len(unique_ids) == len(set(unique_ids))
 
 
 def test_state_choice_without_links_keeps_the_last_one_seen():

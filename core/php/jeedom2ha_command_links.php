@@ -16,14 +16,14 @@
  */
 
 /**
- * fix/switch-appariement-etat — info mise à jour par une commande action (lecture seule).
+ * fix/switch-appariement-etat — info reliée à une commande action (lecture seule).
  *
  * Champs réellement présents dans Jeedom (vérifiés dans le code du cœur et du plugin virtual) :
  * - cœur, `cmd::execCmd()`, toute commande action : configuration `updateCmdId` (id de l'info mise
- *   à jour après l'exécution) et `updateCmdToValue` (valeur écrite) ;
- * - plugin virtual, `virtualCmd::execute()` : configuration `infoId` (id de l'info virtuelle écrite)
- *   et `value` (valeur écrite, sous-type « défaut »). Ces deux clés ne sont lues que pour le plugin
- *   virtual : un autre plugin peut donner un autre sens à `value`.
+ *   à jour après l'exécution ; écran du virtuel : « Commande information à mettre à jour ») ;
+ * - plugin virtual, `virtualCmd::execute()` : configuration `infoId` (id de l'info virtuelle écrite).
+ *   Lue pour le seul plugin virtual.
+ * Seul le lien est exporté : la valeur écrite n'est pas utile pour apparier un switch.
  *
  * Rend uniquement les clés renseignées (aucune clé vide sur chaque commande : la topologie est
  * envoyée en entier à chaque synchro). Une info commande n'a jamais ces clés.
@@ -34,28 +34,13 @@ function jeedom2ha_action_links(string $_type, string $_eqType, callable $_confi
     return array();
   }
   $keys = array('update_cmd_id' => 'updateCmdId');
-  $values = array('update_cmd_to_value' => 'updateCmdToValue');
   if ($_eqType === 'virtual') {
     $keys['virtual_info_id'] = 'infoId';
-    $values['virtual_value'] = 'value';
   }
   $out = array();
   foreach ($keys as $field => $configKey) {
     $raw = $_config($configKey);
     if ($raw === null || !is_scalar($raw) || is_bool($raw) || trim(strval($raw)) === '') {
-      continue;
-    }
-    $out[$field] = strval($raw);
-  }
-  if (!isset($out['update_cmd_id'])) {
-    unset($values['update_cmd_to_value']);
-  }
-  if (!isset($out['virtual_info_id'])) {
-    unset($values['virtual_value']);
-  }
-  foreach ($values as $field => $configKey) {
-    $raw = $_config($configKey);
-    if ($raw === null || !is_scalar($raw) || is_bool($raw) || strval($raw) === '') {
       continue;
     }
     $out[$field] = strval($raw);
