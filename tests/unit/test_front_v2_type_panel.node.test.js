@@ -348,8 +348,9 @@ describe('Lot 5 — surface : choix → aperçu → « Enregistrer et publier »
     const idchange = ui.$(`${panel(2311)}.j2ha-v2-type-idchange`);
     assert.equal(plain(idchange.text()), 'ID modifié switch.jeedom2ha_eq_231 → light.jeedom2ha_eq_231');
     assert.equal(plain(idchange.find('.j2ha-v3-type-idlabel').text()), 'ID modifié');
-    assert.match(plain(idchange.find('.j2ha-v3-info').attr('title')), /automatisations et tableaux de bord Home Assistant qui utilisent l’ancien identifiant seront à reprendre/);
-    assert.equal(idchange.find('.j2ha-v3-info').attr('aria-label'), idchange.find('.j2ha-v3-info').attr('title'));
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(plain(idchange.find('.j2ha-v3-info').attr('data-j2ha-tip')), /automatisations et tableaux de bord Home Assistant qui utilisent l’ancien identifiant seront à reprendre/);
+    assert.equal(plain(idchange.find('.j2ha-v3-info').attr('aria-label')), 'Aide : ' + plain(idchange.find('.j2ha-v3-info').attr('data-j2ha-tip')));
     done();
   });
 

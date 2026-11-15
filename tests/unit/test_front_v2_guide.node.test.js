@@ -377,7 +377,8 @@ describe('Lot 1 — le guide sur la page rendue (squelette PHP réel, overview r
     assert.match(text, new RegExp(`C'est fait : ${view.counts.published} équipements sont dans Home Assistant\\.`));
     // Garde levée (front v3, Lot 3) : « où les trouver » et les exemples passent dans l'info-bulle ⓘ de la ligne de fin.
     assert.doesNotMatch(text, /Paramètres › Appareils et services › MQTT/);
-    const tip = plain(ui.$('#j2ha_v2_guide .j2ha-v3-done-info').attr('title'));
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    const tip = plain(ui.$('#j2ha_v2_guide .j2ha-v3-done-info').attr('data-j2ha-tip'));
     assert.match(tip, /Paramètres › Appareils et services › MQTT/);
     assert.match(tip, /Par exemple : « [^»]+ », « [^»]+ », « [^»]+ »\./);
     if (view.counts.blocked > 0) {

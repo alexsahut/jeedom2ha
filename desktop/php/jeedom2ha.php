@@ -123,22 +123,22 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<div id="div_bridgeHealthBanner" class="j2ha-health-banner j2ha-health-bar j2ha-v3-status">
 			<div class="j2ha-health-items">
 				<span class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthBridge" class="j2ha-v3-pill" data-word="{{Démon}}" data-level="unknown" title="{{Démon}}" aria-label="{{Démon}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Démon}}</span>
+					<span id="span_healthBridge" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Démon}}" data-level="unknown" title="{{Démon}}" aria-label="{{Démon}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Démon}}</span>
 				</span>
 				<span class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthMqtt" class="j2ha-v3-pill" data-word="{{MQTT}}" data-level="unknown" title="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
+					<span id="span_healthMqtt" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{MQTT}}" data-level="unknown" title="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
 					<span id="span_healthMqttBroker" class="j2ha-health-note" hidden></span>
 				</span>
 				<!-- Home Assistant : toujours visible ; non confirmé ou inconnu = gris avec « ? » (raison en info-bulle). -->
 				<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthHa" class="j2ha-v3-pill" data-word="{{Home Assistant}}" data-level="unknown" title="{{Home Assistant}} : {{état inconnu}}" aria-label="{{Home Assistant}} : {{état inconnu}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
+					<span id="span_healthHa" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Home Assistant}}" data-level="unknown" title="{{Home Assistant}} : {{état inconnu}}" aria-label="{{Home Assistant}} : {{état inconnu}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
 				</span>
 				<span class="j2ha-health-item j2ha-v3-relu-item">
-					<span id="span_healthSync" class="j2ha-health-sync j2ha-v3-relu">{{...}}</span>
+					<span id="span_healthSync" class="j2ha-health-sync j2ha-v3-relu j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat">{{...}}</span>
 				</span>
 				<!-- « Dernière opération » : n'apparaît que si elle a échoué (pastille ambre). -->
 				<span class="j2ha-health-item j2ha-v3-op-item" style="display:none;">
-					<span id="span_healthOp" class="j2ha-v3-pill" data-word="" data-level="warn"><span class="j2ha-v3-dot" aria-hidden="true"></span><span class="j2ha-v3-pill-word"></span></span>
+					<span id="span_healthOp" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="" data-level="warn"><span class="j2ha-v3-dot" aria-hidden="true"></span><span class="j2ha-v3-pill-word"></span></span>
 					<span id="span_healthOpMsg" class="j2ha-health-note" hidden></span>
 				</span>
 				<!-- Verdict « Rien à faire » : seulement si la dernière relecture a réussi il y a moins de 24 h (rempli par jeedom2ha_overview.js). -->
@@ -426,6 +426,7 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 <?php include_file('desktop', 'jeedom2ha_v2', 'css', 'jeedom2ha'); ?>
 <!-- Inclusion du fichier javascript du plugin (dossier, nom_du_fichier, extension_du_fichier, id_du_plugin) -->
 <?php include_file('desktop', 'jeedom2ha_mapping_override', 'js', 'jeedom2ha'); ?>
+<?php include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_lexique', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_ha_side', 'js', 'jeedom2ha'); ?>
 <?php include_file('desktop', 'jeedom2ha_mapping_surface', 'js', 'jeedom2ha'); ?>

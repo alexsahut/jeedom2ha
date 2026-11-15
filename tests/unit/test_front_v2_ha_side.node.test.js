@@ -190,7 +190,8 @@ function openFiche(tree) {
 // Assistant » d'une ligne par entité, « Détails techniques » dans le menu ⋯). Les cinq constats de la démo restent vérifiés, sur
 // le nouveau rendu : la phrase longue de chaque cause passe dans l'info-bulle ⓘ, le « comment faire » dans « Détails techniques ».
 describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo', () => {
-  const info = (ui, P, scope) => plain(ui.$(P + scope + ' .j2ha-eq-band-info').attr('title') || '');
+  // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+  const info = (ui, P, scope) => plain(ui.$(P + scope + ' .j2ha-eq-band-info').attr('data-j2ha-tip') || '');
   const tech = (ui, P) => plain(ui.$(P + '.j2ha-eq-tech').text()).replace(/\s+/g, ' ');
 
   it('1. multiprise : « Publié », 3 capteurs binaires en lecture seule, conseil « 3 sorties pilotables » avec le remède du champ « Valeur »', () => {

@@ -119,7 +119,8 @@ for (const theme of ['Light', 'Dark']) {
           const h = await band.evaluate((el) => el.getBoundingClientRect().height);
           assert.ok(h <= 56, `bande sur une ligne (${h} px)`);
         }
-        const info = await band.locator('.j2ha-eq-band-info').getAttribute('title');
+        // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+        const info = await band.locator('.j2ha-eq-band-info').getAttribute('data-j2ha-tip');
         assert.match(info, /le nom dit « lampe », les types Jeedom disent « prise »/);
         assert.equal((await band.locator('.j2ha-v2-publish-anyway').innerText()).trim(), 'Publier en interrupteur');
         // Bloc HA : « Rien », puis l'aperçu de ce que publierait « Toujours ».

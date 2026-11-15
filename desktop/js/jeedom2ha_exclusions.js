@@ -487,6 +487,14 @@
 
   var STATE_CLASS = { published: 'is-ok', to_apply: 'is-todo', blocked: 'is-warn', excluded: 'is-off', disabled: 'is-off', nothing_to_publish: 'is-off' };
 
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
   /**
    * @param {object} env { $, bootbox, rooms, snapshot(), excludedPlugins(), pluginNames, apply(writes, info) }
    *   `apply` reçoit les écritures et { model, changes, diff } ; il rend false si une opération est déjà en cours.
@@ -494,11 +502,13 @@
   function createPanel(env) {
     var $ = env.$;
 
-    // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+    // ⓘ : bouton d'aide (front v3, Lot 6) : la bulle s'ouvre au clic, au toucher ou au clavier (jeedom2ha_infotip.js).
     function info(text, cls) {
-      return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').addClass(cls || '').attr('title', text).attr('aria-label', text)
-        .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
+      var T = infoTipApi();
+      if (!T) return $('<span class="j2ha-info j2ha-v3-info"></span>').addClass(cls || '').attr('data-j2ha-tip', text).attr('title', text);
+      return T.button($, text, { cls: 'j2ha-v3-info ' + (cls || ''), doc: 'choisir-ce-qui-est-publié' });
     }
+    function tipEl($el, text) { var T = infoTipApi(); return T ? T.attach($el, text) : $el; }
 
     function open(opts) {
       var o = opts || {};
@@ -620,12 +630,12 @@
         var countTip = eqWord(count) + ' · ' + publishedAfter + ' ' + (publishedAfter > 1 ? '{{non exclus}}' : '{{non exclu}}')
           + (disabledKept > 0 ? ' ' + (disabledKept > 1 ? '{{dont}} ' + disabledKept + ' {{désactivés dans Jeedom}}' : '{{dont 1 désactivé dans Jeedom}}') : '')
           + ' · {{« Non exclu » ne veut pas dire « publié »}}';
-        $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-count"></span>').text(publishedAfter + '/' + count)
-          .attr('title', countTip).attr('aria-label', countTip));
+        $n.append(tipEl($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v2-excl-count"></span>').text(publishedAfter + '/' + count)
+          .attr('title', countTip).attr('aria-label', countTip)));
         if (disabledKept > 0) {
           var offTip = disabledKept > 1 ? disabledKept + ' {{désactivés dans Jeedom}}' : '{{1 désactivé dans Jeedom}}';
-          $n.append($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v3-excl-off"></span>').attr('title', offTip).attr('aria-label', offTip)
-            .append($('<i class="fas fa-power-off" aria-hidden="true"></i>')).append($('<span></span>').text(' ' + disabledKept)));
+          $n.append(tipEl($('<span class="j2ha-v2-small j2ha-v2-muted j2ha-v3-excl-off"></span>').attr('title', offTip).attr('aria-label', offTip)
+            .append($('<i class="fas fa-power-off" aria-hidden="true"></i>')).append($('<span></span>').text(' ' + disabledKept))));
         }
         // Par plugin : la ligne dit LESQUELS sont exclus (sans avoir à déplier un plugin de quarante équipements).
         if (kind === 'plugin' && !excludedAfter) {

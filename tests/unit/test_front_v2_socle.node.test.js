@@ -34,6 +34,8 @@ describe('Front v2 — Lot 0 : include_file de la page', () => {
   it('scripts dans l\'ordre prescrit', () => {
     assert.deepEqual(includes('js'), [
       'jeedom2ha_mapping_override',
+      // Garde levée (front v3, Lot 6) : composant d'aide ⓘ partagé, chargé avant tous les modules qui rendent une ⓘ.
+      'jeedom2ha_infotip',
       'jeedom2ha_lexique',
       'jeedom2ha_ha_side',
       'jeedom2ha_mapping_surface',
@@ -92,7 +94,8 @@ describe('Front v2 — Lot 0 : points de montage', () => {
     assert.match(menu, /id="bt_j2haCheckInstall" class="j2ha-menu-item" role="menuitem">/);
     assert.match(menu, /id="bt_j2haOpenGuide" class="j2ha-menu-item" role="menuitem">/);
     // Garde levée (front v3, Lot 1) : pastille « point + mot », le mot porté par `data-word`, toujours visible (grise si inconnue).
-    assert.match(php, /<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">\s*<span id="span_healthHa" class="j2ha-v3-pill" data-word="\{\{Home Assistant\}\}" data-level="unknown"/);
+    // Garde levée (front v3, Lot 6) : la pastille porte aussi `j2ha-tip` (focusable, bulle au clic) ; même mot, même niveau.
+    assert.match(php, /<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">\s*<span id="span_healthHa" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip"[^>]*? data-word="\{\{Home Assistant\}\}" data-level="unknown"/);
   });
 
   it('CSS : les conteneurs vides ne s\'affichent pas', () => {

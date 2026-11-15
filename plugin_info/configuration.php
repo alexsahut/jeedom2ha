@@ -48,9 +48,23 @@ $j2haPluginActive = function ($pluginId) {
   }
 };
 $j2haHasMqttManager = $j2haPluginActive('mqtt2');
+// Front v3 (Lot 6) : adresse de la documentation du plugin, base des liens « En savoir plus » des info-bulles ⓘ (vide = pas de lien).
+$j2haDocUrl = '';
+try {
+  $j2haSelf = plugin::byId('jeedom2ha');
+  if (is_object($j2haSelf) && method_exists($j2haSelf, 'getDocumentation')) {
+    $j2haDocUrl = (string) $j2haSelf->getDocumentation();
+  }
+} catch (Throwable $e) {
+  $j2haDocUrl = '';
+}
+// Info-bulles ⓘ : le composant partagé de la page du plugin (aucune dépendance au cœur) et ses couleurs --j2ha-*.
+include_file('desktop', 'jeedom2ha', 'css', 'jeedom2ha');
+include_file('desktop', 'jeedom2ha_v2', 'css', 'jeedom2ha');
+include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha');
 ?>
 
-<p id="p_j2haBackTop" style="margin-bottom:12px;">
+<p id="p_j2haBackTop" style="margin-bottom:12px;" data-j2ha-doc-base="<?php echo htmlspecialchars($j2haDocUrl, ENT_QUOTES, 'UTF-8'); ?>">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha"><i class="fas fa-arrow-left"></i> {{Retour à la page du plugin}}</a>
 </p>
 
@@ -61,10 +75,10 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
   <fieldset>
     <!-- Front v3 (Lot 3) : aucune phrase permanente ; les explications passent en info-bulles ⓘ. -->
     <legend><i class="fas fa-network-wired"></i> {{Connexion au broker MQTT}}
-      <sup><i class="fas fa-info-circle tooltips" id="i_mqttBrokerIntro" tabindex="0" title="{{Indiquez le broker que Home Assistant utilise déjà : le broker MQTT est le serveur de messages que Home Assistant écoute aussi. Le démon ne lit ces réglages qu'à son démarrage.}}" aria-label="{{Le broker que Home Assistant utilise déjà}}"></i></sup>
+      <sup><button type="button" class="j2ha-info j2ha-v3-info" id="i_mqttBrokerIntro" data-j2ha-tip="{{Indiquez le broker que Home Assistant utilise déjà : le broker MQTT est le serveur de messages que Home Assistant écoute aussi. Le démon ne lit ces réglages qu'à son démarrage.}}" aria-label="{{Aide}} : {{Le broker que Home Assistant utilise déjà}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
     </legend>
     <p class="text-warning" id="p_mqttOneInstance"><i class="fas fa-exclamation-triangle"></i> {{Une seule installation jeedom2ha par broker MQTT.}}
-      <i class="fas fa-info-circle tooltips" tabindex="0" title="{{Une deuxième installation branchée sur ce broker (box de test, sauvegarde restaurée ailleurs) retirerait les boutons de scénario de celle-ci, et inversement.}}" aria-label="{{Conséquence d'une deuxième installation}}"></i></p>
+      <button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Une deuxième installation branchée sur ce broker (box de test, sauvegarde restaurée ailleurs) retirerait les boutons de scénario de celle-ci, et inversement.}}" aria-label="{{Aide}} : {{Conséquence d'une deuxième installation}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></p>
 
     <?php if ($j2haHasMqttManager) { ?>
     <div class="form-group">
@@ -78,7 +92,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 
     <div class="form-group">
       <label class="col-md-4 control-label">{{Hôte MQTT}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Adresse IP ou nom d'hôte du broker MQTT}}"></i></sup>
+        <sup><button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Adresse IP ou nom d'hôte du broker MQTT}}" aria-label="{{Aide}} : {{Hôte MQTT}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
       </label>
       <div class="col-md-4">
         <input class="configKey form-control" data-l1key="mqttHost" placeholder="ex: 192.168.1.10"/>
@@ -87,7 +101,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 
     <div class="form-group">
       <label class="col-md-4 control-label">{{Port MQTT}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Port du broker MQTT (1883 par défaut, 8883 pour TLS)}}"></i></sup>
+        <sup><button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Port du broker MQTT (1883 par défaut, 8883 pour TLS)}}" aria-label="{{Aide}} : {{Port MQTT}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
       </label>
       <div class="col-md-4">
         <input type="number" class="configKey form-control" data-l1key="mqttPort" placeholder="1883"/>
@@ -114,7 +128,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 
     <div class="form-group">
       <label class="col-md-4 control-label">{{Activer TLS}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Activer le chiffrement TLS pour la connexion au broker}}"></i></sup>
+        <sup><button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Activer le chiffrement TLS pour la connexion au broker}}" aria-label="{{Aide}} : {{Activer TLS}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
       </label>
       <div class="col-md-4">
         <input type="checkbox" class="configKey" data-l1key="mqttTls"/>
@@ -123,7 +137,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 
     <div class="form-group">
       <label class="col-md-4 control-label">{{Vérifier le certificat}}
-        <sup><i class="fas fa-question-circle tooltips" title="{{Valider le certificat du broker. Décocher pour les certificats auto-signés.}}"></i></sup>
+        <sup><button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Valider le certificat du broker. Décocher pour les certificats auto-signés.}}" aria-label="{{Aide}} : {{Vérifier le certificat}}" aria-expanded="false" data-j2ha-doc="connexion-au-broker-mqtt"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
       </label>
       <div class="col-md-4">
         <input type="checkbox" class="configKey" data-l1key="mqttTlsVerify"/>
@@ -161,7 +175,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 <!-- Front v3 (Lot 3) : ce qui est publié se choisit dans un seul panneau, sur la page du plugin. -->
 <p id="p_j2haChoosePublished">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha#j2ha-choisir" id="lnk_j2haChoosePublished"><i class="fas fa-check-square"></i> {{Choisir ce qui est publié}} <i class="fas fa-external-link-alt"></i></a>
-  <i class="fas fa-info-circle tooltips" tabindex="0" title="{{Plugins, pièces, équipements et réglage « En cas de doute » : sur la page du plugin.}}" aria-label="{{Plugins, pièces, équipements et réglage « En cas de doute »}}"></i>
+  <button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Plugins, pièces, équipements et réglage « En cas de doute » : sur la page du plugin.}}" aria-label="{{Aide}} : {{Plugins, pièces, équipements et réglage « En cas de doute »}}" aria-expanded="false" data-j2ha-doc="ce-qui-est-publié-avancé"><i class="fas fa-info-circle" aria-hidden="true"></i></button>
 </p>
 
 <details id="details_j2haAdvanced" style="margin-bottom:12px;">
@@ -173,7 +187,7 @@ $j2haHasMqttManager = $j2haPluginActive('mqtt2');
 
 <?php /* Front v3 (Lot 3) : avertissement d'une ligne, rendu seulement si cron5 est décoché (et suivi en direct par le JS). */ ?>
 <p class="text-warning" id="p_cron5Note"<?php echo $j2haCron5Enabled ? ' style="display:none;"' : ''; ?>><i class="fas fa-exclamation-triangle"></i> {{cron5 désactivé : mises à jour manuelles}}
-  <i class="fas fa-info-circle tooltips" tabindex="0" title="{{Toutes les 5 minutes, cron5 republie ce qui a changé sans relecture de votre part (scénario ou équipement activé ou désactivé, exclusion) ; décoché, ces changements attendent un « Relire Jeedom ». Il se coche dans le bloc « Fonctionnalités » de Jeedom.}}" aria-label="{{Rôle de cron5}}"></i></p>
+  <button type="button" class="j2ha-info j2ha-v3-info" data-j2ha-tip="{{Toutes les 5 minutes, cron5 republie ce qui a changé sans relecture de votre part (scénario ou équipement activé ou désactivé, exclusion) ; décoché, ces changements attendent un « Relire Jeedom ». Il se coche dans le bloc « Fonctionnalités » de Jeedom.}}" aria-label="{{Aide}} : {{Rôle de cron5}}" aria-expanded="false" data-j2ha-doc="configuration"><i class="fas fa-info-circle" aria-hidden="true"></i></button></p>
 
 <p id="p_j2haBackBottom">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha"><i class="fas fa-arrow-left"></i> {{Retour à la page du plugin}}</a>

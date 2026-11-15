@@ -56,7 +56,8 @@ describe('25.7 / AC4 — encart de cause du détail d\'équipement', () => {
     // au panneau « Choisir ce qui est publié » (vérifié en vrai Chromium, test_front_v3_lot3_panneaux) ; ce banc n'a pas la
     // page entière : repli sur le lien de la configuration, qui renvoie au panneau.
     assert.equal(plain(ui.$('.j2ha-eq-exclusion .j2ha-notice-text').text()).trim(), 'Plugin exclu : Alpha');
-    assert.match(plain(ui.$('.j2ha-eq-exclusion .j2ha-v3-info').attr('title')), /Choisir ce qui est publié/);
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(plain(ui.$('.j2ha-eq-exclusion .j2ha-v3-info').attr('data-j2ha-tip')), /Choisir ce qui est publié/);
     const link = ui.$('.j2ha-eq-exclusion .j2ha-open-plugin-config');
     assert.equal(link.length, 1);
     assert.equal(plain(link.text()).trim(), 'Choisir ce qui est publié');

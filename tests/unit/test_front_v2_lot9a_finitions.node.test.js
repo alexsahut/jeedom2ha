@@ -120,7 +120,8 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     assert.equal(box.length, 1, 'jamais un bouton grisé muet');
     // Garde levée (front v3, Lot 3) : une ligne « Le type seul ne suffit pas » ; l'explication passe en info-bulle ⓘ.
     assert.match(plain(box.text()), /Le type seul ne suffit pas/);
-    assert.match(plain(box.find('.j2ha-v3-info').attr('title')), /garde le type choisi et ajoute le réglage « Toujours »/);
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(plain(box.find('.j2ha-v3-info').attr('data-j2ha-tip')), /garde le type choisi et ajoute le réglage « Toujours »/);
     ui.click(panel + '.j2ha-v2-type-anyway');
     assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="231"] .j2ha-v2-type-panel').length, 1, 'le panneau reste ouvert, le type choisi aussi');
     assert.equal(ui.$(`${panel}input[data-type="light"]`).prop('checked'), true);

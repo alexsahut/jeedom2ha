@@ -16,6 +16,18 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (M, lexicon, haSide) {
   'use strict';
 
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
+  // Pastille ou marque purement informative : focusable, cliquable, même bulle que ⓘ ; son `title` reste en complément.
+  function infoTip($el, opts) { var T = infoTipApi(); return T ? T.attach($el, undefined, opts) : $el; }
+
+
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   var COALESCE_MS = 500;            // Q7 : une action = une relecture, coalescée
   var RETRY_DELAYS_MS = [2000, 5000, 10000]; // Q6 : au plus 3 relectures pendant une opération
@@ -969,8 +981,8 @@
       var $row = $('<div class="j2ha-v2-row j2ha-v2-todo-row j2ha-v3-todo-row"></div>').attr('data-eq-id', item.eq_id).attr('data-kind', item.kind)
         .addClass(blocked ? 'is-warn' : 'is-tip');
       var stateWordText = blocked ? M.EQUIPMENT_STATE_LABELS.blocked : w('Conseil');
-      $row.append($('<i class="fas j2ha-v3-todo-icon"></i>').addClass(blocked ? 'fa-exclamation-triangle' : 'fa-lightbulb')
-        .attr('title', stateWordText).attr('aria-label', stateWordText).attr('role', 'img'));
+      $row.append(infoTip($('<i class="fas j2ha-v3-todo-icon"></i>').addClass(blocked ? 'fa-exclamation-triangle' : 'fa-lightbulb')
+        .attr('title', stateWordText).attr('aria-label', stateWordText).attr('role', 'img')));
       // Le nom ouvre la fiche de l'équipement dans la page (même chemin que « Voir »).
       var $open = $('<button type="button" class="j2ha-free-name j2ha-v3-todo-name j2ha-v3-todo-open"></button>').text(item.eq_name)
         .attr('title', item.eq_name);
@@ -979,7 +991,7 @@
       $row.append($('<span class="text-muted j2ha-free-name j2ha-v3-todo-room"></span>').text(item.room_name));
       var short = shortCause(item.code);
       var $cause = $('<span class="j2ha-v2-todo-cause j2ha-v3-todo-cause"></span>').text(short || item.text || '');
-      if (item.text) $cause.attr('title', item.text);
+      if (item.text) infoTip($cause.attr('title', item.text), { doc: 'les-causes-de-blocage' });
       $row.append($cause);
       $row.append(todoAction(item));
       return $row;
