@@ -105,13 +105,13 @@ def real_shape_eq_logics() -> List[Dict[str, Any]]:
             _cmd(983204, "Commande 1", None, "action", "select", linked_value="983202", list_value=routeur_list),
             _cmd(983205, "Commande 2", None, "action", "select", linked_value="983203", list_value=routeur_list),
         ], eq_type="msunpv"),
-        # Forme réelle de « Modes » (plugin mode, relue en prod) : MODE_STATE « currentMode » (valeur
+        # Forme réelle de « Modes » (plugin mode, relue en prod) : MODE_STATE « Mode », logicalId currentMode (valeur
         # « Normal »), 7 actions MODE_SET_STATE reliées par la seule « Valeur » du cœur (le plugin écrit
         # leur NOM dans l'info), 3 actions MODE_SET_STATE non reliées, dont « Rejouer » qui porte
         # aujourd'hui le bouton d'équipement ; lock / unlock sans type générique.
         _eq(MODES_ID, "Modes", [
             _cmd(983375, "Rejouer", "MODE_SET_STATE", "action", "other"),
-            _cmd(983301, "currentMode", "MODE_STATE", "info", "string", current_value="Normal"),
+            _cmd(983301, "Mode", "MODE_STATE", "info", "string", current_value="Normal", logical_id="currentMode"),
             _cmd(983302, "previousMode", "DONT", "info", "string"),
             _cmd(983303, "lock_state", None, "info", "binary"),
             *[_cmd(983310 + i, name, "MODE_SET_STATE", "action", "other", linked_value="983301")

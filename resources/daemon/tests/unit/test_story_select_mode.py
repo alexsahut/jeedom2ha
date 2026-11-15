@@ -607,8 +607,8 @@ _MODE_NAMES = ["Absent", "Normal", "Vacances scolaires", "Travail", "Soirée", "
 def _real_modes_cmds():
     return [
         {"id": 3775, "name": "Rejouer", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"},
-        {"id": 651, "name": "currentMode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string",
-         "current_value": "Normal"},
+        {"id": 651, "name": "Mode", "logical_id": "currentMode", "generic_type": "MODE_STATE", "type": "info",
+         "sub_type": "string", "current_value": "Normal"},
         {"id": 1730, "name": "previousMode", "generic_type": "DONT", "type": "info", "sub_type": "string"},
         {"id": 3376, "name": "lock_state", "type": "info", "sub_type": "binary"},
         *[{"id": cid, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
@@ -678,6 +678,71 @@ def test_core_value_link_with_a_non_constant_written_value_is_still_refused(capl
         select = _selects(MapperRegistry().map_all(snapshot.eq_logics[104], snapshot))[0]
     assert "Absent" not in select.reason_details["options"]
     assert any("sans valeur constante" in r.message for r in caplog.records)
+
+
+@pytest.mark.parametrize("sub_type", ["numeric", "binary"])
+def test_real_modes_name_fallback_needs_a_text_info(sub_type, caplog):
+    """Le repli sur le nom de l'action n'existe que pour une info texte : la forme réelle de « Modes »
+    avec l'info 651 en numérique ou en binaire ne donne aucun select (les 7 actions sont refusées)."""
+    cmds = _real_modes_cmds()
+    for cmd in cmds:
+        if cmd["id"] == 651:
+            cmd["sub_type"] = sub_type
+            cmd.pop("current_value")
+    snapshot = _snapshot([_raw(104, cmds, name="Modes", eq_type="mode")])
+    with caplog.at_level("WARNING"):
+        results = MapperRegistry().map_all(snapshot.eq_logics[104], snapshot)
+    assert _selects(results) == []
+    assert [(r.ha_entity_type, r.ha_unique_id) for r in results] == [("button", "jeedom2ha_eq_104")]
+    assert any("sans valeur constante" in r.message for r in caplog.records)
+
+
+def test_modes_taken_by_a_switch_leave_no_select_of_the_unlinked_actions():
+    """Cas reproduit en relecture : les 7 actions de mode reliées à 651 sont prises par un interrupteur
+    (typées autrement que MODE_SET_STATE). Les actions MODE_SET_STATE restantes (« Rejouer »,
+    « Retour mode précédent », « Aller au mode suivant ») ne sont reliées à rien : elles ne deviennent
+    pas un select à 3 choix parasites, car une action de l'équipement est reliée au mode."""
+    cmds = _real_modes_cmds()
+    for cmd in cmds:
+        if cmd.get("linked_value") == "651":
+            cmd["generic_type"] = {657: "ENERGY_ON", 658: "ENERGY_OFF"}.get(cmd["id"])
+    snapshot = _snapshot([_raw(104, cmds, name="Modes", eq_type="mode")])
+    results = MapperRegistry().map_all(snapshot.eq_logics[104], snapshot)
+    assert [r.ha_entity_type for r in results] == ["switch"]
+    assert _selects(results) == []
+
+
+def test_unlinked_mode_fallback_keeps_the_action_names_without_any_link():
+    """Comportement voulu de la branche « aucune action reliée » conservé : sans aucun lien dans
+    l'équipement, le type générique « Mode » donne les noms des actions (thermostat de démonstration)."""
+    eq, snapshot = _mode_eq(THERMOSTAT_ID)
+    assert not any(c.linked_info_ids() for c in eq.cmds)
+    select = _selects(MapperRegistry().map_all(eq, snapshot))[0]
+    assert select.reason_details["options"] == ["Confort", "Eco", "Hors-gel"]
+
+
+@pytest.mark.asyncio
+async def test_real_modes_select_takes_the_command_name_not_its_logical_id():
+    """Le nom du select est le NOM de la commande info (« Mode »), jamais son logicalId
+    (« currentMode ») : même rendu que les autres entités secondaires (binary_sensor secondaire)."""
+    eq, snapshot = _real_modes()
+    assert eq.cmds[[c.id for c in eq.cmds].index(651)].logical_id == "currentMode"
+    select = _selects(MapperRegistry().map_all(eq, snapshot))[0]
+    assert select.ha_name == "Mode"
+
+    class _B:
+        def __init__(self):
+            self.calls = []
+
+        def publish_message(self, topic, payload, qos=1, retain=False):
+            self.calls.append((topic, json.loads(payload), retain))
+            return True
+
+    bridge = _B()
+    assert await DiscoveryPublisher(bridge).publish_select(select, snapshot) is True
+    payload = bridge.calls[0][1]
+    assert payload["name"] == "Mode"
+    assert "currentMode" not in json.dumps(payload)
 
 
 def test_outside_mode_types_a_constant_value_is_still_required():
