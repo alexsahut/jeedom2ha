@@ -436,12 +436,17 @@ jeedom2ha_stop_daemon_with_pid_fallback "/tmp/jeedom/jeedom2ha/deamon.pid"
 # forceDisablePlugin, incident du 15/11/2026 sur l'étape 1b). L'arbre
 # restauré est normalisé (www-data, 755/644) et relu en tant que www-data
 # HORS de la vue de Jeedom, puis échangé atomiquement avec le plugin en
-# place (deploy-promote-lib.sh). L'ancien arbre finit dans ${_work},
-# supprimé par le trap.
+# place (deploy-promote-lib.sh). Après un échange, l'ancien arbre (avec
+# ses data/) reste dans ${_work} : le trap est levé, et deploy-to-box.sh le
+# conserve en .jeedom2ha.prev-<ts> une fois le contrôle Jeedom passé.
 jeedom2ha_normalize_plugin_tree "${_work}/jeedom2ha" www-data:www-data
 sudo chmod 711 "${_work}"
 jeedom2ha_check_tree_readable "${_work}/jeedom2ha" www-data
 jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback
+if [[ "${JEEDOM2HA_SWITCH_MODE}" == "exchange" ]]; then
+  trap - EXIT
+  echo "__JEEDOM2HA_PREVIOUS_WORK__=${_work}"
+fi
 sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
@@ -457,6 +462,7 @@ REMOTE
   fi
   echo "${_remote_output}"
   PRE_ROLLBACK_BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_remote_output}")
+  PREVIOUS_WORK=$(sed -n 's/^__JEEDOM2HA_PREVIOUS_WORK__=//p' <<< "${_remote_output}" | tail -n 1)
   if [[ -n "${PRE_ROLLBACK_BACKUP_ARCHIVE}" ]]; then
     echo ""
     echo "  Ce rollback est lui-même réversible :"
@@ -475,6 +481,12 @@ REMOTE
 # Prise sur la box, par PHP avec la configuration Jeedom (même fuseau que
 # log::add), AVANT toute modification du plugin.
 DEPLOY_SINCE=""
+# Dossier de travail qui contient l'ancien arbre après une bascule atomique
+# (marqueur __JEEDOM2HA_PREVIOUS_WORK__). Jamais supprimé avant le contrôle
+# Jeedom d'après bascule ; ensuite conservé en .jeedom2ha.prev-<ts>.
+PREVIOUS_WORK=""
+# Le démon tournait-il avant la bascule ? (arrêté pour la bascule, relancé ensuite)
+DAEMON_WAS_RUNNING=0
 
 # jeedom2ha_capture_deploy_since — fatal si indisponible : on est encore avant
 # toute modification, rien n'a été touché.
@@ -512,9 +524,22 @@ jeedom2ha_remote_verify_plugin() {
   if [[ "${_rc}" -ne 0 ]] || ! grep -qx '__JEEDOM2HA_PLUGIN_CHECK__=OK' <<< "${_out}"; then
     _fail "Contrôle Jeedom du plugin en échec (${_step}, code ${_rc}) : le déploiement N'EST PAS validé.
        Le script ne réactive pas le plugin. Vérifiez son état dans Jeedom (Plugins > Gestion des plugins)
-       et le journal « plugin » ; rollback possible : ./scripts/deploy-to-box.sh --sha \"\$(git rev-parse HEAD)\" --rollback <archive>"
+       et le journal « plugin » ; rollback possible : ./scripts/deploy-to-box.sh --sha \"\$(git rev-parse HEAD)\" --rollback <archive>${PREVIOUS_WORK:+
+       Ancienne version du plugin conservée (non supprimée) : ${PREVIOUS_WORK}/jeedom2ha}"
   fi
   echo ""
+}
+
+# jeedom2ha_remote_retain_previous — à n'appeler qu'APRÈS un contrôle Jeedom
+# réussi : l'ancien arbre devient .jeedom2ha.prev-<ts> (une génération).
+jeedom2ha_remote_retain_previous() {
+  [[ -n "${PREVIOUS_WORK}" ]] || return 0
+  { printf 'V_WORK=%q\nV_PARENT=%q\nset -euo pipefail\n' "${PREVIOUS_WORK}" "$(dirname "${JEEDOM_BOX_PATH}")"
+    cat "${PROMOTE_LIB}"
+    printf 'jeedom2ha_retain_previous "${V_WORK}" "${V_PARENT}"\n'
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s \
+    || echo "WARNING: ancienne version laissée dans ${PREVIOUS_WORK} (renommage en .jeedom2ha.prev-* échoué)." >&2
+  PREVIOUS_WORK=""
 }
 
 # =============================================================================
@@ -543,6 +568,7 @@ if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
   [[ "$(echo "${_rollback_status}" | jq -r '.status // empty')" == "ok" ]] \
     || _fail "Healthcheck échoué après rollback: ${_rollback_status}"
   jeedom2ha_remote_verify_plugin "après rollback"
+  jeedom2ha_remote_retain_previous
   echo "======================================================================="
   echo "  Rollback complete."
   echo "======================================================================="
@@ -736,11 +762,43 @@ echo ""
 # normalisé si l'échange est impossible sur la box.
 # resources/python_venv/ est créé par le cœur Jeedom (dépendances pip3 de packages.json) et sert à lancer le démon :
 # jamais supprimé, jamais chmod 644 (VM de démo 20/10 : démon « python_venv/bin/python3: not found »).
+# Le démon est arrêté le temps de la bascule : data/ (choix de l'utilisateur)
+# est déplacé de l'ancien arbre au nouveau et ses écritures ne doivent pas
+# croiser ce déplacement. Il est relancé à l'étape 3 s'il tournait, même sans
+# --restart-daemon.
+echo "  1b-0. arrêt du démon pour la bascule"
+_stop_out=$(
+  { printf 'V_JEEDOM_ROOT=%q\nset -euo pipefail\n' "${JEEDOM_ROOT}"
+    cat "${PROMOTE_LIB}"
+    printf 'jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"\n'
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
+) || { printf '%s\n' "${_stop_out}"; _fail "Arrêt du démon impossible : bascule annulée, plugin non modifié."; }
+printf '%s\n' "${_stop_out}" | grep -v '^__JEEDOM2HA_' || true
+[[ "$(sed -n 's/^__JEEDOM2HA_DAEMON_WAS_RUNNING__=//p' <<< "${_stop_out}" | tail -n 1)" == "1" ]] && DAEMON_WAS_RUNNING=1
+
 echo "  1b. promotion atomique → ${JEEDOM_BOX_PATH}/"
-{ printf 'V_STAGING=%q\nV_PLUGIN_PATH=%q\nset -euo pipefail\n' "${JEEDOM_STAGING_DIR}" "${JEEDOM_BOX_PATH}"
-  cat "${PROMOTE_LIB}"
-  printf 'jeedom2ha_promote_plugin_dir "${V_STAGING}" "${V_PLUGIN_PATH}" www-data:www-data\n'
-} | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
+_promote_rc=0
+_promote_out=$(
+  { printf 'V_STAGING=%q\nV_PLUGIN_PATH=%q\nset -euo pipefail\n' "${JEEDOM_STAGING_DIR}" "${JEEDOM_BOX_PATH}"
+    cat "${PROMOTE_LIB}"
+    printf 'jeedom2ha_promote_plugin_dir "${V_STAGING}" "${V_PLUGIN_PATH}" www-data:www-data\n'
+  } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
+) || _promote_rc=$?
+printf '%s\n' "${_promote_out}"
+PREVIOUS_WORK=$(sed -n 's/^__JEEDOM2HA_PREVIOUS_WORK__=//p' <<< "${_promote_out}" | tail -n 1)
+if [[ "${_promote_rc}" -ne 0 ]]; then
+  if [[ "${DAEMON_WAS_RUNNING}" == "1" ]]; then
+    echo "  Promotion annulée : relance du démon sur la version en place..." >&2
+    ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE || echo "WARNING: relance du démon échouée — à relancer depuis Jeedom." >&2
+sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
+jeedom2ha::deamon_start();
+'
+REMOTE
+  fi
+  _fail "Promotion échouée (code ${_promote_rc}) : voir ci-dessus."
+fi
 echo ""
 
 # 1c — écrire un fichier VERSION à la racine du plugin (hors data/), APRÈS le
@@ -775,6 +833,8 @@ echo ""
 # 1d — Jeedom voit-il encore le plugin ? (sous www-data, autoload du cœur,
 # journal plugin). Échec ⇒ arrêt, rc ≠ 0, aucune réactivation automatique.
 jeedom2ha_remote_verify_plugin "après promotion"
+# Contrôle passé : l'ancienne version est conservée (une génération).
+jeedom2ha_remote_retain_previous
 
 # =============================================================================
 # STEP 2 — Cleanup HA discovery (avant restart/sync)
@@ -857,6 +917,11 @@ fi
 # Le curl s'exécute sur la box (daemon 127.0.0.1 seulement) et le JSON
 # est rapatrié localement pour être évalué par jq local — pas de jq distant requis.
 # =============================================================================
+
+if [[ "${RESTART_DAEMON}" != "true" && "${DAEMON_WAS_RUNNING}" == "1" ]]; then
+  echo "  Le démon tournait avant la bascule : relance (étape 3) même sans --restart-daemon."
+  RESTART_DAEMON=true
+fi
 
 if [[ "${RESTART_DAEMON}" == "true" ]]; then
   echo "--- [3/5] Restart daemon (jeedom2ha::deamon_start + boucle readiness MQTT)..."

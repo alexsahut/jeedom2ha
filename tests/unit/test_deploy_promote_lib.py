@@ -133,10 +133,10 @@ class _Watcher(threading.Thread):
         self.live = live
         self.problems: "list[str]" = []
         self.samples = 0
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
 
     def run(self):
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             for rel in _WATCHED:
                 problem = _visible_to_others(self.live, rel)
                 if problem:
@@ -145,7 +145,7 @@ class _Watcher(threading.Thread):
             time.sleep(0.002)
 
     def stop(self):
-        self._stop.set()
+        self._stop_event.set()
         self.join()
 
 
@@ -159,26 +159,45 @@ def _watched_run(live: Path, script: str, *args: str) -> "tuple[subprocess.Compl
     return result, watcher
 
 
+# Démon arrêté par défaut (deploy-to-box.sh l'arrête avant la bascule) ; un
+# test peut redéfinir la fonction pour simuler le contraire.
+_NO_DAEMON = "jeedom2ha_daemon_running() { return 1; }"
+
+
 def _promote(staging: Path, live: Path, prelude: str = ""):
     return _watched_run(
         live,
-        f'{prelude}\njeedom2ha_promote_plugin_dir "$1" "$2" www-data:www-data',
+        f'{_NO_DAEMON}\n{prelude}\njeedom2ha_promote_plugin_dir "$1" "$2" www-data:www-data',
         str(staging), str(live),
     )
 
 
-def _assert_promoted(live: Path, data_inode: int, venv_inode: int):
+def _inodes(live: Path) -> dict:
+    return {
+        "data_dir": (live / "data").stat().st_ino,
+        "data_file": (live / "data" / "overrides.json").stat().st_ino,
+        "venv_dir": (live / "resources" / "python_venv").stat().st_ino,
+    }
+
+
+def _previous_work(result: subprocess.CompletedProcess) -> Path:
+    marks = [line.split("=", 1)[1] for line in result.stdout.splitlines()
+             if line.startswith("__JEEDOM2HA_PREVIOUS_WORK__=")]
+    assert len(marks) == 1, result.stdout
+    return Path(marks[0])
+
+
+def _assert_promoted(live: Path, inodes: dict):
     assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v2\n"
     assert (live / "resources" / "daemon" / "new_module.py").is_file()
     assert not (live / "resources" / "daemon" / "obsolete.py").exists()
-    # data/ et venv : conservés, mêmes inodes (aucune copie, aucune perte).
+    # data/ et venv : les MÊMES dossiers (déplacés ou laissés en place, jamais copiés).
     assert (live / "data" / "overrides.json").read_text() == '{"user": "config"}\n'
-    assert (live / "data" / "overrides.json").stat().st_ino == data_inode
-    assert (live / "resources" / "python_venv" / "bin" / "python3").stat().st_ino == venv_inode
+    assert _inodes(live) == inodes
     assert os.stat(live / "resources" / "python_venv" / "bin" / "python3").st_mode & 0o111
-    # Modes Jeedom posés partout (hors venv).
+    # Modes Jeedom posés sur le code (data/ et venv : gérés par le démon / le cœur).
     for p in [live, *live.rglob("*")]:
-        if "python_venv" in p.parts:
+        if "python_venv" in p.parts or "data" in p.relative_to(live).parts:
             continue
         mode = p.stat().st_mode & 0o777
         if p.is_dir():
@@ -187,8 +206,6 @@ def _assert_promoted(live: Path, data_inode: int, venv_inode: int):
             assert mode == 0o755, (p, oct(mode))
         else:
             assert mode == 0o644, (p, oct(mode))
-    # Aucun dossier de travail laissé dans plugins/.
-    assert sorted(x.name for x in live.parent.iterdir()) == ["jeedom2ha"]
 
 
 def test_observer_catches_the_pre_fix_promotion(tmp_path):
@@ -207,8 +224,7 @@ def test_observer_catches_the_pre_fix_promotion(tmp_path):
 
 def test_promotion_never_exposes_an_incomplete_or_unreadable_plugin(tmp_path):
     staging, live = _build(tmp_path)
-    data_ino = (live / "data" / "overrides.json").stat().st_ino
-    venv_ino = (live / "resources" / "python_venv" / "bin" / "python3").stat().st_ino
+    inodes = _inodes(live)
 
     result, watcher = _promote(staging, live)
 
@@ -216,22 +232,144 @@ def test_promotion_never_exposes_an_incomplete_or_unreadable_plugin(tmp_path):
     assert "Bascule atomique" in result.stdout, result.stdout + result.stderr
     assert watcher.samples > 10
     assert watcher.problems == [], watcher.problems[:5]
-    _assert_promoted(live, data_ino, venv_ino)
+    _assert_promoted(live, inodes)
 
 
-def test_fallback_without_atomic_exchange_keeps_plugin_readable(tmp_path):
-    # Noyau/FS sans RENAME_EXCHANGE (ou python3 absent) : repli rsync
-    # --delay-updates depuis l'arbre déjà normalisé.
+def test_promotion_keeps_the_previous_tree_until_retained(tmp_path):
+    # L'ancien arbre n'est jamais supprimé par la promotion : il attend le
+    # contrôle d'après bascule dans le dossier de travail.
     staging, live = _build(tmp_path)
-    data_ino = (live / "data" / "overrides.json").stat().st_ino
-    venv_ino = (live / "resources" / "python_venv" / "bin" / "python3").stat().st_ino
+    result, _ = _promote(staging, live)
+    assert result.returncode == 0, result.stderr
+
+    work = _previous_work(result)
+    assert work.parent == live.parent and work.name.startswith(".jeedom2ha-deploy.")
+    old = work / "jeedom2ha"
+    assert (old / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+    assert (old / "resources" / "daemon" / "obsolete.py").is_file()
+    assert not (old / "data").exists(), "data/ doit avoir été déplacé, pas laissé ni copié"
+
+
+def test_retain_previous_keeps_exactly_one_generation(tmp_path):
+    parent = tmp_path / "plugins"
+    _write(parent / "jeedom2ha" / "plugin_info" / "info.json", "{}", 0o644)
+    names = []
+    for gen in ("A", "B"):
+        work = parent / f".jeedom2ha-deploy.{gen}"
+        _write(work / "jeedom2ha" / "gen.txt", gen, 0o644)
+        result = _bash(
+            'jeedom2ha_retain_previous "$1" "$2"\nsleep 1.1', str(work), str(parent))
+        assert result.returncode == 0, result.stderr
+        assert not work.exists()
+        names = sorted(x.name for x in parent.iterdir() if x.name.startswith(".jeedom2ha.prev-"))
+        assert len(names) == 1, names
+    assert (parent / names[0] / "jeedom2ha" / "gen.txt").read_text() == "B"
+    assert (parent / "jeedom2ha" / "plugin_info" / "info.json").is_file()
+
+
+def test_retain_previous_refuses_unexpected_paths(tmp_path):
+    parent = tmp_path / "plugins"
+    _write(parent / "jeedom2ha" / "plugin_info" / "info.json", "{}", 0o644)
+    result = _bash('jeedom2ha_retain_previous "$1" "$2"', str(parent / "jeedom2ha"), str(parent))
+    assert result.returncode != 0
+    assert (parent / "jeedom2ha" / "plugin_info" / "info.json").is_file()
+
+
+def test_write_to_data_right_before_the_switch_is_kept(tmp_path):
+    # Écritures du démon/de l'utilisateur dans data/ juste avant la bascule,
+    # de la même taille et dans la même seconde que le contenu précédent (le
+    # cas où une réconciliation taille/date les perdait) :
+    #  - l'une par remplacement atomique (tmp + rename, comme
+    #    mapping/overrides.py) au chemin du plugin, juste avant le
+    #    déplacement de data/ ;
+    #  - l'autre au dossier data/ déjà déplacé, juste avant l'échange
+    #    (processus qui aurait gardé le dossier ouvert).
+    staging, live = _build(tmp_path)
+    data = live / "data"
+    (data / "decision.json").write_text("AAAA")
+    prelude = r"""
+_writes=0
+_LIVE="$2"
+jeedom2ha_daemon_running() {
+  if [ "$_writes" = 0 ]; then
+    printf '{"user": "NEWCFG"}\n' > "$_LIVE/data/.ov.tmp"; mv "$_LIVE/data/.ov.tmp" "$_LIVE/data/overrides.json"
+    _writes=1
+  fi
+  return 1
+}
+eval "$(declare -f jeedom2ha_exchange_dirs | sed '1s/jeedom2ha_exchange_dirs/_real_exchange/')"
+jeedom2ha_exchange_dirs() {
+  case "$1" in
+    */.probe-a) ;;
+    *) printf 'BBBB' > "$1/data/.d.tmp"; mv "$1/data/.d.tmp" "$1/data/decision.json" ;;
+  esac
+  _real_exchange "$@"
+}
+"""
+    result, _ = _promote(staging, live, prelude=prelude)
+
+    assert result.returncode == 0, result.stderr
+    assert (live / "data" / "overrides.json").read_text() == '{"user": "NEWCFG"}\n'
+    assert (live / "data" / "decision.json").read_text() == "BBBB"
+
+
+def test_running_daemon_blocks_the_switch_and_moves_nothing(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    result, _ = _promote(staging, live, prelude="jeedom2ha_daemon_running() { return 0; }")
+
+    assert result.returncode != 0
+    assert "le démon jeedom2ha tourne" in result.stderr
+    assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+    assert _inodes(live) == inodes
+    assert sorted(x.name for x in live.parent.iterdir()) == ["jeedom2ha"]
+
+
+def test_data_on_another_filesystem_blocks_the_switch(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    prelude = r"""
+jeedom2ha_fs_id() { case "$1" in */data) echo 999 ;; *) echo 1 ;; esac; }
+"""
+    result, _ = _promote(staging, live, prelude=prelude)
+
+    assert result.returncode != 0
+    assert "pas sur le même système de fichiers" in result.stderr
+    assert _inodes(live) == inodes
+    assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+
+
+def test_failed_exchange_puts_data_back(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    prelude = r"""
+eval "$(declare -f jeedom2ha_exchange_dirs | sed '1s/jeedom2ha_exchange_dirs/_real_exchange/')"
+jeedom2ha_exchange_dirs() { case "$1" in */.probe-a) _real_exchange "$@" ;; *) return 1 ;; esac; }
+"""
+    result, watcher = _promote(staging, live, prelude=prelude)
+
+    assert result.returncode != 0
+    assert "échange atomique en échec" in result.stderr
+    assert _inodes(live) == inodes
+    assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+    assert watcher.problems == []
+
+
+def test_fallback_without_atomic_exchange_leaves_data_in_place(tmp_path):
+    # Noyau/FS sans RENAME_EXCHANGE (ou python3 absent) : data/ et venv ne
+    # bougent pas, seul le code est mis à jour (rsync --delay-updates depuis
+    # l'arbre déjà normalisé).
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
 
     result, watcher = _promote(staging, live, prelude="jeedom2ha_exchange_dirs() { return 3; }")
 
     assert result.returncode == 0, result.stderr
-    assert "repli rsync --delay-updates" in result.stderr
+    assert "repli" in result.stderr
+    assert "__JEEDOM2HA_PREVIOUS_WORK__" not in result.stdout
     assert watcher.problems == [], watcher.problems[:5]
-    _assert_promoted(live, data_ino, venv_ino)
+    _assert_promoted(live, inodes)
+    assert sorted(x.name for x in live.parent.iterdir()) == ["jeedom2ha"]
 
 
 def test_incomplete_prepared_tree_is_never_switched(tmp_path):
@@ -430,13 +568,16 @@ def test_deploy_never_reactivates_the_plugin():
 def test_plugin_check_runs_after_promotion_and_before_the_deploy_tag():
     text = SCRIPT.read_text()
     since = text.index("\njeedom2ha_capture_deploy_since\n")
+    stop = text.index('jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"')
     promote = text.index('echo "  1b. promotion atomique')
     version = text.index('echo "  1c. VERSION')
     after_promotion = text.index('jeedom2ha_remote_verify_plugin "après promotion"')
+    retain = text.index('jeedom2ha_remote_retain_previous\n', after_promotion)
+    relaunch = text.index('[[ "${RESTART_DAEMON}" != "true" && "${DAEMON_WAS_RUNNING}" == "1" ]]')
     restart = text.index('echo "--- [3/5] Restart daemon')
     final = text.index('jeedom2ha_remote_verify_plugin "fin de déploiement"')
     tag = text.index('  jeedom2ha_create_and_push_deploy_tag "${_deploy_sha}"')
-    assert since < promote < version < after_promotion < restart < final < tag
+    assert since < stop < promote < version < after_promotion < retain < relaunch < restart < final < tag
     # L'ancien rsync en place vers le dossier vu par Jeedom a disparu.
     assert 'rsync -a --delete --exclude \'data/\'' not in text
     assert 'sudo rm -rf "${PLUGIN_PATH}"' not in text
