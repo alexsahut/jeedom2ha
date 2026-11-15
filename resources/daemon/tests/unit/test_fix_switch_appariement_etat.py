@@ -448,3 +448,31 @@ def test_state_choice_without_links_keeps_the_last_one_seen():
     on1, on2 = JeedomCmd(id=3, name="c"), JeedomCmd(id=4, name="d")
     assert choose_state([s1, s2], [on1, on2], []).id == 2
     assert choose_state([s1, s2], [on1], []).id == 2  # une seule paire : inchangé
+
+
+def test_an_action_with_two_links_still_targets_its_state():
+    """Forme de la borne de recharge : chaque action porte deux liens, ``updateCmdId`` vers l'état du
+    switch et ``infoId`` vers une autre info (sa dernière action). Elle reste reliée à son état."""
+    cmds = [
+        {"id": 61, "name": "Charge", "generic_type": "ENERGY_STATE", "type": "info", "sub_type": "binary"},
+        {"id": 62, "name": "action_ev", "type": "info", "sub_type": "other"},
+        {"id": 63, "name": "Démarrer", "generic_type": "ENERGY_ON", "type": "action", "sub_type": "other",
+         "update_cmd_id": "61", "virtual_info_id": "62"},
+        {"id": 64, "name": "Arrêter", "generic_type": "ENERGY_OFF", "type": "action", "sub_type": "other",
+         "update_cmd_id": "61", "virtual_info_id": "62"},
+        {"id": 65, "name": "Mode éco", "generic_type": "ENERGY_ON", "type": "action", "sub_type": "other",
+         "virtual_info_id": "62"},
+        {"id": 66, "name": "Mode normal", "generic_type": "ENERGY_OFF", "type": "action", "sub_type": "other",
+         "virtual_info_id": "62"},
+    ]
+    snapshot = _snapshot_of([_eq_raw(60, cmds, name="Borne")])
+    eq = snapshot.eq_logics[60]
+    assert {c.id: c.linked_info_ids() for c in eq.cmds}[63] == frozenset({61, 62})
+    switch = MapperRegistry().map(eq, snapshot)
+    assert (switch.confidence, switch.reason_code) == ("sure", "switch_on_off_state")
+    assert _roles(switch) == {"ENERGY_STATE": 61, "ENERGY_ON": 63, "ENERGY_OFF": 64}
+    # Deux actions reliées à l'état dans un même sens : ambigu (jamais de choix au hasard).
+    cmds[4]["update_cmd_id"] = "61"
+    snapshot = _snapshot_of([_eq_raw(60, cmds, name="Borne")])
+    switch = MapperRegistry().map(snapshot.eq_logics[60], snapshot)
+    assert (switch.confidence, switch.reason_code) == ("ambiguous", SWITCH_PAIRING_AMBIGUOUS)
