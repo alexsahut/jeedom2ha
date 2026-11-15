@@ -642,12 +642,12 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, SYNCED, { derniere_synchro_terminee: '2026-11-13T23:06:00', ha: { birth_seen_at: '2026-11-13T21:04:00' } }) });
     assert.equal(plain(ui.$('#span_healthSync').text()), 'Relu le 13/11');
-    assert.equal(plain(ui.$('#span_healthSync').attr('title')), 'Dernière relecture : 13/11 23:06 · Réussie');
+    assert.equal(plain(ui.$('#span_healthSync').attr('data-j2ha-tip')), 'Dernière relecture : 13/11 23:06 · Réussie');
     assert.equal(ui.$('#div_op').list[0].visible, false);
     assert.equal(ui.$('#div_healthHa').list[0].visible, true);
     assert.equal(plain(ui.$('#span_healthHa').text()), 'Home Assistant', 'le mot ne change pas');
     assert.equal(ui.$('#span_healthHa').attr('data-level'), 'ok');
-    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : Vu le 13/11 à 21:04');
+    assert.equal(plain(ui.$('#span_healthHa').attr('data-j2ha-tip')), 'Home Assistant : Vu le 13/11 à 21:04');
     assert.equal(plain(ui.$('#span_healthHa').attr('aria-label')), 'Home Assistant : Vu le 13/11 à 21:04');
     assert.equal(ui.sandbox.window.jeedom2haBridgeInflight, false, 'lecture terminée');
   });
@@ -659,7 +659,7 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     assert.equal(ui.$('#div_op').list[0].visible, true);
     assert.equal(plain(ui.$('#span_healthOp .j2ha-v3-pill-word').text()), 'Relecture partielle');
     assert.equal(ui.$('#span_healthOp').attr('data-level'), 'warn');
-    assert.equal(plain(ui.$('#span_healthOp').attr('title')), 'Relecture partielle : Relecture terminée avec avertissements.');
+    assert.equal(plain(ui.$('#span_healthOp').attr('data-j2ha-tip')), 'Relecture partielle : Relecture terminée avec avertissements.');
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'echec', intention: 'publier', message: 'x' } }) });
     assert.equal(plain(ui.$('#span_healthOp .j2ha-v3-pill-word').text()), 'Publication échouée');
@@ -675,11 +675,11 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     ui.respond('getBridgeStatus', { state: 'ok', result: Object.assign({}, UP, { derniere_operation_resultat: { resultat: 'succes', intention: 'publier', message: 'ok' } }) });
     assert.notEqual(ui.$('#div_healthHa').list[0].visible, false);
     assert.equal(ui.$('#span_healthHa').attr('data-level'), 'unknown');
-    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : état inconnu (le démon ne fournit pas cette information)');
+    assert.equal(plain(ui.$('#span_healthHa').attr('data-j2ha-tip')), 'Home Assistant : état inconnu (le démon ne fournit pas cette information)');
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: { daemon: false, ha: { birth_seen_at: null } } });
     assert.notEqual(ui.$('#div_healthHa').list[0].visible, false);
-    assert.equal(plain(ui.$('#span_healthHa').attr('title')), 'Home Assistant : état inconnu (démon arrêté)');
+    assert.equal(plain(ui.$('#span_healthHa').attr('data-j2ha-tip')), 'Home Assistant : état inconnu (démon arrêté)');
     assert.equal(plain(ui.$('#span_healthSync').text()), 'Relu : inconnu');
   });
 
@@ -689,13 +689,13 @@ describe('Lot 1 — jeedom2ha.js : barre d’état, relecture, guide branché', 
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: status });
     assert.equal(ui.$('#span_healthHa').attr('data-level'), 'unknown');
-    assert.match(plain(ui.$('#span_healthHa').attr('title')), /^Home Assistant : Non confirmé — Home Assistant se signale sur le broker/);
+    assert.match(plain(ui.$('#span_healthHa').attr('data-j2ha-tip')), /^Home Assistant : Non confirmé — Home Assistant se signale sur le broker/);
     ui.sandbox.window.Jeedom2haGuideInstance = { onStatus() {}, haConfirmed: () => true };
     ui.sandbox.refreshBridgeStatus();
     ui.respond('getBridgeStatus', { state: 'ok', result: status });
     assert.equal(ui.$('#span_healthHa').attr('data-level'), 'ok');
     assert.ok(ui.$('#span_healthHa').hasClass('j2ha-v3-pill-confirmed'));
-    assert.match(plain(ui.$('#span_healthHa').attr('title')), /^Home Assistant : Confirmé par vous — Vous avez indiqué que Home Assistant voit l'appareil/);
+    assert.match(plain(ui.$('#span_healthHa').attr('data-j2ha-tip')), /^Home Assistant : Confirmé par vous — Vous avez indiqué que Home Assistant voit l'appareil/);
   });
 
   it('le guide reçoit chaque état du pont (et null en erreur)', () => {

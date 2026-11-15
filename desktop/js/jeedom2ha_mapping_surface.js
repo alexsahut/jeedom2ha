@@ -1326,6 +1326,8 @@
     var first = nodes[0];
     var last = nodes[nodes.length - 1];
     var active = typeof document !== 'undefined' ? document.activeElement : null;
+    // Front v3 (Lot 6) : la bulle d'aide ouverte depuis la fenêtre (posée sur body) fait partie de la fenêtre pour le clavier.
+    if (active && active.closest && active.closest('.j2ha-info-pop')) return;
     var inside = !!active && root.contains(active);
     if (event.shiftKey && (!inside || active === first)) {
       event.preventDefault();

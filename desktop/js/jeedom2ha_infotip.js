@@ -48,12 +48,18 @@
     return $b;
   }
 
-  /** Pastille informative : focusable, cliquable, ouvre la même bulle. Le `title` existant reste en complément. */
+  /** Pastille informative : focusable, cliquable, ouvre la même bulle. Son `title` passe dans `data-j2ha-tip` et disparaît
+   *  (sinon l'info-bulle du navigateur, ou celle du cœur Jeedom 4.4+, double la bulle) ; `aria-label` reste le nom accessible. */
   function attach($el, text, opts) {
     var o = opts || {};
     if (!$el || !$el.length) return $el;
     $el.addClass('j2ha-tip j2ha-v3-tip').attr('aria-expanded', 'false');
-    if (text !== undefined && text !== null) $el.attr('data-j2ha-tip', String(text));
+    var tip = text !== undefined && text !== null ? String(text) : $el.attr('title');
+    if (tip !== undefined && tip !== null && tip !== '') {
+      $el.attr('data-j2ha-tip', tip);
+      if ($el.attr('aria-label') === undefined) $el.attr('aria-label', tip);
+    }
+    $el.removeAttr('title');
     if ($el.attr('tabindex') === undefined) $el.attr('tabindex', '0');
     $el.attr('role', 'button');
     if (o.doc) $el.attr('data-j2ha-doc', o.doc);
@@ -231,18 +237,27 @@
     if (key === 'Tab' && state.open) {
       var more = state.open.pop.querySelector('a');
       if (event.target === state.open.trigger && more && !event.shiftKey) {
-        // Le lien « En savoir plus » de la bulle suit l'icône dans l'ordre du clavier.
+        // Le lien « En savoir plus » de la bulle suit l'icône dans l'ordre du clavier. La touche ne va pas plus loin : le piège
+        // de focus d'une fenêtre (« Corriger le type ») ramènerait sinon le focus dans la fenêtre, hors de la bulle.
         event.preventDefault();
+        event.stopPropagation();
         more.focus();
         return;
       }
       if (state.open.pop.contains(event.target)) {
         event.preventDefault();
+        event.stopPropagation();
         close(true);
         return;
       }
       close(false);
     }
+  }
+
+  // Le focus dans la bulle (posée sur body) n'est pas « hors de la fenêtre » : le rappel de focus d'une modale Bootstrap / bootbox
+  // (`focusin` sur document) ne doit pas le reprendre.
+  function onFocusIn(event) {
+    if (state.open && state.open.pop.contains(event.target)) event.stopPropagation();
   }
 
   function isMouse(event) { return !event.pointerType || event.pointerType === 'mouse'; }
@@ -294,6 +309,7 @@
     // Phase de capture : la bulle passe avant les gestionnaires jQuery (fermeture des menus, Échap de la fenêtre modale).
     doc.addEventListener('click', onClick, true);
     doc.addEventListener('keydown', onKeydown, true);
+    doc.addEventListener('focusin', onFocusIn, true);
     doc.addEventListener('pointerover', onPointerOver, true);
     doc.addEventListener('pointerout', onPointerOut, true);
     var win = doc.defaultView;

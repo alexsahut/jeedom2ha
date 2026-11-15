@@ -290,7 +290,7 @@ describe('Lot 2 — fiche rendue : en-tête, bloc Home Assistant, tableau, régl
     assert.equal(text('.j2ha-eq-meta-facts'), 'Virtuel · 9 commandes');
     assert.equal(ui.$(P + '.j2ha-eq-meta-facts').attr('title'), '3 états, 3 ordres On, 3 ordres Off');
     assert.equal(ui.$(P + '.j2ha-eq-open-jeedom').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=142');
-    assert.match(plain(ui.$(P + '.j2ha-v2-where-toggle').attr('title')), /Paramètres › Appareils et services › MQTT, puis l’appareil « Multiprise Bureau »/);
+    assert.match(plain(ui.$(P + '.j2ha-v2-where-toggle').attr('data-j2ha-tip')), /Paramètres › Appareils et services › MQTT, puis l’appareil « Multiprise Bureau »/);
     assert.equal(text('.j2ha-eq-ha-title').replace(/3 entités$/, '').trim(), 'Dans Home Assistant');
     assert.match(plain(ui.$(P + '.j2ha-eq-entity-id').attr('title')), /Home Assistant peut ajuster cet identifiant/);
   });

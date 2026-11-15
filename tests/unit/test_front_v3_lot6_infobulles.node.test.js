@@ -151,7 +151,7 @@ for (const theme of ['Light', 'Dark']) {
     test(`Lot 6 réel — page maison : pastilles de la barre d'état au clic, second clic, clic ailleurs, une seule bulle (${tag})`, async (t) => {
       await withRealView(t, options(theme, width), async (page, ctx) => {
         await setTheme(page, theme);
-        await page.waitForFunction(() => /Démon : /.test(document.querySelector('#span_healthBridge').getAttribute('title') || ''));
+        await page.waitForFunction(() => /Démon : /.test(document.querySelector('#span_healthBridge').getAttribute('data-j2ha-tip') || ''));
         assert.equal((await popState(page)).count, 0);
         await page.locator('#span_healthBridge').click();
         let s = await popState(page);
@@ -164,13 +164,14 @@ for (const theme of ['Light', 'Dark']) {
         assert.notEqual(s.bg, 'rgba(0, 0, 0, 0)', 'fond opaque');
         assert.notEqual(s.bg, s.color, 'texte lisible');
         assertInViewport(s, 'Démon');
-        // Le `title` est mis de côté pendant l'ouverture (pas d'info-bulle du navigateur en double), puis rendu.
+        // Aucun `title` sur un élément qui ouvre la bulle : ni info-bulle du navigateur, ni tooltip du cœur en double.
         assert.equal(await page.locator('#span_healthBridge').getAttribute('title'), null);
         await shot(page, `maison-${theme}-${width}`);
         // Second clic : fermée.
         await page.locator('#span_healthBridge').click();
         assert.equal((await popState(page)).count, 0);
-        assert.match(await page.locator('#span_healthBridge').getAttribute('title'), /^Démon : /);
+        assert.equal(await page.locator('#span_healthBridge').getAttribute('title'), null);
+        assert.match(await page.locator('#span_healthBridge').getAttribute('aria-label'), /^Démon : /);
         assert.equal(await page.locator('#span_healthBridge').getAttribute('aria-expanded'), 'false');
         // Une seule bulle : ouvrir MQTT ferme Démon.
         await page.locator('#span_healthBridge').click();
@@ -261,6 +262,8 @@ for (const theme of ['Light', 'Dark']) {
         assert.ok(checked >= 5, `aides vérifiées : ${checked}`);
         const stray = await page.evaluate(() => [...document.querySelectorAll('.fa-info-circle')].filter((i) => !i.closest('button.j2ha-info')).map((i) => i.parentElement.className));
         assert.deepEqual(stray, []);
+        const titled = await page.evaluate(() => [...document.querySelectorAll('.j2ha-info, .j2ha-tip')].filter((el) => el.hasAttribute('title')).map((el) => el.className));
+        assert.deepEqual(titled, [], 'aucun title sur un élément qui ouvre la bulle');
         assert.deepEqual(ctx.errors, []);
       });
     });
@@ -284,6 +287,14 @@ for (const theme of ['Light', 'Dark']) {
         assertInViewport(s, 'fenêtre');
         assert.equal(await page.evaluate(() => document.querySelector('.j2ha-info-pop').closest('[inert]')), null, 'bulle non inerte');
         await shot(page, `fenetre-${theme}-${width}`);
+        // Clavier dans la fenêtre (Codex P2) : Tab depuis ⓘ atteint « En savoir plus » de la bulle, malgré le piège de focus.
+        await info.focus();
+        await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => document.activeElement.classList.contains('j2ha-info-more')), true, 'Tab : « En savoir plus » dans la fenêtre');
+        await page.keyboard.press('Tab');
+        assert.equal((await popState(page)).count, 0, 'Tab depuis le lien : bulle fermée');
+        assert.equal(await page.evaluate(() => document.activeElement.classList.contains('j2ha-info')), true, 'focus rendu à ⓘ, dans la fenêtre');
+        await info.click();
         await page.keyboard.press('Escape');
         assert.equal((await popState(page)).count, 0);
         assert.equal(await page.locator('.j2ha-v3-type-modal').count(), 1, 'Échap ferme d’abord la bulle, pas la fenêtre');
@@ -301,12 +312,21 @@ for (const theme of ['Light', 'Dark']) {
         await page.locator(`${card} .j2ha-menu-toggle`).click();
         await page.locator(`${card} .j2ha-room-choose`).click();
         await page.locator('.bootbox .j2ha-v2-excl').waitFor({ state: 'visible' });
+        // Rappel de focus d'une modale Bootstrap 3 (enforceFocus du cœur), que le banc ne charge pas : simulé ici à l'identique.
+        await page.evaluate(() => {
+          const modal = document.querySelector('.bootbox');
+          modal.setAttribute('tabindex', '-1');
+          document.addEventListener('focusin', (e) => { if (modal !== e.target && !modal.contains(e.target)) modal.focus(); });
+        });
         await page.locator('.bootbox .j2ha-v2-excl-rule').click();
         const s = await popState(page);
         assert.match(s.text, /ni lui-même, ni par sa pièce, ni par son plugin/);
         assert.ok(s.onTop);
         assert.equal(s.more, 'https://doc.example.test/plugin#choisir-ce-qui-est-publié');
         assertInViewport(s, 'panneau');
+        await page.locator('.bootbox .j2ha-v2-excl-rule').focus();
+        await page.keyboard.press('Tab');
+        assert.equal(await page.evaluate(() => document.activeElement.classList.contains('j2ha-info-more')), true, 'Tab : « En savoir plus », non repris par la modale');
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.bootbox .j2ha-v2-excl').count(), 1, 'Échap ferme la bulle, pas la boîte');
         const stray = await page.evaluate(() => [...document.querySelectorAll('.fa-info-circle')].filter((i) => !i.closest('button.j2ha-info')).length);

@@ -123,15 +123,15 @@ if (strpos($j2haDocUrl, 'https://') !== 0) {
 		<div id="div_bridgeHealthBanner" class="j2ha-health-banner j2ha-health-bar j2ha-v3-status">
 			<div class="j2ha-health-items">
 				<span class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthBridge" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Démon}}" data-level="unknown" title="{{Démon}}" aria-label="{{Démon}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Démon}}</span>
+					<span id="span_healthBridge" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Démon}}" data-level="unknown" data-j2ha-tip="{{Démon}}" aria-label="{{Démon}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Démon}}</span>
 				</span>
 				<span class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthMqtt" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{MQTT}}" data-level="unknown" title="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
+					<span id="span_healthMqtt" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{MQTT}}" data-level="unknown" data-j2ha-tip="{{MQTT}}" aria-label="{{MQTT}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{MQTT}}</span>
 					<span id="span_healthMqttBroker" class="j2ha-health-note" hidden></span>
 				</span>
 				<!-- Home Assistant : toujours visible ; non confirmé ou inconnu = gris avec « ? » (raison en info-bulle). -->
 				<span id="div_healthHa" class="j2ha-health-item j2ha-v3-pill-item">
-					<span id="span_healthHa" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Home Assistant}}" data-level="unknown" title="{{Home Assistant}} : {{état inconnu}}" aria-label="{{Home Assistant}} : {{état inconnu}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
+					<span id="span_healthHa" class="j2ha-v3-pill j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat" data-word="{{Home Assistant}}" data-level="unknown" data-j2ha-tip="{{Home Assistant}} : {{état inconnu}}" aria-label="{{Home Assistant}} : {{état inconnu}}"><span class="j2ha-v3-dot" aria-hidden="true"></span>{{Home Assistant}}<span class="j2ha-v3-pill-q" aria-hidden="true"> ?</span></span>
 				</span>
 				<span class="j2ha-health-item j2ha-v3-relu-item">
 					<span id="span_healthSync" class="j2ha-health-sync j2ha-v3-relu j2ha-tip j2ha-v3-tip" tabindex="0" role="button" aria-expanded="false" data-j2ha-doc="la-barre-détat">{{...}}</span>

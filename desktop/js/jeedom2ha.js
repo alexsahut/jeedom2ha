@@ -56,7 +56,7 @@ function refreshBridgeStatus() {
         j2haSetPill($bridge, 'danger', '{{Arrêté}}');
         j2haSetPill($mqtt, 'unknown', '{{Inconnu}}');
         $broker.text('');
-        $sync.text('{{Relu}} : {{inconnu}}').attr('title', '{{Dernière relecture inconnue}}');
+        $sync.text('{{Relu}} : {{inconnu}}').attr('data-j2ha-tip', '{{Dernière relecture inconnue}}').attr('aria-label', '{{Dernière relecture inconnue}}');
         renderOperationHealth(null);
         renderHaHealth(r);
         applyHAGating(r);
@@ -89,7 +89,7 @@ function refreshBridgeStatus() {
       }
 
       // 3. « Relu HH:MM » (date complète et résultat en info-bulle)
-      $sync.text(relectureShort(r.derniere_synchro_terminee)).attr('title', relectureTitle(r));
+      $sync.text(relectureShort(r.derniere_synchro_terminee)).attr('data-j2ha-tip', relectureTitle(r)).attr('aria-label', relectureTitle(r));
 
       // 4. Dernière opération : pastille ambre seulement si elle a échoué.
       renderOperationHealth(r);
@@ -115,7 +115,9 @@ function j2haSetPill($pill, level, detail) {
   // Le mot (« Démon », « MQTT »…) est porté par `data-word` dans la page ; le détail ne remplace jamais le mot.
   var word = $pill.attr('data-word') || '';
   var text = detail ? word + ' : ' + detail : word;
-  $pill.attr('data-level', level).attr('title', text).attr('aria-label', text);
+  // Front v3 (Lot 6) : le détail est lu par la bulle d'aide au clic (`data-j2ha-tip`, jeedom2ha_infotip.js) et par le nom
+  // accessible ; plus de `title` (sinon l'info-bulle du navigateur, ou celle du cœur, double la bulle).
+  $pill.attr('data-level', level).attr('data-j2ha-tip', text).attr('aria-label', text).removeAttr('title');
 }
 
 /* « Relu 15:58 » (aujourd'hui), « Relu le 12/11 » (avant), « Jamais relu » (aucune relecture). */
