@@ -372,6 +372,23 @@ async def test_other_payloads_are_refused(payload):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("topic", [
+    "jeedom2ha/554/5489/set",            # ancien topic (identité par commande d'avant la relecture)
+    "jeedom2ha/554/set",                 # topic du switch : « manu » n'y est pas un ordre On/Off
+    "jeedom2ha/554/select_5530/set",     # select d'une autre info
+    "jeedom2ha/553/select_5489/set",     # autre équipement
+    "jeedom2ha/554/select_5489x/set",    # suffixe parasite
+    "jeedom2ha/554/select_5489/set/x",
+])
+async def test_no_other_topic_ever_runs_a_select_action(topic):
+    eq, snapshot = _heater()
+    sync, _bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))
+    for payload in ("manu", "auto", "Absence"):
+        assert await sync.handle_command_message(topic, payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_the_switch_still_drives_the_relay_next_to_the_select():
     eq, snapshot = _heater()
     sync, _bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))

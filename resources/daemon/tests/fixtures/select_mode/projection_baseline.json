@@ -839,13 +839,45 @@
    "confidence": "sure",
    "type": "button"
   },
-  "jeedom2ha_eq_9834": {
+  "jeedom2ha_eq_9834_cmd_983401": {
    "commands": {
-    "ENERGY_OFF": 983404,
-    "ENERGY_ON": 983403,
-    "ENERGY_STATE": 983401
+    "983401": 983401
    },
-   "confidence": "ambiguous",
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9834_cmd_983402": {
+   "commands": {
+    "983402": 983402
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9834_cmd_983403": {
+   "commands": {
+    "SWITCH_OFF": 983405,
+    "SWITCH_ON": 983404,
+    "SWITCH_STATE": 983403
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9834_cmd_983406": {
+   "commands": {
+    "SWITCH_OFF": 983408,
+    "SWITCH_ON": 983407,
+    "SWITCH_STATE": 983406
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9834_cmd_983409": {
+   "commands": {
+    "SWITCH_OFF": 983411,
+    "SWITCH_ON": 983410,
+    "SWITCH_STATE": 983409
+   },
+   "confidence": "probable",
    "type": "switch"
   },
   "jeedom2ha_eq_9835_cmd_983501": {
@@ -1812,6 +1844,42 @@
    "qos": 1,
    "retain": true,
    "topic": "jeedom2ha/9833/availability"
+  },
+  {
+   "payload": "{\"name\": \"Charge\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983403\", \"object_id\": \"jeedom2ha_9834_983403\", \"command_topic\": \"jeedom2ha/9834/983403/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983403/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983403\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983403/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9834/availability"
+  },
+  {
+   "payload": "{\"name\": \"Charge solaire\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983406\", \"object_id\": \"jeedom2ha_9834_983406\", \"command_topic\": \"jeedom2ha/9834/983406/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983406/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983406\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983406/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge manuelle\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983409\", \"object_id\": \"jeedom2ha_9834_983409\", \"command_topic\": \"jeedom2ha/9834/983409/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983409/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983409\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983409/config"
+  },
+  {
+   "payload": "{\"name\": \"Branche\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983401\", \"object_id\": \"jeedom2ha_9834_983401\", \"state_topic\": \"jeedom2ha/9834/983401/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9834_983401\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9834_983401/config"
+  },
+  {
+   "payload": "{\"name\": \"Connecte\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983402\", \"object_id\": \"jeedom2ha_9834_983402\", \"state_topic\": \"jeedom2ha/9834/983402/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9834_983402\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9834_983402/config"
   },
   {
    "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9835_cmd_983501\", \"object_id\": \"jeedom2ha_9835_983501\", \"command_topic\": \"jeedom2ha/9835/983501/set\", \"payload_lock\": \"LOCK\", \"payload_unlock\": \"UNLOCK\", \"state_topic\": \"jeedom2ha/9835/983501/state\", \"state_locked\": \"LOCKED\", \"state_unlocked\": \"UNLOCKED\", \"state_jammed\": \"JAMMED\", \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9835\"], \"name\": \"Serrure portillon\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"lock.jeedom2ha_9835_983501\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9835/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",

@@ -25,7 +25,7 @@ VOLET_ID = 9830           # volet : info texte 1/0 posée par FLAP_UP / FLAP_DOW
 VOITURE_ID = 9831         # lumière : info texte « OnOff fictif » posée par LIGHT_ON / LIGHT_OFF reliées
 ROUTEUR_ID = 9832         # routeur solaire : actions « liste » reliées à des infos numériques publiées en capteurs
 MODES_ID = 9833           # « Modes » : 7 actions MODE_SET_STATE reliées par infoId/value, 3 non reliées
-BORNE_ID = 9834           # borne : info « action_ev » de sous-type other, actions à deux liens
+BORNE_ID = 9834           # borne (forme 583) : trois trios SWITCH_* par nom, action_ev action, ordres à deux liens
 SERRURE_ID = 9835         # serrure virtuelle : état texte posé par LOCK_OPEN / LOCK_CLOSE reliées
 
 
@@ -113,13 +113,33 @@ def real_shape_eq_logics() -> List[Dict[str, Any]]:
             _cmd(983321, "Retour mode précédent", "MODE_SET_STATE", "action", "other"),
             _cmd(983322, "Aller au mode suivant", "MODE_SET_STATE", "action", "other"),
         ]),
+        # Forme réelle de la borne (583) : trois trios SWITCH_* regroupés par nom, infos GENERIC_INFO, et
+        # « action_ev » qui est une ACTION. Chaque ordre porte deux liens : son état (updateCmdId) et
+        # l'info texte « Mode de charge » (infoId + value) — candidat select dont toutes les actions sont
+        # déjà portées par les switchs : jamais publié.
         _eq(BORNE_ID, "Borne garage", [
-            _cmd(983401, "Charge", "ENERGY_STATE", "info", "binary"),
-            _cmd(983402, "action_ev", None, "info", "other"),
-            _cmd(983403, "Démarrer", "ENERGY_ON", "action", "other",
-                 update_cmd_id="983401", update_cmd_to_value="1", virtual_info_id="983402", virtual_value="start"),
-            _cmd(983404, "Arrêter", "ENERGY_OFF", "action", "other",
-                 update_cmd_id="983401", update_cmd_to_value="0", virtual_info_id="983402", virtual_value="stop"),
+            _cmd(983401, "Branche", "SWITCH_STATE", "info", "binary"),
+            _cmd(983402, "Connecte", "SWITCH_STATE", "info", "binary"),
+            _cmd(983403, "Charge", "SWITCH_STATE", "info", "binary"),
+            _cmd(983404, "Charge On", "SWITCH_ON", "action", "other", update_cmd_id="983403", update_cmd_to_value="1",
+                 virtual_info_id="983420", virtual_value="charge"),
+            _cmd(983405, "Charge Off", "SWITCH_OFF", "action", "other", update_cmd_id="983403", update_cmd_to_value="0",
+                 virtual_info_id="983420", virtual_value="arret"),
+            _cmd(983406, "Charge solaire", "SWITCH_STATE", "info", "binary"),
+            _cmd(983407, "Charge solaire On", "SWITCH_ON", "action", "other", update_cmd_id="983406",
+                 update_cmd_to_value="1", virtual_info_id="983420", virtual_value="solaire"),
+            _cmd(983408, "Charge solaire Off", "SWITCH_OFF", "action", "other", update_cmd_id="983406",
+                 update_cmd_to_value="0", virtual_info_id="983420", virtual_value="arret solaire"),
+            _cmd(983409, "Charge manuelle", "SWITCH_STATE", "info", "binary"),
+            _cmd(983410, "Charge manuelle On", "SWITCH_ON", "action", "other", update_cmd_id="983409",
+                 update_cmd_to_value="1", virtual_info_id="983420", virtual_value="manuelle"),
+            _cmd(983411, "Charge manuelle Off", "SWITCH_OFF", "action", "other", update_cmd_id="983409",
+                 update_cmd_to_value="0", virtual_info_id="983420", virtual_value="arret manuel"),
+            _cmd(983412, "Puissance", "GENERIC_INFO", "info", "numeric", unit="W"),
+            _cmd(983413, "Etat connecteur", "GENERIC_INFO", "info", "string"),
+            _cmd(983420, "Mode de charge", "GENERIC_INFO", "info", "string"),
+            _cmd(983421, "action_ev", None, "action", "other"),
+            _cmd(983422, "Rafraichir", None, "action", "other"),
         ]),
         _eq(SERRURE_ID, "Serrure portillon", [
             _cmd(983501, "Etat", "LOCK_STATE", "info", "string"),
