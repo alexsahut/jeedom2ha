@@ -63,6 +63,14 @@ printf 'ARGS: %s\n' "$*" >> "$MOCK_SSH_LOG"
 stdin=$(cat)
 printf '%s\n' "$stdin" >> "$MOCK_SSH_STDIN"
 case "$*" in *"bash -s"*) _is_remote_program=true ;; *) _is_remote_program=false ;; esac
+# Read-only probes of deploy-promote-lib.sh (Jeedom timestamp before any
+# change, plugin check after promotion/rollback) answer as a healthy box.
+case "$stdin" in
+  *'jeedom2ha_box_now "${V_JEEDOM_ROOT}"'*) printf '2026-11-15 15:00:00\\n'; exit 0 ;;
+  *'jeedom2ha_verify_plugin_loaded "${V_JEEDOM_ROOT}"'*)
+    printf '__JEEDOM2HA_PLUGIN_CHECK__=%s\\n' "${MOCK_PLUGIN_CHECK:-OK}"
+    [ "${MOCK_PLUGIN_CHECK:-OK}" = OK ] && exit 0 || exit 1 ;;
+esac
 if [ -n "$MOCK_SSH_OUTPUT" ] && [ "$_is_remote_program" = true ]; then
   printf '%s\n' "$MOCK_SSH_OUTPUT"
   exit "${MOCK_SSH_EXIT:-0}"
@@ -756,3 +764,25 @@ def test_mqtt_credentials_never_in_ssh_argv(tmp_path):
     opts_content = mosquitto_opts_log.read_text()
     assert f"-u {mqtt_user}\n" in opts_content
     assert f"-P {mqtt_pass}\n" in opts_content
+
+
+def test_rollback_fails_loudly_when_jeedom_no_longer_sees_the_plugin(tmp_path):
+    # Incident du 15/11/2026 : un déploiement/rollback qui laisse le plugin
+    # désactivé par Jeedom doit rendre rc != 0, sans le réactiver.
+    archive = "/home/test/jeedom2ha-backups/jeedom2ha-20260927T000000Z-a.tar.gz"
+    result = _run(tmp_path, "--rollback", archive, MOCK_PLUGIN_CHECK="KO")
+
+    assert result.returncode != 0
+    assert "Contrôle Jeedom du plugin en échec (après rollback" in result.stderr
+    assert "ne réactive pas le plugin" in result.stderr
+    assert "Rollback complete." not in result.stdout
+
+
+def test_rollback_restores_through_atomic_switch_not_rm_then_mv(tmp_path):
+    archive = "/home/test/jeedom2ha-backups/jeedom2ha-20260927T000000Z-a.tar.gz"
+    result = _run(tmp_path, "--rollback", archive)
+
+    assert result.returncode == 0, result.stderr
+    remote_program = (tmp_path / "ssh.stdin").read_text()
+    assert 'jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback' in remote_program
+    assert 'sudo rm -rf "${PLUGIN_PATH}"' not in remote_program

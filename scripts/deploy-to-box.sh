@@ -20,6 +20,7 @@ ENV_FILE="${REPO_ROOT}/.env"
 VERSION_FILE_LIB="${SCRIPT_DIR}/deploy-version-file.sh"
 ROLLBACK_LIB="${SCRIPT_DIR}/deploy-rollback-lib.sh"
 INVENTORY_DIFF_LIB="${SCRIPT_DIR}/deploy-inventory-diff.sh"
+PROMOTE_LIB="${SCRIPT_DIR}/deploy-promote-lib.sh"
 
 _fail() { echo "ERROR: $*" >&2; exit 1; }
 
@@ -392,6 +393,7 @@ jeedom2ha_rollback_archive() {
     { printf 'ARCHIVE=%s\nPLUGIN_PATH=%s\nJEEDOM_ROOT=%s\nBACKUP_DIR=%s\nBOX_USER=%s\n' \
         "${_archive_src}" "${_plugin_path_src}" "${_jeedom_root_src}" "${_backup_dir_src}" "${_box_user_src}"
       cat "${ROLLBACK_LIB}"
+      cat "${PROMOTE_LIB}"
       cat <<'REMOTE'
 set -euo pipefail
 [[ -r "${ARCHIVE}" ]] || { echo "ERROR: archive inaccessible: ${ARCHIVE}" >&2; exit 1; }
@@ -429,9 +431,17 @@ jeedom2ha::deamon_stop();
 }
 jeedom2ha_stop_daemon_with_pid_fallback "/tmp/jeedom/jeedom2ha/deamon.pid"
 
-sudo rm -rf "${PLUGIN_PATH}"
-sudo mv "${_work}/jeedom2ha" "${PLUGIN_PATH}"
-sudo chown -R www-data:www-data "${PLUGIN_PATH}"
+# Plus de « rm -rf puis mv » : entre les deux, plugins/jeedom2ha n'existait
+# pas et un accès PHP de Jeedom désactivait le plugin (plugin::byId →
+# forceDisablePlugin, incident du 15/11/2026 sur l'étape 1b). L'arbre
+# restauré est normalisé (www-data, 755/644) et relu en tant que www-data
+# HORS de la vue de Jeedom, puis échangé atomiquement avec le plugin en
+# place (deploy-promote-lib.sh). L'ancien arbre finit dans ${_work},
+# supprimé par le trap.
+jeedom2ha_normalize_plugin_tree "${_work}/jeedom2ha" www-data:www-data
+sudo chmod 711 "${_work}"
+jeedom2ha_check_tree_readable "${_work}/jeedom2ha" www-data
+jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback
 sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
 require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
 require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
@@ -461,6 +471,52 @@ REMOTE
   fi
 }
 
+# Borne basse du contrôle du journal `plugin` (jeedom2ha_verify_plugin_loaded).
+# Prise sur la box, par PHP avec la configuration Jeedom (même fuseau que
+# log::add), AVANT toute modification du plugin.
+DEPLOY_SINCE=""
+
+# jeedom2ha_capture_deploy_since — fatal si indisponible : on est encore avant
+# toute modification, rien n'a été touché.
+jeedom2ha_capture_deploy_since() {
+  local _raw
+  _raw=$(
+    { printf 'V_JEEDOM_ROOT=%q\nset -euo pipefail\n' "${JEEDOM_ROOT}"
+      cat "${PROMOTE_LIB}"
+      printf 'jeedom2ha_box_now "${V_JEEDOM_ROOT}"\n'
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>/dev/null
+  ) || true
+  DEPLOY_SINCE=$(grep -Eo '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}' <<< "${_raw}" | tail -n 1 || true)
+  [[ -n "${DEPLOY_SINCE}" ]] \
+    || _fail "Horodatage Jeedom de la box indisponible (php sous www-data) : arrêt AVANT toute modification du plugin."
+  echo "  Début de fenêtre de contrôle du journal plugin : ${DEPLOY_SINCE} (heure Jeedom)."
+}
+
+# jeedom2ha_remote_verify_plugin <étape>
+# Contrôle « Jeedom voit-il le plugin ? » (scripts/deploy-promote-lib.sh,
+# jeedom2ha_verify_plugin_loaded) : sous www-data, SANS require_once de la
+# classe — byId()->isActive(), class_exists() par l'autoload du cœur, et
+# journal `plugin` sans « Plugin introuvable : jeedom2ha » ni « Fichier
+# introuvable » jeedom2ha depuis DEPLOY_SINCE. Échec ⇒ rc ≠ 0. Ne réactive
+# jamais le plugin.
+jeedom2ha_remote_verify_plugin() {
+  local _step="$1" _out _rc=0
+  echo "--- Contrôle Jeedom du plugin (${_step})..."
+  _out=$(
+    { printf 'V_JEEDOM_ROOT=%q\nV_SINCE=%q\nset -euo pipefail\n' "${JEEDOM_ROOT}" "${DEPLOY_SINCE}"
+      cat "${PROMOTE_LIB}"
+      printf 'jeedom2ha_verify_plugin_loaded "${V_JEEDOM_ROOT}" "${V_SINCE}"\n'
+    } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
+  ) || _rc=$?
+  printf '%s\n' "${_out}"
+  if [[ "${_rc}" -ne 0 ]] || ! grep -qx '__JEEDOM2HA_PLUGIN_CHECK__=OK' <<< "${_out}"; then
+    _fail "Contrôle Jeedom du plugin en échec (${_step}, code ${_rc}) : le déploiement N'EST PAS validé.
+       Le script ne réactive pas le plugin. Vérifiez son état dans Jeedom (Plugins > Gestion des plugins)
+       et le journal « plugin » ; rollback possible : ./scripts/deploy-to-box.sh --sha \"\$(git rev-parse HEAD)\" --rollback <archive>"
+  fi
+  echo ""
+}
+
 # =============================================================================
 echo "======================================================================="
 echo "  DEV/TEST DEPLOY — jeedom2ha"
@@ -473,6 +529,7 @@ echo "  Target  : ${JEEDOM_BOX_PATH}/ (via sudo)"
 echo ""
 
 if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
+  jeedom2ha_capture_deploy_since
   if jeedom2ha_rollback_archive "${ROLLBACK_ARCHIVE}"; then
     :
   else
@@ -485,6 +542,7 @@ if [[ -n "${ROLLBACK_ARCHIVE}" ]]; then
   fi
   [[ "$(echo "${_rollback_status}" | jq -r '.status // empty')" == "ok" ]] \
     || _fail "Healthcheck échoué après rollback: ${_rollback_status}"
+  jeedom2ha_remote_verify_plugin "après rollback"
   echo "======================================================================="
   echo "  Rollback complete."
   echo "======================================================================="
@@ -496,8 +554,9 @@ fi
 #
 # Étape 1a      : rsync local → staging (accessible en écriture par JEEDOM_BOX_USER)
 # Étape 1a-bis  : backup archive (700/600) du plugin existant, avant écrasement
-# Étape 1b      : sudo promotion staging → plugin dir + permissions www-data
+# Étape 1b      : promotion atomique staging → plugin dir (arbre préparé www-data, bascule renameat2)
 # Étape 1c      : écriture atomique du fichier VERSION (version + sha + date)
+# Étape 1d      : contrôle Jeedom du plugin (www-data, autoload, journal plugin)
 #
 # Pattern terrain doc "Sur la box Jeedom de test" adapté pour user non-root.
 # Toutes les opérations sur /var/www/html passent par sudo.
@@ -615,6 +674,8 @@ REMOTE
   exit 0
 fi
 
+jeedom2ha_capture_deploy_since
+
 echo "--- Inventaire MQTT avant déploiement..."
 jeedom2ha_refresh_mqtt_credentials
 _inv_before_output=$(jeedom2ha_inventory_discovery "before")
@@ -661,20 +722,25 @@ BACKUP_ARCHIVE=$(sed -n 's/^__JEEDOM2HA_BACKUP_ARCHIVE__=//p' <<< "${_backup_out
 [[ -n "${BACKUP_ARCHIVE}" ]] || _fail "Backup absent : le déploiement est annulé pour préserver un rollback sûr."
 echo ""
 
-# 1b — promotion staging → plugin dir + permissions (sudo requis)
+# 1b — promotion staging → plugin dir (scripts/deploy-promote-lib.sh).
+# Incident du 15/11/2026 : l'ancien `sudo rsync -a --delete staging/ plugin/`
+# suivi APRÈS COUP de chown/chmod recopiait propriétaire (compte SSH) et modes
+# du staging sur les dossiers du plugin au fil du transfert ; www-data perdait
+# l'accès à core/class/ puis plugin_info/, Jeedom journalisait « Fichier
+# introuvable » / « Plugin introuvable : jeedom2ha » et désactivait le plugin
+# (plugin::byId → forceDisablePlugin).
+# Désormais : arbre complet préparé à côté (code du staging + data/ et
+# resources/python_venv/ repris par liens physiques), www-data/755/644 posés
+# et relus en tant que www-data, puis bascule atomique (renameat2
+# RENAME_EXCHANGE) ; repli rsync --delay-updates depuis l'arbre déjà
+# normalisé si l'échange est impossible sur la box.
 # resources/python_venv/ est créé par le cœur Jeedom (dépendances pip3 de packages.json) et sert à lancer le démon :
-# ni supprimé par --delete, ni chmod 644 (VM de démo 20/10 : démon « python_venv/bin/python3: not found »).
-echo "  1b. sudo promote → ${JEEDOM_BOX_PATH}/"
-ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE
-set -e
-sudo mkdir -p "${JEEDOM_BOX_PATH}"
-sudo rsync -a --delete --exclude 'data/' --exclude '/resources/python_venv/' "${JEEDOM_STAGING_DIR}/" "${JEEDOM_BOX_PATH}/"
-sudo chown -R www-data:www-data "${JEEDOM_BOX_PATH}"
-sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type d -exec chmod 755 {} \;
-sudo find "${JEEDOM_BOX_PATH}" -path "${JEEDOM_BOX_PATH}/resources/python_venv" -prune -o -type f -exec chmod 644 {} \;
-sudo chmod +x "${JEEDOM_BOX_PATH}/resources/daemon/main.py"
-echo "  Permissions OK (www-data, 755/644, main.py +x)."
-REMOTE
+# jamais supprimé, jamais chmod 644 (VM de démo 20/10 : démon « python_venv/bin/python3: not found »).
+echo "  1b. promotion atomique → ${JEEDOM_BOX_PATH}/"
+{ printf 'V_STAGING=%q\nV_PLUGIN_PATH=%q\nset -euo pipefail\n' "${JEEDOM_STAGING_DIR}" "${JEEDOM_BOX_PATH}"
+  cat "${PROMOTE_LIB}"
+  printf 'jeedom2ha_promote_plugin_dir "${V_STAGING}" "${V_PLUGIN_PATH}" www-data:www-data\n'
+} | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
 echo ""
 
 # 1c — écrire un fichier VERSION à la racine du plugin (hors data/), APRÈS le
@@ -705,6 +771,10 @@ Obtenu:
 ${_remote_version_readback}"
 fi
 echo ""
+
+# 1d — Jeedom voit-il encore le plugin ? (sous www-data, autoload du cœur,
+# journal plugin). Échec ⇒ arrêt, rc ≠ 0, aucune réactivation automatique.
+jeedom2ha_remote_verify_plugin "après promotion"
 
 # =============================================================================
 # STEP 2 — Cleanup HA discovery (avant restart/sync)
@@ -946,6 +1016,9 @@ REMOTE
   } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s
   echo ""
 fi
+
+# Second passage : couvre aussi le redémarrage du démon et la synchro.
+jeedom2ha_remote_verify_plugin "fin de déploiement"
 
 if [[ "${SKIP_POST_DEPLOY}" == "true" ]]; then
   echo "WARNING: aucun tag de déploiement créé : --skip-post-deploy ne confirme pas le healthcheck." >&2
