@@ -115,6 +115,16 @@
         aide: 'Gardez des types génériques d’une seule famille. ' + RELOAD_HELP,
       };
     },
+    // fix/switch-appariement-etat — plusieurs paires On/Off : le plugin ne devine pas laquelle pilote l'appareil.
+    switch_pairing_ambiguous: function () {
+      return {
+        quoi: 'Non publié en interrupteur : l’équipement a plusieurs ordres On et Off.',
+        pourquoi: 'Aucun n’est relié de façon sûre à l’état de l’appareil : le plugin ne devine pas lequel le pilote.',
+        actions: ['equipment'],
+        aide: 'Dans Jeedom, reliez l’ordre On et l’ordre Off qui pilotent l’appareil à son état (champ « Valeur » de '
+          + 'chaque action), sans toucher aux types génériques. ' + RELOAD_HELP,
+      };
+    },
     switch_state_orphan: function () {
       return {
         quoi: 'Non publié : un état existe, mais aucun ordre On / Off.',

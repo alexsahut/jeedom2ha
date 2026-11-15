@@ -479,16 +479,16 @@
           "matched_commands": [
             {
               "attendu_ha": "switch",
-              "cmd_id": 5490,
-              "cmd_name": "Manu",
+              "cmd_id": 5706,
+              "cmd_name": "On_5701",
               "generic_type": "ENERGY_ON",
               "mapping_decision": "switch",
               "retained": true
             },
             {
               "attendu_ha": "switch",
-              "cmd_id": 5491,
-              "cmd_name": "auto",
+              "cmd_id": 5707,
+              "cmd_name": "Off_5702",
               "generic_type": "ENERGY_OFF",
               "mapping_decision": "switch",
               "retained": true
@@ -642,13 +642,13 @@
                 "used_type": "ENERGY_STATE"
               },
               {
-                "command_id": 5490,
+                "command_id": 5706,
                 "configured_type": "ENERGY_ON",
                 "logical_role": "ENERGY_ON",
                 "used_type": "ENERGY_ON"
               },
               {
-                "command_id": 5491,
+                "command_id": 5707,
                 "configured_type": "ENERGY_OFF",
                 "logical_role": "ENERGY_OFF",
                 "used_type": "ENERGY_OFF"
@@ -666,16 +666,16 @@
             },
             {
               "attendu_ha": null,
-              "cmd_id": 5706,
-              "cmd_name": "On_5701",
+              "cmd_id": 5490,
+              "cmd_name": "Manu",
               "generic_type": "ENERGY_ON",
               "mapping_decision": null,
               "retained": false
             },
             {
               "attendu_ha": null,
-              "cmd_id": 5707,
-              "cmd_name": "Off_5702",
+              "cmd_id": 5491,
+              "cmd_name": "auto",
               "generic_type": "ENERGY_OFF",
               "mapping_decision": null,
               "retained": false
@@ -7002,16 +7002,16 @@
           "matched_commands": [
             {
               "attendu_ha": "switch",
-              "cmd_id": 5490,
-              "cmd_name": "Manu",
+              "cmd_id": 5706,
+              "cmd_name": "On_5701",
               "generic_type": "ENERGY_ON",
               "mapping_decision": "switch",
               "retained": true
             },
             {
               "attendu_ha": "switch",
-              "cmd_id": 5491,
-              "cmd_name": "auto",
+              "cmd_id": 5707,
+              "cmd_name": "Off_5702",
               "generic_type": "ENERGY_OFF",
               "mapping_decision": "switch",
               "retained": true
@@ -7165,13 +7165,13 @@
                 "used_type": "ENERGY_STATE"
               },
               {
-                "command_id": 5490,
+                "command_id": 5706,
                 "configured_type": "ENERGY_ON",
                 "logical_role": "ENERGY_ON",
                 "used_type": "ENERGY_ON"
               },
               {
-                "command_id": 5491,
+                "command_id": 5707,
                 "configured_type": "ENERGY_OFF",
                 "logical_role": "ENERGY_OFF",
                 "used_type": "ENERGY_OFF"
@@ -7189,16 +7189,16 @@
             },
             {
               "attendu_ha": null,
-              "cmd_id": 5706,
-              "cmd_name": "On_5701",
+              "cmd_id": 5490,
+              "cmd_name": "Manu",
               "generic_type": "ENERGY_ON",
               "mapping_decision": null,
               "retained": false
             },
             {
               "attendu_ha": null,
-              "cmd_id": 5707,
-              "cmd_name": "Off_5702",
+              "cmd_id": 5491,
+              "cmd_name": "auto",
               "generic_type": "ENERGY_OFF",
               "mapping_decision": null,
               "retained": false
@@ -15410,13 +15410,13 @@
         "commands": {
           "ENERGY_OFF": {
             "generic_type": "ENERGY_OFF",
-            "id": 5491,
+            "id": 5707,
             "sub_type": "other",
             "type": "action"
           },
           "ENERGY_ON": {
             "generic_type": "ENERGY_ON",
-            "id": 5490,
+            "id": 5706,
             "sub_type": "other",
             "type": "action"
           },

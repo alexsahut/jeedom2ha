@@ -29,7 +29,7 @@ describe('25.1 / AC5 — partition D3 des codes de cause', () => {
   const blocked = ['ambiguous_skipped', 'name_heuristic_rejection', 'duplicate_generic_types', 'conflicting_generic_types',
     'switch_state_orphan', 'probable_skipped', 'low_confidence', 'no_generic_type_configured', 'no_mapping',
     'skipped_no_mapping_candidate', 'ha_missing_command_topic', 'ha_missing_state_topic', 'discovery_publish_failed',
-    'no_projection_possible'];
+    'no_projection_possible', 'switch_pairing_ambiguous'];
   const state = ['disabled_eqlogic', 'excluded_eqlogic', 'excluded_plugin', 'excluded_object', 'publication_excluded_eqlogic',
     'publication_excluded_command', 'publication_forced', 'sure_mapping'];
 

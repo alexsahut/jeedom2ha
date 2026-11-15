@@ -1736,6 +1736,7 @@
     duplicate_generic_types: '{{Type en double}}',
     conflicting_generic_types: '{{Types incompatibles}}',
     switch_state_orphan: '{{État sans ordre}}',
+    switch_pairing_ambiguous: '{{Ordres On/Off en double}}',
     probable_skipped: '{{Type pas assez sûr}}',
     low_confidence: '{{Type pas assez sûr}}',
     no_generic_type_configured: '{{Sans type générique}}',

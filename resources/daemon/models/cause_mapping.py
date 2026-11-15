@@ -181,6 +181,17 @@ _STATE_ONLY_CAUSE = {
     "action": "Choisir le type binary_sensor dans la liste « Override HA » de la commande, puis « Forcer » la publication.",
 }
 
+# fix/switch-appariement-etat — cause précise « plusieurs paires On/Off » (`switch_pairing_ambiguous`,
+# mapping `ambiguous`) : le plugin ne sait pas quelle paire pilote l'état, il ne devine pas. Le
+# remède est dans Jeedom : relier les ordres On/Off à leur info d'état (champ « Valeur » de l'action,
+# ou « mise à jour de la commande » en configuration avancée) ; les types génériques restent intacts.
+_PAIRING_MAPPING_REASON = "switch_pairing_ambiguous"
+_PAIRING_CAUSE = {
+    "label": "Plusieurs ordres On/Off — aucun relié de façon sûre à l'état, non publié en interrupteur",
+    "action": "Dans Jeedom, relier l'action On et l'action Off qui pilotent l'appareil à leur info d'état "
+              "(champ « Valeur » de l'action), puis relancer une synchronisation.",
+}
+
 # Alias fermés provenant de la taxonomie decision_trace.reason_code.
 _CAUSE_UX_REASON_ALIASES: dict = {
     "confidence_policy_skipped": "probable_skipped",
@@ -216,6 +227,14 @@ def resolve_cause_ux(
       `switch_state_orphan` sous une décision `ambiguous`/`ambiguous_skipped` change le libellé
     """
     normalized_reason = str(reason_code or "").strip()
+    if (
+        mapping_reason_code == _PAIRING_MAPPING_REASON
+        and normalized_reason in ("ambiguous", "ambiguous_skipped")
+    ):
+        return {
+            "cause_label": _PAIRING_CAUSE["label"],
+            "cause_action": _PAIRING_CAUSE["action"],
+        }
     if (
         mapping_reason_code == _STATE_ONLY_MAPPING_REASON
         and normalized_reason in ("ambiguous", "ambiguous_skipped")

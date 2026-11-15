@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
 from models.mapping import SwitchCapabilities, MappingResult, PublicationDecision
 from models.decide_publication import DEFAULT_CONFIDENCE_POLICY
+from mapping.pairing import PAIRING_AMBIGUOUS, PAIRING_LINKED, SWITCH_PAIRING_AMBIGUOUS, pair_on_off
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,10 +124,14 @@ class SwitchMapper:
         # Collect ENERGY_* commands and detect ANTI_SWITCH_* commands
         energy_cmds: Dict[str, JeedomCmd] = {}
         anti_switch_cmds: Set[str] = set()
+        # fix/switch-appariement-etat — toutes les actions de chaque sens, dans l'ordre Jeedom.
+        energy_orders: Dict[str, List[JeedomCmd]] = {"ENERGY_ON": [], "ENERGY_OFF": []}
 
         for cmd in eq.cmds:
             if cmd.generic_type and cmd.generic_type in {"ENERGY_STATE", "ENERGY_ON", "ENERGY_OFF"}:
                 energy_cmds[cmd.generic_type] = cmd
+                if cmd.generic_type in energy_orders:
+                    energy_orders[cmd.generic_type].append(cmd)
             elif cmd.generic_type and cmd.generic_type in _ANTI_SWITCH_GENERIC_TYPES:
                 anti_switch_cmds.add(cmd.generic_type)
 
@@ -170,6 +175,27 @@ class SwitchMapper:
             _LOGGER.info(
                 "[MAPPING] eq_id=%d name='%s': name contains non-switch keyword '%s' → capabilities kept ambiguous",
                 eq.id, eq.name, matched_kw,
+            )
+
+        # fix/switch-appariement-etat — plusieurs ordres de même sens : on garde la paire reliée à
+        # l'info d'état retenue, jamais « la dernière vue » ; sans lien univoque, pas de switch.
+        pairing = pair_on_off(
+            energy_orders["ENERGY_ON"], energy_orders["ENERGY_OFF"], energy_cmds.get("ENERGY_STATE"),
+            on_key="ENERGY_ON", off_key="ENERGY_OFF",
+        )
+        if pairing.status == PAIRING_AMBIGUOUS:
+            return self._ambiguous_pairing(eq, snapshot, energy_cmds.get("ENERGY_STATE"), energy_orders, pairing)
+        if pairing.status == PAIRING_LINKED:
+            for key, chosen in (("ENERGY_ON", pairing.on), ("ENERGY_OFF", pairing.off)):
+                if chosen is None:
+                    energy_cmds.pop(key, None)
+                else:
+                    energy_cmds[key] = chosen
+            _LOGGER.info(
+                "[MAPPING] eq_id=%d: plusieurs ordres On/Off, paire reliée à l'état %s retenue "
+                "(On=%s, Off=%s, candidats %s)",
+                eq.id, energy_cmds["ENERGY_STATE"].id,
+                getattr(pairing.on, "id", None), getattr(pairing.off, "id", None), pairing.candidates,
             )
 
         # Phase 1: Detect On/Off capability
@@ -275,6 +301,53 @@ class SwitchMapper:
             reason_details={
                 "device_class_source": eq.eq_type_name or "",
                 **({"matched_keyword": matched_kw} if matched_kw else {}),
+            },
+        )
+
+    @staticmethod
+    def _ambiguous_pairing(
+        eq: JeedomEqLogic,
+        snapshot: TopologySnapshot,
+        state_cmd: Optional[JeedomCmd],
+        orders: Dict[str, List[JeedomCmd]],
+        pairing,
+    ) -> MappingResult:
+        """fix/switch-appariement-etat — plusieurs paires On/Off, aucune reliée de façon univoque.
+
+        Pas de switch (aucun ordre retenu : ``has_on_off=False``, donc jamais pilotable, même
+        forcé) ; l'état et toutes les actions candidates portent la raison dédiée à l'écran.
+        """
+        _LOGGER.warning(
+            "[MAPPING] eq_id=%d: plusieurs ordres On/Off et aucun relié de façon univoque à l'état %s "
+            "(candidats %s) → pas de switch (%s)",
+            eq.id, getattr(state_cmd, "id", None), pairing.candidates, SWITCH_PAIRING_AMBIGUOUS,
+        )
+        commands: Dict[str, JeedomCmd] = {}
+        if state_cmd is not None:
+            commands["ENERGY_STATE"] = state_cmd
+        # Clés de diagnostic seulement (« ENERGY_ON#<id> ») : aucune n'est une clé routable
+        # (``ENERGY_ON`` / ``ENERGY_OFF``), aucune commande ne peut donc être envoyée.
+        for key, cmds in orders.items():
+            for cmd in cmds:
+                commands[f"{key}#{cmd.id}"] = cmd
+        return MappingResult(
+            ha_entity_type="switch",
+            confidence="ambiguous",
+            reason_code=SWITCH_PAIRING_AMBIGUOUS,
+            jeedom_eq_id=eq.id,
+            ha_unique_id=f"jeedom2ha_eq_{eq.id}",
+            ha_name=eq.name,
+            suggested_area=snapshot.get_suggested_area(eq.id),
+            commands=commands,
+            capabilities=SwitchCapabilities(
+                has_on_off=False,
+                has_state=state_cmd is not None,
+                on_off_confidence="ambiguous",
+                device_class=None,
+            ),
+            reason_details={
+                "pairing_candidates": pairing.candidates,
+                "state_cmd_id": getattr(state_cmd, "id", None),
             },
         )
 

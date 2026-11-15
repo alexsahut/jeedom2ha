@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-15 — Interrupteur : la bonne paire On / Off
+
+- Un équipement qui porte **plusieurs ordres On et Off** (par exemple un chauffe-eau virtuel dont une paire pilote le relais et une autre change un mode) : l'interrupteur de Home Assistant utilise maintenant la paire **reliée à l'état** de l'appareil, au lieu de la dernière lue. Le lien se lit dans Jeedom : champ « Valeur » de l'action, ou info mise à jour par l'action (configuration avancée du cœur, ou info d'un virtuel).
+- Si aucune paire n'est reliée de façon sûre, le plugin ne devine pas : pas d'interrupteur, et la cause « plusieurs ordres On/Off — reliez à l’état ceux qui pilotent l’appareil (champ « Valeur » dans Jeedom) » s'affiche (bande « Ordres On/Off en double »). Les autres entités de l'équipement restent publiées.
+- Un équipement à une seule paire On / Off ne change pas. Les types génériques de Jeedom ne sont jamais modifiés.
+
+---
+
 # 2026-11-14 — Refonte de l'interface (front v3)
 
 - **Plus de phrases à l'écran.** Un état se lit à sa couleur, son icône et son mot ; l'explication est dans l'info-bulle, et « En savoir plus » mène à la documentation, réécrite écran par écran.
