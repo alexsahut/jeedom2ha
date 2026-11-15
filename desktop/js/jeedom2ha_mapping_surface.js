@@ -1519,16 +1519,40 @@
     });
   }
 
-  // « Annuler » du bandeau après « Publier quand même » : retire « Toujours » (revertPublicationOverride, même commande),
-  // puis rétablit le type précédent et republie (chemin de l'annulation existante).
-  function undoTypeAnyway(eqId, cmdId, previous) {
+  // Front v3 (Lot 7, revue Codex #406) : réglage de publication porté par la commande ELLE-MÊME avant l'écriture (champ additif
+  // `publication_override_own` de l'arbre, présent seulement s'il est posé). null = aucun.
+  function ownPublicationOf(eqId, cmdId) {
+    var raw = ctx.raw[eqId];
+    var rows = raw && Array.isArray(raw.commands) ? raw.commands : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].jeedom_cmd_id === cmdId) {
+        var own = rows[i].publication_override_own;
+        return own === 'exclude' || own === 'force_publish' ? own : null;
+      }
+    }
+    return null;
+  }
+
+  // « Annuler » du bandeau après « Publier quand même » : rétablit EXACTEMENT le réglage de publication de la commande du
+  // panneau (Front v3, Lot 7) — retiré seul (`scope: 'command'`) s'il n'existait pas, réécrit s'il valait « Jamais », laissé
+  // s'il valait déjà « Toujours » —, puis rétablit le type précédent et republie (chemin de l'annulation existante). Le retour
+  // canonique (sans `scope`) purgeait les réglages de TOUTES les commandes de l'entité (une correction de type sœur comprise).
+  function undoTypeAnyway(eqId, cmdId, previous, previousPublication) {
     var undoTypeOnly = undoType(eqId, cmdId, previous);
     return function ($toast, $undo) {
       if ($undo.prop('disabled')) return;
       $undo.prop('disabled', true);
       if (ctx.typeToast && ctx.typeToast.timer) { clearTimeout(ctx.typeToast.timer); ctx.typeToast.timer = null; }
       $toast.find('.j2ha-v2-type-toast-text').first().text('{{Retour au réglage précédent…}}');
-      $.ajax({ type: 'POST', url: AJAX_URL, data: { action: 'revertPublicationOverride', eqId: eqId, cmdId: cmdId }, dataType: 'json' })
+      if (previousPublication === 'force_publish') {
+        $undo.prop('disabled', false);
+        undoTypeOnly($toast, $undo);
+        return;
+      }
+      var data = previousPublication === 'exclude'
+        ? { action: 'savePublicationOverride', eqId: eqId, publicationPolicy: 'exclude', cmdId: cmdId }
+        : { action: 'revertPublicationOverride', eqId: eqId, cmdId: cmdId, scope: 'command' };
+      $.ajax({ type: 'POST', url: AJAX_URL, data: data, dataType: 'json' })
         .done(function (resp) {
           var error = M.readPublicationRequestError(resp);
           if (error) { showTypeToast(eqId, '{{Le réglage précédent n’a pas pu être rétabli :}} ' + error, true, null); return; }
@@ -1544,6 +1568,7 @@
     state.busy = true;
     var type = state.choice || null;
     var previous = state.current;
+    var previousPublication = ownPublicationOf(state.eqId, state.cmdId);
     var name = equipmentName(state.eqId);
     state.$error.text('').hide();
     state.$cancel.prop('disabled', true);
@@ -1566,7 +1591,7 @@
           showTypeToast(state.eqId, '{{Type enregistré, mais « Toujours » a été refusé :}} ' + error, true, undoType(state.eqId, state.cmdId, previous));
           return;
         }
-        var undoBoth = undoTypeAnyway(state.eqId, state.cmdId, previous);
+        var undoBoth = undoTypeAnyway(state.eqId, state.cmdId, previous, previousPublication);
         if (outcome.ok) showTypeToast(state.eqId, tp.resultMessage(name, type), false, undoBoth);
         else showTypeToast(state.eqId, publicationProblem(outcome), true, undoBoth);
       });

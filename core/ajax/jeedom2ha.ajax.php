@@ -1158,6 +1158,19 @@ try {
       if ($cmdId !== '') {
         $payload['jeedom_cmd_id'] = (int)$cmdId;
       }
+      // Front v3 (Lot 7) : `scope=command` (cmdId obligatoire) ne retire que le réglage de publication de CETTE commande ;
+      // types HA et réglages des autres commandes intacts (« Annuler » après « Publier quand même »).
+      if (init('scope', '') === 'command') {
+        if ($cmdId === '') {
+          throw new Exception(__('Override de publication invalide', __FILE__));
+        }
+        $payload['scope'] = 'command';
+        $result = jeedom2ha::callDaemon('/action/publication_override_revert', $payload, 'POST', 15);
+        if ($result === null) {
+          throw new Exception(__('Le démon ne répond pas (timeout API) — vérifiez qu\'il est bien démarré', __FILE__));
+        }
+        ajax::success($result);
+      }
       // Front v2 (Lot 6) : `scope=equipment` (sans cmdId) ne retire que le réglage de publication de l'équipement ;
       // absent, comportement inchangé (retour complet en automatique, CC-19).
       $revertScope = init('scope', '');
