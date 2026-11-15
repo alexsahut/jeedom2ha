@@ -11,9 +11,12 @@ interpréteur à `jeedom2ha::deamon_start()`. Constaté sur la VM de démo
 `rsync -a --delete` de l'étape 1b supprimait le venv (absent du staging) et le
 démon ne démarrait plus (`sh: 1: …/resources/python_venv/bin/python3: not found`).
 
-Le bloc distant de l'étape 1b est extrait tel quel du script (pas une copie
-réécrite à la main), puis exécuté localement contre une arborescence
-fictive ; seul `sudo` est remplacé (passe-plat, sans le chown www-data).
+Depuis l'incident du 15/11/2026 (plugin désactivé par Jeedom pendant la
+promotion), l'étape 1b appelle jeedom2ha_promote_plugin_dir de
+scripts/deploy-promote-lib.sh (arbre préparé à côté puis bascule atomique) :
+c'est cette fonction, envoyée telle quelle à la box, qui est exécutée ici
+localement contre une arborescence fictive ; seul `sudo` est remplacé
+(passe-plat, sans le chown www-data ni le changement d'utilisateur).
 
 Rejouer :
     pytest tests/unit/test_deploy_preserve_python_venv.py -v
@@ -29,26 +32,27 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "deploy-to-box.sh"
 
-_STEP_1B_HEADER = 'echo "  1b. sudo promote → ${JEEDOM_BOX_PATH}/"'
+PROMOTE_LIB = REPO_ROOT / "scripts" / "deploy-promote-lib.sh"
 
 # `sudo` passe-plat ; le chown vers www-data est neutralisé (l'utilisateur
-# n'existe pas forcément sur l'hôte de test et n'est pas l'objet du test).
+# n'existe pas forcément sur l'hôte de test et n'est pas l'objet du test), et
+# `sudo -u <user>` exécute la commande sous l'utilisateur courant.
 _SUDO_STUB = '''
 sudo() {
+  if [ "$1" = "-u" ]; then shift 2; fi
   if [ "$1" = "chown" ]; then return 0; fi
   "$@"
 }
 '''
 
 
-def _extract_step_1b_remote_body() -> str:
-    """Corps exact du heredoc distant de l'étape 1b (entre `bash <<REMOTE`
-    et `REMOTE`), extrait de deploy-to-box.sh."""
+def test_step_1b_calls_the_promote_lib():
+    # L'étape 1b du script doit bien passer par la fonction testée ici.
     text = SCRIPT.read_text()
-    start = text.index(_STEP_1B_HEADER)
-    heredoc_open = text.index("bash <<REMOTE\n", start) + len("bash <<REMOTE\n")
-    heredoc_close = text.index("\nREMOTE\n", heredoc_open)
-    return text[heredoc_open:heredoc_close]
+    step = text[text.index('echo "  1b. promotion atomique'):text.index("# 1c — écrire un fichier VERSION")]
+    assert 'cat "${PROMOTE_LIB}"' in step
+    assert "jeedom2ha_promote_plugin_dir" in step
+    assert "rsync -a --delete" not in step
 
 
 def _make_executable(path: Path) -> None:
@@ -61,6 +65,9 @@ def _build_tree(tmp_path: Path) -> "tuple[Path, Path]":
     (staging / "resources" / "daemon" / "main.py").write_text("# daemon\n")
     (staging / "plugin_info").mkdir()
     (staging / "plugin_info" / "packages.json").write_text("{}\n")
+    (staging / "plugin_info" / "info.json").write_text('{"id": "jeedom2ha"}\n')
+    (staging / "core" / "class").mkdir(parents=True)
+    (staging / "core" / "class" / "jeedom2ha.class.php").write_text("<?php\n")
 
     plugin = tmp_path / "plugins" / "jeedom2ha"
     venv_bin = plugin / "resources" / "python_venv" / "bin"
@@ -78,15 +85,11 @@ def _build_tree(tmp_path: Path) -> "tuple[Path, Path]":
 
 
 def _run_step_1b(tmp_path: Path, staging: Path, plugin: Path) -> subprocess.CompletedProcess:
-    body = _extract_step_1b_remote_body()
-    # Le heredoc est non quoté : ${JEEDOM_STAGING_DIR} et ${JEEDOM_BOX_PATH}
-    # sont développés côté poste ; on les fournit ici comme variables shell.
     script = (
         "set -euo pipefail\n"
         f"{_SUDO_STUB}\n"
-        f'JEEDOM_STAGING_DIR="{staging}"\n'
-        f'JEEDOM_BOX_PATH="{plugin}"\n'
-        f"{body}\n"
+        f"source '{PROMOTE_LIB}'\n"
+        f'jeedom2ha_promote_plugin_dir "{staging}" "{plugin}" www-data:www-data\n'
     )
     return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
 
