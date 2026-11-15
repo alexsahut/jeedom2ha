@@ -120,6 +120,20 @@ class LockCapabilities:
     has_unlock: bool = False
 
 
+@dataclass
+class SelectCapabilities:
+    """Select capabilities (story/select-mode).
+
+    has_state: une info d'état (la valeur courante du mode).
+    has_command: au moins une action qui pose une option.
+    has_options: au moins deux options, toutes différentes (valeurs exactes écrites).
+    """
+    has_state: bool = False
+    has_command: bool = False
+    has_options: bool = False
+    options: List[str] = field(default_factory=list)
+
+
 MappingCapabilities = Union[
     LightCapabilities,
     CoverCapabilities,
@@ -129,6 +143,7 @@ MappingCapabilities = Union[
     AlarmCapabilities,
     ValveCapabilities,
     LockCapabilities,
+    SelectCapabilities,  # story/select-mode
 ]
 
 

@@ -46,6 +46,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:  # pragma: no cover - typing only, no runtime mapper dependency (D8)
     from models.mapping import MappingResult
+    from models.topology import JeedomEqLogic, TopologySnapshot
 
 _LOGGER = logging.getLogger(__name__)
 _OVERRIDES_FILENAME = "ha_overrides.json"
@@ -413,6 +414,10 @@ def apply_type_override(
         if not entry:
             continue
         forced_type = entry.get("ha_entity_type")
+        if forced_type == "select" and mapping.ha_entity_type != "select":
+            # story/select-mode — « select » sur une commande est un rôle « Mode » (lu par le mapper
+            # des modes, `with_mode_roles`), jamais un changement de type d'une autre entité.
+            continue
         if not isinstance(forced_type, str) or not forced_type:
             _LOGGER.warning(
                 "[OVERRIDES] Override %s sans 'ha_entity_type' exploitable — ignoré",
@@ -436,6 +441,33 @@ def apply_type_override(
         )
 
     return mapping
+
+
+def mode_roles_for(eq: "JeedomEqLogic", overrides: Optional[Dict[str, dict]]) -> Dict[int, str]:
+    """story/select-mode — rôles « Mode » d'un équipement posés par « Corriger le type ».
+
+    Un override ``ha_entity_type: "select"`` sur une commande info vaut « Mode (état) »
+    (``"state"``), sur une commande action « Mode (commande) » (``"command"``). Lecture pure ;
+    les types génériques Jeedom ne sont jamais touchés (ils alimentent aussi Homebridge).
+    """
+    roles: Dict[int, str] = {}
+    if not overrides:
+        return roles
+    for cmd in eq.cmds:
+        entry = overrides.get(_override_key(eq.id, cmd.id)) or {}
+        if entry.get("ha_entity_type") != "select":
+            continue
+        roles[int(cmd.id)] = "state" if (cmd.type or "").lower() == "info" else "command"
+    return roles
+
+
+def with_mode_roles(snapshot: "TopologySnapshot", eq: "JeedomEqLogic",
+                    overrides: Optional[Dict[str, dict]]) -> "TopologySnapshot":
+    """Snapshot portant les rôles « Mode » de ``eq`` (copie superficielle), ou le même s'il n'y en a pas."""
+    roles = mode_roles_for(eq, overrides)
+    if not roles:
+        return snapshot
+    return replace(snapshot, mode_roles={**(getattr(snapshot, "mode_roles", None) or {}), **roles})
 
 
 def remove_override(jeedom_eq_id: int, jeedom_cmd_id: int, data_dir: str) -> bool:

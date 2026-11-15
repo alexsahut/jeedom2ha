@@ -107,6 +107,15 @@ def normalize_finite_number(value: Any) -> Optional[float]:
     return number if math.isfinite(number) else None
 
 
+def _normalize_raw_text(value: Any) -> Optional[str]:
+    """story/select-mode — valeur écrite par une action, gardée telle quelle (casse et espaces
+    compris) ; None si absente, vide ou non scalaire. Un nombre devient son texte."""
+    if value is None or isinstance(value, (bool, dict, list, tuple)):
+        return None
+    text = str(value)
+    return text if text.strip() else None
+
+
 _SCENARIO_MODES = ("provoke", "schedule", "all")
 
 
@@ -195,6 +204,12 @@ class JeedomCmd:
     # None si absent ou illisible : jamais deviné.
     update_cmd_id: Optional[int] = None
     virtual_info_id: Optional[int] = None
+    # story/select-mode — valeur écrite par l'action dans l'info reliée, texte brut (casse gardée) :
+    # ``updateCmdToValue`` du cœur, ``value`` du plugin virtual ; et liste d'une action de sous-type
+    # « select » (``listValue`` du cœur : ``valeur|libellé;…``). None si absente : jamais devinée.
+    update_cmd_to_value: Optional[str] = None
+    virtual_value: Optional[str] = None
+    list_value: Optional[str] = None
 
     def linked_info_ids(self) -> frozenset:
         """Ids des infos auxquelles cette action est reliée (« Valeur », ``updateCmdId``, ``infoId``)."""
@@ -282,6 +297,9 @@ class TopologySnapshot:
     objects: Dict[int, JeedomObject] = field(default_factory=dict)
     eq_logics: Dict[int, JeedomEqLogic] = field(default_factory=dict)
     scenarios: Dict[int, "JeedomScenario"] = field(default_factory=dict)
+    # story/select-mode — rôles « Mode » posés par « Corriger le type » (cmd_id → "state" | "command"),
+    # jamais écrits dans Jeedom ; injectés par `evaluate_equipment` depuis les overrides.
+    mode_roles: Dict[int, str] = field(default_factory=dict)
 
     @classmethod
     def from_jeedom_payload(cls, payload: Dict[str, Any]) -> "TopologySnapshot":
@@ -330,6 +348,9 @@ class TopologySnapshot:
                             max_value=normalize_finite_number(cmd_raw.get("max_value")),
                             update_cmd_id=normalize_linked_cmd_id(cmd_raw.get("update_cmd_id")),
                             virtual_info_id=normalize_linked_cmd_id(cmd_raw.get("virtual_info_id")),
+                            update_cmd_to_value=_normalize_raw_text(cmd_raw.get("update_cmd_to_value")),
+                            virtual_value=_normalize_raw_text(cmd_raw.get("virtual_value")),
+                            list_value=_normalize_raw_text(cmd_raw.get("list_value")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue

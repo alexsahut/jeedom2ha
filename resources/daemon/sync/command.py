@@ -41,6 +41,8 @@ _LOGGER = logging.getLogger(__name__)
 
 _SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/set$")
 _NODE_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<cmd_id>\d+)/set$")
+# story/select-mode — topic de commande d'un select (espace de noms propre : jamais celui d'un capteur).
+_SELECT_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/select_(?P<cmd_id>\d+)/set$")
 _BRIGHTNESS_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/brightness/set$")
 _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 # Story 24.15 — climate orders: setpoint, mode (heat / off), preset.
@@ -323,6 +325,11 @@ class CommandSynchronizer:
                 cmd_id=int(match.group("cmd_id")),
             ), None
 
+        match = _SELECT_SET_TOPIC_RE.match(topic)
+        if match:
+            # story/select-mode — routé seulement si un select publié de l'équipement le déclare.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel="set"), None
+
         match = _BRIGHTNESS_TOPIC_RE.match(topic)
         if match:
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="brightness"), None
@@ -456,6 +463,12 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "select":
+            # story/select-mode — one command topic per select (node-scoped by its state info).
+            command_topic = (mapping.reason_details or {}).get("command_topic")
+            if isinstance(command_topic, str) and command_topic:
+                topics["set"] = command_topic
+
         if mapping.ha_entity_type == "climate":
             # Story 24.15 — exactly the order topics the discovery declares (publisher
             # ``_build_climate_payload``): setpoint always, mode with a stop order, presets.
@@ -491,6 +504,10 @@ class CommandSynchronizer:
             # was already matched against this button's own discovery topic.
             # P3 — exact comparison on the raw payload (no strip, no case folding).
             return self._translate_button_command(mapping, str(raw_payload))
+
+        if mapping.ha_entity_type == "select":
+            # story/select-mode — the topic was already matched against this select's discovery.
+            return self._translate_select_command(mapping, str(raw_payload))
 
         if mapping.ha_entity_type == "climate":
             # Story 24.15 — the topic was already matched against this climate's discovery.
@@ -746,6 +763,32 @@ class CommandSynchronizer:
         except (TypeError, ValueError):
             return None, "missing_action_command"
         return CommandTranslation(cmd_id=cmd_id, options={}, command_family="valve_open_close"), None
+
+    @staticmethod
+    def _translate_select_command(
+        mapping: MappingResult, payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """story/select-mode — an option runs the action that writes it (exact payload, no folding).
+
+        An action of sub-type ``select`` (``listValue``) receives the option as ``select``; any
+        other payload, or an option whose action is not one of this select's commands, is refused.
+        """
+        option_commands = (mapping.reason_details or {}).get("option_commands") or {}
+        entry = option_commands.get(payload)
+        if not isinstance(entry, dict):
+            return None, "invalid_command_payload"
+        cmd_id = entry.get("cmd_id")
+        own_ids = set()
+        for cmd in (mapping.commands or {}).values():
+            try:
+                own_ids.add(int(cmd.id))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if not isinstance(cmd_id, int) or isinstance(cmd_id, bool) or cmd_id not in own_ids:
+            return None, "missing_action_command"
+        select_value = entry.get("select")
+        options = {"select": select_value} if isinstance(select_value, str) else {}
+        return CommandTranslation(cmd_id=cmd_id, options=options, command_family="select_option"), None
 
     @staticmethod
     def _translate_lock_command(

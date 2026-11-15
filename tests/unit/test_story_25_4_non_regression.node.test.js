@@ -300,6 +300,34 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/tests/unit/test_story_19_2_p1_publication_decision_ref_coherence.py::{\"id\": c, \"name\": n, \"generic_type\": g, \"type\": t, \"sub_type\": st, \"unit\": u}",
   ];
 
+  // story/select-mode : ouverture de `select` dans PRODUCT_SCOPE et dans le registre des publishers (AR13) — les tests
+  // qui figent la liste exacte des types ouverts la suivent. Le code du démon n'a que des ajouts. Admis dans leur fichier.
+  const REPLACED_BY_SELECT_MODE = [
+    "resources/daemon/tests/fixtures/golden_corpus/sync_payload.json::\"update_cmd_id\": \"5708\"",
+    "resources/daemon/tests/fixtures/golden_corpus/sync_payload.json::\"virtual_info_id\": \"5489\"",
+    "resources/daemon/tests/unit/fix_switch_appariement_corpus.py::_cmd(i(5706), \"On_5701\", \"ENERGY_ON\", \"action\", \"other\", **link(update_cmd_id=5708)),",
+    "resources/daemon/tests/unit/fix_switch_appariement_corpus.py::_cmd(i(5707), \"Off_5702\", \"ENERGY_OFF\", \"action\", \"other\", **link(update_cmd_id=5708)),",
+    "resources/daemon/tests/unit/fix_switch_appariement_corpus.py::_cmd(i(5372), \"Absence\", None, \"action\", \"other\", **link(virtual_info_id=5489)),",
+    "resources/daemon/tests/unit/fix_switch_appariement_corpus.py::_cmd(i(5490), \"Manu\", \"ENERGY_ON\", \"action\", \"other\", **link(virtual_info_id=5489)),",
+    "resources/daemon/tests/unit/fix_switch_appariement_corpus.py::_cmd(i(5491), \"auto\", \"ENERGY_OFF\", \"action\", \"other\", **link(virtual_info_id=5489)),",
+    "resources/daemon/tests/unit/test_fix_switch_appariement_etat.py::return app, cli, {\"mqtt\": bridge.calls, \"entities\": entity_commands(app[\"mappings\"])}",
+    "resources/daemon/tests/unit/test_ha_component_registry.py::assert PRODUCT_SCOPE == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::\"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_24_9_serrure_lock.py::assert PRODUCT_SCOPE[-1] == \"lock\"",
+    "resources/daemon/tests/unit/test_story_24_9_serrure_lock.py::assert PublisherRegistry.known_types()[-1] == \"lock\"",
+    "resources/daemon/tests/unit/test_story_7_2_wave_registry.py::NON_WAVE_TYPES = (\"number\", \"select\")  # climate ouvert Story 10.2 — n'est plus hors vague",
+    "resources/daemon/tests/unit/test_story_7_2_wave_registry.py::for component in NON_WAVE_TYPES:",
+    "resources/daemon/tests/unit/test_story_7_2_wave_registry.py::assert PRODUCT_SCOPE == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_7_3_projection_validation_wave.py::assert PRODUCT_SCOPE == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert set(PRODUCT_SCOPE) == {\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"}",
+    "resources/daemon/tests/unit/test_story_7_4_governance_product_scope.py::assert len(PRODUCT_SCOPE) == 10",
+    "resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert set(registry.publishers.keys()) == {\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"}",
+    "resources/daemon/tests/unit/test_story_8_2_publisher_registry.py::assert PublisherRegistry.known_types() == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_9_1_sensor_mapper.py::assert PublisherRegistry.known_types() == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_9_2_binary_sensor_mapper.py::assert PublisherRegistry.known_types() == [\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"]",
+    "resources/daemon/tests/unit/test_story_9_3_button_mapper.py::\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"",
+  ];
+
   it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
     const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
     if (diff !== null) assert.equal(diff, '');
@@ -327,7 +355,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
         && !REPLACED_BY_24_15.includes(`${f}::${line}`)
         && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`)
         && !REPLACED_BY_24_17.includes(`${f}::${line}`)
-        && !REPLACED_BY_FIX_SWITCH_APPARIEMENT.includes(`${f}::${line}`))
+        && !REPLACED_BY_FIX_SWITCH_APPARIEMENT.includes(`${f}::${line}`)
+        && !REPLACED_BY_SELECT_MODE.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

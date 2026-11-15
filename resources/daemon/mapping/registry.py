@@ -12,6 +12,7 @@ from mapping.fallback import FallbackMapper
 from mapping.light import LightMapper
 from mapping.lock import LockMapper
 from mapping.presence_switch import PresenceSwitchMapper
+from mapping.select import SelectMapper
 from mapping.sensor import SensorMapper
 from mapping.switch import SwitchMapper
 from mapping.valve import ValveMapper
@@ -46,6 +47,10 @@ class MapperRegistry:
         # reconnue avant le binary_sensor `lock` et avant le bouton (24.12 refuse l'appui
         # sur les familles LOCK_*), qu'elle remplace explicitement.
         self._lock_mapper = LockMapper()
+        # story/select-mode — les modes (select) s'ajoutent APRÈS toutes les autres entités : ils
+        # n'en remplacent aucune, ne changent ni leur nom ni leurs topics, et ne sont jamais primaires
+        # tant qu'une autre entité existe.
+        self._select_mapper = SelectMapper()
 
     @property
     def mappers(self) -> List[object]:
@@ -73,6 +78,27 @@ class MapperRegistry:
         return primary
 
     def map_all(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
+        """story/select-mode — projection d'avant (``_map_all_base``), puis les select en ajout.
+
+        Les entités d'avant sont rendues telles quelles (même ordre, mêmes noms, mêmes commandes) ;
+        sans entité d'avant, les select suivent la règle du nom (un seul : nom de l'équipement).
+        """
+        before = self._map_all_base(eq, snapshot)
+        # Une commande déjà portée par une entité (info d'un capteur, ordre d'un volet, d'une lumière,
+        # d'une serrure…) ne passe jamais dans un select ; un identifiant déjà pris non plus.
+        carried = set()
+        for result in before:
+            carried |= self._result_cmd_ids(result)
+        selects = self._select_mapper.map_all(
+            eq, snapshot, carried_cmd_ids=carried, taken_unique_ids={r.ha_unique_id for r in before},
+        )
+        if not selects:
+            return before
+        if not before:
+            return self._apply_entity_name_rule(eq, selects)
+        return [*before, *selects]
+
+    def _map_all_base(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         """API additive Story 11.1 : retourne tous les mappings du premier mapper
         qui reconnaît l'eqLogic.
 

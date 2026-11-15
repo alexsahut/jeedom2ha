@@ -894,6 +894,49 @@
           "topic": "jeedom2ha/bridge/status"
         },
         {
+          "topic": "jeedom2ha/554/availability"
+        }
+      ],
+      "availability_mode": "all",
+      "command_topic": "jeedom2ha/554/select_5489/set",
+      "default_entity_id": "select.jeedom2ha_554_select_5489",
+      "device": {
+        "identifiers": [
+          "jeedom2ha_554"
+        ],
+        "manufacturer": "Jeedom (virtual)",
+        "model": "virtual",
+        "name": "Chauffe-eau",
+        "suggested_area": "Salon",
+        "via_device": "jeedom2ha_bridge"
+      },
+      "name": "etat",
+      "object_id": "jeedom2ha_554_select_5489",
+      "optimistic": false,
+      "options": [
+        "Absence",
+        "manu",
+        "auto"
+      ],
+      "origin": {
+        "name": "jeedom2ha",
+        "sw_version": "0.2.0"
+      },
+      "payload_available": "online",
+      "payload_not_available": "offline",
+      "state_topic": "jeedom2ha/554/select_5489/state",
+      "unique_id": "jeedom2ha_eq_554_select_5489"
+    },
+    "retain": true,
+    "topic": "homeassistant/select/jeedom2ha_554_select_5489/config"
+  },
+  {
+    "payload": {
+      "availability": [
+        {
+          "topic": "jeedom2ha/bridge/status"
+        },
+        {
           "topic": "jeedom2ha/583/availability"
         }
       ],

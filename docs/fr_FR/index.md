@@ -19,7 +19,7 @@ L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleu
    - [La pièce et la fiche](#la-pièce-et-la-fiche) · [Corriger le type](#corriger-le-type) · [Choisir ce qui est publié](#choisir-ce-qui-est-publié) ([Exclure une pièce](#exclure-une-pièce))
    - [Les scénarios](#les-scénarios) · [Configuration](#configuration) · [Vérifier l'installation](#vérifier-linstallation) · [Le guide de démarrage](#le-guide-de-démarrage)
 6. [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
-   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures)
+   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures) · [Modes](#modes-listes-de-choix)
    - [Les causes de blocage](#les-causes-de-blocage) · [Les conseils](#les-conseils)
 7. [Les états et les compteurs](compteurs.md) — le détail des chiffres (page séparée).
 8. [Dépannage](#dépannage)
@@ -488,6 +488,23 @@ Un équipement Jeedom qui porte les types « Serrure » du cœur (`LOCK_STATE` p
 - **La serrure remplace les entités qui utilisaient ses commandes** : le capteur binaire de classe « serrure » (`binary_sensor`) ou un bouton sur `LOCK_OPEN` / `LOCK_CLOSE` est retiré et remplacé par la serrure, sous un nouvel identifiant ; pensez à reprendre les automatisations qui l'utilisaient. Les autres entités de l'équipement restent publiées comme avant, avec les mêmes identifiants.
 - **Assist et commande vocale** : le plugin ne règle jamais l'exposition des entités à Assist. Exposer la serrure à Assist, et donc permettre de la déverrouiller à la voix, est un choix que vous faites dans Home Assistant (Paramètres > Assistants vocaux > Exposer) ; aucune valeur par défaut du plugin ne l'expose.
 - Identifiant de l'entité : `lock.jeedom2ha_<équipement>_<commande d'état>`.
+
+### Modes (listes de choix)
+
+Une info texte de Jeedom dont la valeur est posée par **au moins deux actions**, chacune écrivant une valeur fixe différente (par exemple un chauffe-eau virtuel dont trois actions écrivent `manu`, `auto` et `Absence` dans l'info « etat »), est publiée comme une **liste de choix** (`select`). Le plugin la reconnaît, dans cet ordre :
+
+1. les types « Mode » du cœur : `MODE_STATE` pour l'info, `MODE_SET_STATE` pour chaque action. Dès qu'une action est reliée à l'info, **seules les actions reliées** comptent (une action « Rejouer » ou « Mode suivant » non reliée n'est jamais un choix). Le choix est la valeur que l'action écrit ; une action reliée par la seule commande d'état liée (« Valeur » du cœur), sans valeur écrite connue, donne son **nom** quand l'info est de sous-type texte : c'est le plugin qui écrit ce nom dans l'info (plugin Mode, convention suivie par Homebridge). Si aucune action de l'équipement n'est reliée à l'info, le choix est le **nom** de l'action (convention du type générique « Mode », lue aussi par Homebridge) ; si une action est reliée à l'info sans être un choix (typée autrement, ou déjà portée par une autre entité), les actions non reliées restantes ne deviennent pas des choix ;
+2. une action de sous-type « Liste » reliée à l'info (commande d'état liée) : les choix sont les **libellés** de sa liste (`valeur|libellé;…`) ; choisir un libellé envoie sa valeur, et la valeur lue dans l'info (« 2.0 » vaut « 2 ») s'affiche par son libellé ;
+3. des actions reliées à l'info : « Commande information à mettre à jour » et « Valeur de l'information » de l'action, ou, pour un virtuel, l'info que l'action écrit et sa « Valeur ».
+
+- **Choix** : les valeurs exactes écrites, casse et espaces compris (`manu`, `auto`, `Absence`).
+- **État** : la valeur de l'info. Une valeur qui n'est pas un des choix donne un état **inconnu** dans Home Assistant, jamais un choix inventé.
+- **Ordre** : choisir une option dans Home Assistant exécute l'action qui l'écrit (une action « Liste » reçoit la valeur choisie). Toute autre valeur est refusée.
+- **Pas de liste** quand : moins de deux choix, deux actions écrivent la même valeur, ou deux actions « Liste » visent la même info. Une action reliée dont la valeur n'est pas fixe (calcul, `#…#`) n'est jamais un choix (avertissement dans le journal du démon).
+- **Jamais en double** : si l'info **ou une seule** des actions est déjà portée par une autre entité de l'équipement (un capteur qui publie l'info, l'ordre d'un volet, d'une lumière, d'un interrupteur, d'une serrure…), il n'y a pas de liste ; l'entité existante reste seule. Les familles sensibles ne deviennent jamais une liste : serrure, alarme, sirène, portail, vanne, arrosage, et les ordres de volet, de lumière, de chauffage et de thermostat.
+- **En ajout seulement** : la liste s'ajoute aux entités de l'équipement, sans en remplacer ni en changer aucune. L'interrupteur, les capteurs ou les boutons gardent leurs identifiants et leurs topics.
+- **Voie manuelle** : quand un seul côté est reconnu, « Corriger le type » complète l'autre, et l'aperçu montre la liste avant d'enregistrer. Sur une info texte dont les actions portent déjà le type `MODE_SET_STATE`, il propose **« Mode (état) »** ; sur une action d'un équipement dont l'info porte déjà `MODE_STATE` (ou a reçu « Mode (état) »), il propose **« Mode (commande) »**, action par action (la liste gagne un choix à chaque action). Une commande sans équivalent dans Home Assistant garde ce lien dans la liste repliée des commandes ignorées (« Mode (état)… », « Mode (commande)… »). Quand ni l'info ni les actions ne sont reconnues, rien n'est proposé. Ce réglage reste dans le plugin : **les types génériques de Jeedom ne sont jamais modifiés** (ils servent aussi à Homebridge et HomeKit).
+- Identifiant de l'entité : `select.jeedom2ha_<équipement>_select_<info d'état>` (un espace de noms propre : il ne peut pas rencontrer celui d'un capteur).
 
 ### Les causes de blocage
 

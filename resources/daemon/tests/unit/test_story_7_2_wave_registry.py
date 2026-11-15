@@ -20,7 +20,8 @@ from validation.ha_component_registry import (
 
 
 WAVE_TARGETS = ("sensor", "binary_sensor")
-NON_WAVE_TYPES = ("number", "select")  # climate ouvert Story 10.2 — n'est plus hors vague
+NON_WAVE_TYPES = ("number",)  # climate ouvert Story 10.2, select ouvert story/select-mode — plus hors vague
+KNOWN_NON_WAVE_TYPES = ("number", "select")  # story/select-mode : select reste décrit tel quel dans le registre
 
 EXPECTED_NON_WAVE_REGISTRY = {
     "number": {
@@ -61,7 +62,7 @@ def test_has_state_reason_mapping_is_declared():
 
 def test_non_wave_registry_entries_unchanged():
     """AC2 — les types hors vague restent strictement inchanges."""
-    for component in NON_WAVE_TYPES:
+    for component in KNOWN_NON_WAVE_TYPES:
         assert HA_COMPONENT_REGISTRY[component] == EXPECTED_NON_WAVE_REGISTRY[component]
 
 
@@ -78,7 +79,7 @@ def test_product_scope_snapshot_with_wave_open():
     Story 10.2 a ouvert climate sous FR40/NFR10.
     Story 10.3 a ouvert alarm_control_panel sous FR40/NFR10.
     """
-    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock"]
+    assert PRODUCT_SCOPE == ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock", "select"]
     for component in NON_WAVE_TYPES:
         assert component not in PRODUCT_SCOPE
 

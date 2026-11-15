@@ -56,6 +56,7 @@ STATE_NONE = "none"
 
 # Domaines HA dotés d'un command_topic : sans retour d'état en streaming, ils restent optimistes.
 _ACTUATOR_TYPES = frozenset({"light", "cover", "switch", "climate", "alarm_control_panel", "valve", "lock"})
+_ACTUATOR_TYPES = _ACTUATOR_TYPES | {"select"}  # story/select-mode
 
 _PUBLICATION_VALUES = frozenset({"exclude", "force_publish"})
 

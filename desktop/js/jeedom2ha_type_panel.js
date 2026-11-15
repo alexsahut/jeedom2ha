@@ -38,6 +38,7 @@
     cover: { article: 'un', one: 'volet', many: 'volets' },
     light: { article: 'une', one: 'lumière', many: 'lumières' },
     lock: { article: 'une', one: 'serrure', many: 'serrures' },
+    select: { article: 'un', one: 'mode', many: 'modes' }, // story/select-mode
     sensor: { article: 'un', one: 'capteur', many: 'capteurs' },
     switch: { article: 'un', one: 'interrupteur', many: 'interrupteurs' },
     valve: { article: 'une', one: 'vanne', many: 'vannes' },
@@ -47,6 +48,10 @@
   // projection rejouée avec ce type est invalide), pas POURQUOI. Aucune raison n'est devinée ici (revue du Lot 5) : sans
   // raison fournie par le démon, une seule phrase vraie.
   var NOT_OFFERED_REASON = 'non proposé par le plugin pour cette commande';
+
+  // story/select-mode : rôles « Mode » d'une commande (réglage du plugin ; les types génériques de Jeedom ne changent pas).
+  var MODE_STATE_LABEL = 'Mode (état)';
+  var MODE_COMMAND_LABEL = 'Mode (commande)';
 
   function M() {
     return mapping();
@@ -72,11 +77,27 @@
     return M().formatHaDomain(type);
   }
 
+  /**
+   * story/select-mode — libellé d'un choix : « Mode (état) » pour une info, « Mode (commande) » pour une action (champ
+   * `mode_role` du démon) ; les autres types gardent « Lumière (light) ».
+   */
+  function choiceLabel(type, row) {
+    if (type !== 'select') return typeLabel(type);
+    return isObject(row) && row.mode_role === 'state' ? MODE_STATE_LABEL : MODE_COMMAND_LABEL;
+  }
+
+  function choiceHint(type, row) {
+    if (type !== 'select') return null;
+    return isObject(row) && row.mode_role === 'state'
+      ? 'cette info donne le mode en cours ; ses valeurs deviennent les choix d’une liste dans Home Assistant'
+      : 'cette action pose un mode ; elle devient un choix de la liste dans Home Assistant';
+  }
+
   /** « Personnalisé : Lumière (light) » ou « Automatique » : texte du lien de la colonne « Type HA ».
    * Front v2 (Lot 9a, regard neuf v2) : « Automatique » (le mot du réglage) au lieu de « auto », illisible comme lien. */
   function cellLabel(row) {
     var r = row || {};
-    return r.override_applied === true ? 'Personnalisé : ' + typeLabel(r.effective_ha) : 'Automatique';
+    return r.override_applied === true ? 'Personnalisé : ' + choiceLabel(r.effective_ha, r) : 'Automatique';
   }
 
   /**
@@ -143,10 +164,12 @@
       checked: current === null,
     }];
     allowed.forEach(function (type) {
-      choices.push({ value: type, label: typeLabel(type), hint: null, disabled: false, reason: null, checked: type === current });
+      choices.push({ value: type, label: choiceLabel(type, row), hint: choiceHint(type, row), disabled: false, reason: null, checked: type === current });
     });
     all.forEach(function (type) {
       if (allowed.indexOf(type) !== -1) return;
+      // story/select-mode : le rôle « Mode » n'est montré que là où le démon le propose (sinon il n'a pas de sens).
+      if (type === 'select') return;
       choices.push({
         value: type, label: typeLabel(type), hint: null, disabled: true, reason: impossibleReason(), checked: false,
       });
@@ -327,6 +350,7 @@
     TYPE_NOUNS: TYPE_NOUNS,
     typeLabel: typeLabel,
     cellLabel: cellLabel,
+    choiceLabel: choiceLabel,
     scopeOf: scopeOf,
     impossibleReason: impossibleReason,
     buildChoices: buildChoices,

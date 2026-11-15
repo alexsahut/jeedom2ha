@@ -152,8 +152,8 @@ def test_lock_is_known_and_open_in_the_same_increment():
         "required_fields": ["state_topic", "command_topic", "platform", "availability"],
         "required_capabilities": ["has_state", "has_command"],
     }
-    assert PRODUCT_SCOPE[-1] == "lock"
-    assert PublisherRegistry.known_types()[-1] == "lock"
+    assert "lock" in PRODUCT_SCOPE  # story/select-mode : select ouvert après lock
+    assert "lock" in PublisherRegistry.known_types()
 
 
 def test_validate_projection_nominal_case():

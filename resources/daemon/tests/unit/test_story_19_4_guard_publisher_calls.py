@@ -109,6 +109,7 @@ _KNOWN_TYPES = [
     "binary_sensor", "button", "climate", "alarm_control_panel",
     "valve",  # Story 24.8
     "lock",  # Story 24.9
+    "select",  # story/select-mode
 ]
 
 

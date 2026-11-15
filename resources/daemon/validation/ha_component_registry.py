@@ -20,6 +20,7 @@ from models.mapping import (
     LightCapabilities,
     LockCapabilities,
     ProjectionValidity,
+    SelectCapabilities,
     SensorCapabilities,
     SwitchCapabilities,
     ValveCapabilities,
@@ -86,6 +87,7 @@ HA_COMPONENT_REGISTRY = {
 }
 
 PRODUCT_SCOPE = ["light", "cover", "switch", "sensor", "binary_sensor", "button", "climate", "alarm_control_panel", "valve", "lock"]  # climate ouvert Story 10.2 sous FR40/NFR10 # alarm_control_panel ouvert Story 10.3 sous FR40/NFR10 # valve ouvert Story 24.8 sous FR40/NFR10 # lock ouvert Story 24.9 sous FR40/NFR10
+PRODUCT_SCOPE = PRODUCT_SCOPE + ["select"]  # select ouvert story/select-mode sous FR40/NFR10 (AR13 : registre, preuves validate_projection, contrat 4D)
 # AR13 : toute modification de PRODUCT_SCOPE exige simultanement dans le meme increment :
 #   (1) entree dans HA_COMPONENT_REGISTRY avec required_fields + required_capabilities,
 #   (2) au moins un cas nominal + un cas d'echec validate_projection() pour ce type,
@@ -185,6 +187,12 @@ def _cross_family_action_mismatch(ha_entity_type: str, capabilities: object) -> 
     # par la capacité `has_setpoint` (motif ha_missing_temperature_command_topic, inchangé).
     if isinstance(capabilities, ClimateCapabilities):
         return ha_entity_type not in ("climate", "sensor", "binary_sensor")
+    # story/select-mode — un mode ne se pilote que par ses options, routées par `_translate_command`
+    # pour le seul type `select` : forcé vers un autre actionneur, il serait impilotable ; le lire en
+    # capteur (sensor) reste honnête. Une autre famille forcée en `select` est refusée par la capacité
+    # `has_options` (motif ha_missing_required_option).
+    if isinstance(capabilities, SelectCapabilities):
+        return ha_entity_type not in ("select", "sensor")
     if ha_entity_type in ("light", "switch"):
         return isinstance(capabilities, CoverCapabilities)
     if ha_entity_type == "cover":

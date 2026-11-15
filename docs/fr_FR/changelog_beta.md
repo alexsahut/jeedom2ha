@@ -6,6 +6,14 @@
 
 ---
 
+# 2026-11-15 — Modes publiés en liste de choix
+
+- Un **mode** Jeedom (une info texte posée par plusieurs actions qui écrivent chacune une valeur fixe, par exemple `manu`, `auto` ou `Absence` pour un chauffe-eau virtuel) est publié dans Home Assistant comme une **liste de choix** (`select`) : les choix sont les valeurs exactes, l'état suit l'info (une valeur inconnue donne un état inconnu), et choisir une option exécute l'action qui l'écrit.
+- Reconnu par les types « Mode » du cœur (`MODE_STATE` / `MODE_SET_STATE`), par une action « Liste » reliée à l'info, ou par les actions reliées à l'info. Quand un seul côté est reconnu, « Corriger le type » complète l'autre : **« Mode (état) »** sur l'info, **« Mode (commande) »** sur une action, sans jamais modifier les types génériques de Jeedom.
+- La liste **s'ajoute** aux entités de l'équipement : aucune entité, aucun identifiant ni aucun topic existant ne change.
+
+---
+
 # 2026-11-15 — Interrupteur : la bonne paire On / Off
 
 - Un équipement qui porte **plusieurs ordres On et Off** (par exemple un chauffe-eau virtuel dont une paire pilote le relais et une autre change un mode) : l'interrupteur de Home Assistant utilise maintenant la paire **reliée à l'état** de l'appareil, au lieu de la dernière lue. Le lien se lit dans Jeedom : pour un virtuel, « Commande information à mettre à jour » de l'action (ou l'info qu'elle écrit) ; pour un autre plugin, la commande d'état liée de l'action.

@@ -7,6 +7,9 @@ Corpus doré + trois équipements de démonstration du Front v2 (Lot 3), auxquel
 - le même chauffe-eau sans aucun lien (PHP d'avant, ou liens absents dans Jeedom) : cas ambigu ;
 - des équipements à une seule paire, reliée ou non, pour prouver qu'ils ne bougent pas.
 
+story/select-mode : le chauffe-eau porte aussi les valeurs écrites (``update_cmd_to_value``,
+``virtual_value``) que le PHP du Lot B exporte ; le correctif du switch ne les lit pas.
+
 Noms et identifiants fictifs, sauf les ids de commandes du chauffe-eau (déjà dans le corpus de la
 story 11.2). Aucun nom réel, aucune adresse. Ce module ne dépend que de la bibliothèque standard :
 il est aussi chargé par chemin pour capturer la ligne de base sur le code d'avant.
@@ -55,14 +58,14 @@ def chauffe_eau_cmds(offset: int = 0, links: bool = True) -> List[Dict[str, Any]
     return [
         _cmd(i(5205), "Routage", None, "info", "numeric", unit="%"),
         _cmd(i(5530), "Routage réel", "ENERGY_STATE", "info", "numeric", unit="%"),
-        _cmd(i(5706), "On_5701", "ENERGY_ON", "action", "other", **link(update_cmd_id=5708)),
-        _cmd(i(5707), "Off_5702", "ENERGY_OFF", "action", "other", **link(update_cmd_id=5708)),
+        _cmd(i(5706), "On_5701", "ENERGY_ON", "action", "other", **link(update_cmd_id=5708, update_cmd_to_value="1")),
+        _cmd(i(5707), "Off_5702", "ENERGY_OFF", "action", "other", **link(update_cmd_id=5708, update_cmd_to_value="0")),
         _cmd(i(5204), "Rafraichir", None, "action", "other"),
         _cmd(i(5206), "Puissance", None, "info", "numeric", unit="W"),
         _cmd(i(5489), "etat", None, "info", "string"),
-        _cmd(i(5372), "Absence", None, "action", "other", **link(virtual_info_id=5489)),
-        _cmd(i(5490), "Manu", "ENERGY_ON", "action", "other", **link(virtual_info_id=5489)),
-        _cmd(i(5491), "auto", "ENERGY_OFF", "action", "other", **link(virtual_info_id=5489)),
+        _cmd(i(5372), "Absence", None, "action", "other", **link(virtual_info_id=5489, virtual_value="Absence")),
+        _cmd(i(5490), "Manu", "ENERGY_ON", "action", "other", **link(virtual_info_id=5489, virtual_value="manu")),
+        _cmd(i(5491), "auto", "ENERGY_OFF", "action", "other", **link(virtual_info_id=5489, virtual_value="auto")),
         _cmd(i(5510), "chauffe complète dans la journée", None, "info", "binary"),
         _cmd(i(5535), "CE Kwh chauffe complete", None, "info", "numeric", unit="kWh"),
         _cmd(i(5708), "activé", "ENERGY_STATE", "info", "binary"),

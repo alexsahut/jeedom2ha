@@ -156,7 +156,8 @@
           "name": "On_5701",
           "sub_type": "other",
           "type": "action",
-          "update_cmd_id": "5708"
+          "update_cmd_id": "5708",
+          "update_cmd_to_value": "1"
         },
         {
           "generic_type": "ENERGY_OFF",
@@ -164,7 +165,8 @@
           "name": "Off_5702",
           "sub_type": "other",
           "type": "action",
-          "update_cmd_id": "5708"
+          "update_cmd_id": "5708",
+          "update_cmd_to_value": "0"
         },
         {
           "generic_type": null,
@@ -194,7 +196,8 @@
           "name": "Absence",
           "sub_type": "other",
           "type": "action",
-          "virtual_info_id": "5489"
+          "virtual_info_id": "5489",
+          "virtual_value": "Absence"
         },
         {
           "generic_type": "ENERGY_ON",
@@ -202,7 +205,8 @@
           "name": "Manu",
           "sub_type": "other",
           "type": "action",
-          "virtual_info_id": "5489"
+          "virtual_info_id": "5489",
+          "virtual_value": "manu"
         },
         {
           "generic_type": "ENERGY_OFF",
@@ -210,7 +214,8 @@
           "name": "auto",
           "sub_type": "other",
           "type": "action",
-          "virtual_info_id": "5489"
+          "virtual_info_id": "5489",
+          "virtual_value": "auto"
         },
         {
           "generic_type": null,

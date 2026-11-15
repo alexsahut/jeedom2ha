@@ -296,7 +296,11 @@ async def _project(aiohttp_client, links):
     cli = await aiohttp_client(app)
     resp = await cli.post("/action/sync", json=sync_body(load_scene(links), "appariement"), headers=H)
     assert resp.status == 200, await resp.text()
-    return app, cli, {"mqtt": bridge.calls, "entities": entity_commands(app["mappings"])}
+    # story/select-mode : les select AJOUTÉS (mode du chauffe-eau) sont prouvés à part
+    # (test_story_select_mode.py, ligne de base prise sur ce correctif) ; ils sont écartés ici.
+    calls = [c for c in bridge.calls if not c["topic"].startswith("homeassistant/select/")]
+    entities = {u: e for u, e in entity_commands(app["mappings"]).items() if e["type"] != "select"}
+    return app, cli, {"mqtt": calls, "entities": entities}
 
 
 def _baseline():
