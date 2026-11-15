@@ -270,6 +270,36 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     ],
   };
 
+  // Correctif fix/switch-appariement-etat : le mapper de présence actionnable garde toutes les actions SET_ON / SET_OFF (et non
+  // la dernière vue) pour apparier la paire reliée à l'état ; les mappers de capteurs lisent l'état retenu du switch par la
+  // même fonction (`energy_state_of`) au lieu du dernier ENERGY_STATE vu ; le corpus doré et les fixtures du chauffe-eau reçoivent les liens
+  // que le PHP exporte désormais, et la capture dorée 8.4 passe de la paire « Manu / auto » à la paire du relais. Admis dans
+  // leur fichier seulement.
+  const REPLACED_BY_FIX_SWITCH_APPARIEMENT = [
+    "resources/daemon/mapping/presence_switch.py::from typing import Dict, Optional",
+    "resources/daemon/mapping/presence_switch.py::set_on_cmd: Optional[JeedomCmd] = None",
+    "resources/daemon/mapping/presence_switch.py::set_off_cmd: Optional[JeedomCmd] = None",
+    "resources/daemon/mapping/presence_switch.py::set_on_cmd = cmd",
+    "resources/daemon/mapping/presence_switch.py::set_off_cmd = cmd",
+    "resources/daemon/mapping/presence_switch.py::if presence_cmd is None or set_on_cmd is None or set_off_cmd is None:",
+    "resources/daemon/mapping/sensor.py::state_cmds = [other for other in eq.cmds if other.generic_type == \"ENERGY_STATE\"]",
+    "resources/daemon/mapping/sensor.py::return has_action and bool(state_cmds) and state_cmds[-1].id == cmd.id",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_id\": 5490,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_name\": \"Manu\",",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_id\": 5491,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_name\": \"auto\",",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"command_id\": 5490,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"command_id\": 5491,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_id\": 5706,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_name\": \"On_5701\",",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_id\": 5707,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"cmd_name\": \"Off_5702\",",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"id\": 5491,",
+    "resources/daemon/tests/fixtures/golden_corpus/expected_sync_snapshot.json::\"id\": 5490,",
+    "resources/daemon/tests/fixtures/golden_corpus/sync_payload.json::\"type\": \"action\"",
+    "resources/daemon/tests/unit/test_story_19_2_p1_publication_decision_ref_coherence.py::{\"id\": c, \"name\": n, \"generic_type\": g, \"type\": t, \"sub_type\": st, \"unit\": u}",
+  ];
+
   it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
     const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
     if (diff !== null) assert.equal(diff, '');
@@ -296,7 +326,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
         && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`)
         && !REPLACED_BY_24_15.includes(`${f}::${line}`)
         && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`)
-        && !REPLACED_BY_24_17.includes(`${f}::${line}`))
+        && !REPLACED_BY_24_17.includes(`${f}::${line}`)
+        && !REPLACED_BY_FIX_SWITCH_APPARIEMENT.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

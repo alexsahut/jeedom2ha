@@ -618,6 +618,8 @@
     duplicate_generic_types: 'types génériques en double',
     switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours »',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
+    // fix/switch-appariement-etat — plusieurs paires On/Off, aucune reliée de façon sûre à l'info d'état.
+    switch_pairing_ambiguous: 'plusieurs ordres On/Off — reliez à l’état, dans Jeedom, ceux qui pilotent l’appareil',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',
     no_supported_generic_type: 'type non couvert par la V1 du plugin',
@@ -660,6 +662,7 @@
   // est portée par le mapping dans `reason_code` et doit donc passer avant lui.
   function causeCandidates(d) {
     var preciseAmbiguity = ['name_heuristic_rejection', 'duplicate_generic_types', 'switch_state_orphan'];
+    preciseAmbiguity.push('switch_pairing_ambiguous'); // fix/switch-appariement-etat
     return d.publication_reason === 'ambiguous_skipped' && preciseAmbiguity.indexOf(d.reason_code) !== -1
       ? [d.reason_code, d.publication_reason, d.validity_reason_code]
       : [d.publication_reason, d.reason_code, d.validity_reason_code];
@@ -832,6 +835,7 @@
       'switch_state_orphan', 'probable_skipped', 'low_confidence', 'no_generic_type_configured', 'no_mapping',
       'skipped_no_mapping_candidate', 'ha_missing_command_topic', 'ha_missing_state_topic', 'discovery_publish_failed',
       'no_projection_possible',
+      'switch_pairing_ambiguous', // fix/switch-appariement-etat
     ],
     state: [
       'disabled_eqlogic', 'excluded_eqlogic', 'excluded_plugin', 'excluded_object', 'publication_excluded_eqlogic',

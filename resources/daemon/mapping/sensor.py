@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from models.mapping import MappingResult, SensorCapabilities
+from mapping.pairing import energy_state_of  # fix/switch-appariement-etat
 from models.topology import (
     MULTI_SENSOR_EQ_TYPES,
     JeedomCmd,
@@ -163,8 +164,10 @@ def _is_actionable_readback_consumed_by_switch(cmd: JeedomCmd, eq: JeedomEqLogic
     generic_type = cmd.generic_type
     if generic_type == "ENERGY_STATE":
         has_action = any(other.generic_type in {"ENERGY_ON", "ENERGY_OFF"} for other in eq.cmds)
-        state_cmds = [other for other in eq.cmds if other.generic_type == "ENERGY_STATE"]
-        return has_action and bool(state_cmds) and state_cmds[-1].id == cmd.id
+        # fix/switch-appariement-etat — même état retenu que le switch (``energy_state_of``) : plus
+        # « le dernier ENERGY_STATE vu », qui dépendait de l'ordre des commandes dans Jeedom.
+        retained = energy_state_of(eq)
+        return has_action and retained is not None and retained.id == cmd.id
     if generic_type == "SWITCH_STATE":
         key = _switch_group_key(cmd.name)
         group_types = {

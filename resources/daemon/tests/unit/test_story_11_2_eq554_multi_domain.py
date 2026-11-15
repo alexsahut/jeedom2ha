@@ -74,6 +74,17 @@ _EXPECTED_SENSOR_CMD_IDS = {
 _EXPECTED_BINARY_CMD_ID = 5510  # #5708 (ENERGY_STATE) volontairement exclu
 
 
+# fix/switch-appariement-etat — liens exportés par le PHP (updateCmdId du cœur, infoId du virtual) :
+# la paire On/Off du relais est reliée à l'état « activé », la paire Manu/auto au mode « etat ».
+_EQ554_LINKS = {
+    5706: {"update_cmd_id": 5708},
+    5707: {"update_cmd_id": 5708},
+    5490: {"virtual_info_id": 5489},
+    5491: {"virtual_info_id": 5489},
+    5372: {"virtual_info_id": 5489},
+}
+
+
 def _eq554() -> JeedomEqLogic:
     return JeedomEqLogic(
         id=554,
@@ -88,6 +99,7 @@ def _eq554() -> JeedomEqLogic:
                 type=cmd_type,
                 sub_type=sub_type,
                 unit=unit,
+                **_EQ554_LINKS.get(cmd_id, {}),
             )
             for cmd_id, name, cmd_type, sub_type, generic_type, unit in _EQ554_CMDS
         ],
@@ -386,6 +398,7 @@ def _eq554_cmd_payload():
             "type": cmd_type,
             "sub_type": sub_type,
             "unit": unit,
+            **{k: str(v) for k, v in _EQ554_LINKS.get(cmd_id, {}).items()},
         }
         for cmd_id, name, cmd_type, sub_type, generic_type, unit in _EQ554_CMDS
     ]

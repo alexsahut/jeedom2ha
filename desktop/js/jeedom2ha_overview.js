@@ -421,6 +421,7 @@
     duplicate_generic_types: '{{Types génériques en double}}',
     conflicting_generic_types: '{{Types génériques en conflit}}',
     switch_state_orphan: '{{Aucun ordre On / Off}}',
+    switch_pairing_ambiguous: '{{Ordres On / Off en double}}',
     probable_skipped: '{{Type pas assez sûr}}',
     low_confidence: '{{Type pas assez sûr}}',
     no_supported_generic_type: '{{Type non pris en charge}}',

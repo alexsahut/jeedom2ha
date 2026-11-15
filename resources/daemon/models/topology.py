@@ -188,6 +188,21 @@ class JeedomCmd:
     # cœur) ; None si absentes ou non numériques (jamais devinées).
     min_value: Optional[float] = None
     max_value: Optional[float] = None
+    # fix/switch-appariement-etat — info reliée à une action, lue en lecture seule :
+    # - cœur Jeedom, toute commande action : configuration ``updateCmdId`` (id de l'info mise à
+    #   jour après l'exécution) ;
+    # - plugin virtual : configuration ``infoId`` (id de l'info virtuelle écrite par l'action).
+    # None si absent ou illisible : jamais deviné.
+    update_cmd_id: Optional[int] = None
+    virtual_info_id: Optional[int] = None
+
+    def linked_info_ids(self) -> frozenset:
+        """Ids des infos auxquelles cette action est reliée (« Valeur », ``updateCmdId``, ``infoId``)."""
+        return frozenset(
+            cmd_id
+            for cmd_id in (self.linked_value, self.update_cmd_id, self.virtual_info_id)
+            if cmd_id is not None
+        )
 
 @dataclass
 class JeedomEqLogic:
@@ -313,6 +328,8 @@ class TopologySnapshot:
                             linked_value=normalize_linked_cmd_id(cmd_raw.get("linked_value")),
                             min_value=normalize_finite_number(cmd_raw.get("min_value")),
                             max_value=normalize_finite_number(cmd_raw.get("max_value")),
+                            update_cmd_id=normalize_linked_cmd_id(cmd_raw.get("update_cmd_id")),
+                            virtual_info_id=normalize_linked_cmd_id(cmd_raw.get("virtual_info_id")),
                         ))
                     except (ValueError, TypeError, KeyError):
                         continue
