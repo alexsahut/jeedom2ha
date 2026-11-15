@@ -206,7 +206,18 @@
   /** Scénarios dont le bouton dans Home Assistant ne suit pas encore le choix enregistré (`in_ha` lu du démon). */
   function haMismatchIds(list) {
     if (!Array.isArray(list)) return [];
-    return list.filter(function (s) { return (s.published === true) !== (s.in_ha === true); }).map(function (s) { return s.id; });
+    return list.filter(haWaiting).map(function (s) { return s.id; });
+  }
+
+  /**
+   * Bouton pas encore à jour dans Home Assistant. Lot 8 (revue P2 #406) : `withdraw_pending` (retrait non confirmé, `in_ha`
+   * alors inconnu) et `ha_pending` (publication, disponibilité ou retrait non confirmé par la dernière synchro) priment ;
+   * sinon, choix enregistré et `in_ha` en désaccord. Un `in_ha` inconnu (null) n'est jamais lu comme « absent ».
+   */
+  function haWaiting(s) {
+    if (s.withdraw_pending === true || s.ha_pending === true) return true;
+    if (s.in_ha === null) return true;
+    return (s.published === true) !== (s.in_ha === true);
   }
 
   function buttonsWord(n) { return n + ' ' + (n > 1 ? '{{boutons}}' : '{{bouton}}'); }
@@ -360,9 +371,10 @@
     function haCell(s) {
       var $cell = $('<td class="j2ha-v3-sc-hacell"></td>');
       // État réel côté Home Assistant (`in_ha`), pas seulement le choix enregistré.
-      if ((s.published === true) !== (s.in_ha === true)) {
+      if (haWaiting(s)) {
         return $cell.append(infoTip($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-hawait"></span>')
-          .attr('title', s.published === true ? '{{Choisi, mais le bouton n’est pas encore dans Home Assistant}}' : '{{Retiré de vos choix, mais le bouton est encore dans Home Assistant}}')
+          .attr('title', s.published !== true ? '{{Retiré de vos choix, mais le retrait n’est pas encore confirmé}}'
+            : (s.in_ha === true ? '{{Mise à jour pas encore confirmée par Home Assistant}}' : '{{Choisi, mais le bouton n’est pas encore dans Home Assistant}}'))
           .append($('<span aria-hidden="true">◷</span>'), textNode(' {{En attente de Home Assistant}}'))));
       }
       if (s.published !== true) return $cell.append($('<span class="j2ha-v3-sc-muted"></span>').text('—').attr('title', '{{Pas publié}}'));
@@ -647,6 +659,7 @@
     successLine: successLine,
     saveOutcome: saveOutcome,
     haMismatchIds: haMismatchIds,
+    haWaiting: haWaiting,
     suggestionIds: suggestionIds,
     suggestionText: suggestionText,
     createPanel: createPanel,
