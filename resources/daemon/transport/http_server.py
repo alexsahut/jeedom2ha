@@ -3708,6 +3708,10 @@ def _build_mapping_override_tree(
         }
         if override_applied:
             row["override_source"] = entry.get("source", "user")
+        # Front v3 (Lot 7, champ additif, présent seulement s'il est posé) : réglage de publication porté par CETTE
+        # commande (valeur brute persistée). Sert à « Annuler » pour rétablir exactement l'état d'avant.
+        if entry.get("publication_override"):
+            row["publication_override_own"] = entry.get("publication_override")
         row["diagnostic"] = _decision_view(command_decision_by_cmd.get(cmd.id), diag_mapping)
         # Story 22.2 (R2, AC6) : types « Override HA » qui peuvent aboutir (champ additif). Calculé une
         # fois par entité porteuse (la validité ne dépend que de ses capacités), pour les seules
@@ -4327,6 +4331,52 @@ async def _handle_mapping_override_revert(
     })
 
 
+def _publication_revert_command_only(request: web.Request, payload: dict) -> web.Response:
+    """Front v3 (Lot 7) : retire le SEUL réglage de publication posé sur UNE commande (`scope == "command"`).
+
+    Laisse intacts son type HA, les réglages (type et publication) des autres commandes de l'entité et le réglage
+    de l'équipement. Sert à « Annuler » après « Publier quand même » : le chemin canonique (sans `scope`) purge tous
+    les réglages des commandes de l'entité (CC-19), ce qui effacerait une correction de type préexistante.
+    """
+    eq_id = payload.get("jeedom_eq_id")
+    cmd_id = payload.get("jeedom_cmd_id")
+    if not isinstance(eq_id, int) or isinstance(eq_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "jeedom_eq_id (int) requis"}, status=400
+        )
+    if not isinstance(cmd_id, int) or isinstance(cmd_id, bool):
+        return web.json_response(
+            {"status": "error", "message": "scope=command exige jeedom_cmd_id (int)"}, status=400
+        )
+    snapshot = request.app.get("topology")
+    eq = snapshot.eq_logics.get(eq_id) if snapshot else None
+    if eq is None:
+        return web.json_response(
+            {"status": "error", "message": f"Équipement {eq_id} introuvable"}, status=404
+        )
+    if not any(cmd.id == cmd_id for cmd in eq.cmds):
+        return web.json_response(
+            {"status": "error", "message": f"Commande {cmd_id} introuvable"}, status=404
+        )
+    data_dir = _resolve_data_dir(request)
+    removed = remove_override_fields(eq_id, cmd_id, ("publication_override",), data_dir)
+    _invalidate_equipment_states(request.app)
+    _LOGGER.info(
+        "[OVERRIDES] Retour mode auto (réglage de publication d'une commande seul) eq_id=%d cmd_id=%d removed=%s",
+        eq_id, cmd_id, removed,
+    )
+    return web.json_response({
+        "status": "ok",
+        "payload": {
+            "jeedom_eq_id": eq_id,
+            "jeedom_cmd_id": cmd_id,
+            "scope": "command_publication",
+            "removed": removed,
+            "removed_commands": [cmd_id] if removed else [],
+        },
+    })
+
+
 async def _publication_revert_equipment_only(request: web.Request) -> Optional[web.Response]:
     """Front v2 (Lot 6) : retour en automatique du SEUL réglage de publication d'équipement.
 
@@ -4342,6 +4392,8 @@ async def _publication_revert_equipment_only(request: web.Request) -> Optional[w
     payload = data.get("payload", {}) if isinstance(data, dict) else {}
     if not isinstance(payload, dict) or payload.get("scope") is None:
         return None
+    if payload.get("scope") == "command":
+        return _publication_revert_command_only(request, payload)
     if payload.get("scope") != "equipment" or payload.get("jeedom_cmd_id") is not None:
         return web.json_response(
             {"status": "error", "message": "scope=equipment exige jeedom_eq_id seul"}, status=400

@@ -150,7 +150,9 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     // « Annuler » défait les deux : « Toujours » retiré, puis retour au type précédent (automatique) et publication.
     ui.click(P + '.j2ha-v2-type-undo');
     const r1 = ui.respond('revertPublicationOverride', { state: 'ok', result: { status: 'ok' } });
-    assert.deepEqual({ ...r1.data }, { action: 'revertPublicationOverride', eqId: 231, cmdId: 2311 });
+    // Garde levée (front v3, Lot 7, revue Codex #406) : le retrait est limité au réglage de publication de la commande
+    // (`scope: 'command'`) ; sans lui, la route purgeait aussi les types corrigés des commandes sœurs de l'entité.
+    assert.deepEqual({ ...r1.data }, { action: 'revertPublicationOverride', eqId: 231, cmdId: 2311, scope: 'command' });
     const r2 = ui.respond('revertMappingOverride', { state: 'ok', result: { status: 'ok' } });
     assert.deepEqual({ ...r2.data }, { action: 'revertMappingOverride', eqId: 231, cmdId: 2311 });
     ui.respond('executeHaAction', ACTION_OK);
