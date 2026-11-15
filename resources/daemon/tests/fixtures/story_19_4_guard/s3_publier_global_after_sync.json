@@ -424,7 +424,6 @@
       "reason_details": {
         "cmd_id": 5489,
         "command_topic": "jeedom2ha/554/select_5489/set",
-        "linked_options": true,
         "node_id": "jeedom2ha_554_select_5489",
         "object_id": "jeedom2ha_554_select_5489",
         "option_commands": {

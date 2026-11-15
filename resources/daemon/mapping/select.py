@@ -171,6 +171,15 @@ def _has_manual_role(snapshot: TopologySnapshot, info: JeedomCmd, options) -> bo
     return int(info.id) in roles or any(int(o.action.id) in roles for o in options)
 
 
+def _linked_by_core_value_only(action: JeedomCmd, info_id: int) -> bool:
+    """Action reliée à l'info par la seule « Valeur » du cœur (aucun updateCmdId / infoId vers elle)."""
+    return (
+        action.linked_value == info_id
+        and action.update_cmd_id != info_id
+        and action.virtual_info_id != info_id
+    )
+
+
 def _warn_not_constant(eq: JeedomEqLogic, info: JeedomCmd, action: JeedomCmd) -> None:
     _LOGGER.warning(
         "[MAPPING] eq_id=%d: action %s reliée à l'info %s sans valeur constante → pas une option",
@@ -179,15 +188,12 @@ def _warn_not_constant(eq: JeedomEqLogic, info: JeedomCmd, action: JeedomCmd) ->
 
 
 class _Option:
-    __slots__ = ("value", "action", "select_value", "linked")
+    __slots__ = ("value", "action", "select_value")
 
-    def __init__(self, value: str, action: JeedomCmd, select_value: Optional[str] = None,
-                 linked: bool = True) -> None:
+    def __init__(self, value: str, action: JeedomCmd, select_value: Optional[str] = None) -> None:
         self.value = value
         self.action = action
         self.select_value = select_value
-        # Faux seulement pour une option tirée du NOM d'une action non reliée (type générique « Mode »).
-        self.linked = linked
 
 
 class SelectMapper:
@@ -259,13 +265,19 @@ class SelectMapper:
                 # action « Rejouer » ou « Mode suivant » non reliée n'est jamais une option).
                 for action in linked:
                     value = written_value(action, state_id)
+                    if value is None and _linked_by_core_value_only(action, state_id):
+                        # Couple standard MODE_STATE / MODE_SET_STATE relié par la « Valeur » du cœur,
+                        # sans valeur écrite connue : c'est le plugin qui écrit le NOM de l'action dans
+                        # l'info (convention suivie par Homebridge). L'option est ce nom.
+                        options.append(_Option(action.name, action))
+                        continue
                     if value is None:
                         _warn_not_constant(eq, state, action)
                         continue
                     options.append(_Option(value, action))
             elif len(states) == 1:
                 # Aucune action reliée : convention du type générique « Mode », l'option est le nom.
-                options = [_Option(a.name, a, linked=False) for a in orders if not a.linked_info_ids()]
+                options = [_Option(a.name, a) for a in orders if not a.linked_info_ids()]
             yield state, options, {}
 
     @staticmethod
@@ -364,7 +376,5 @@ class SelectMapper:
                 "option_commands": option_commands,
                 "value_to_option": dict(value_to_option),
                 "select_source": source,
-                # Toutes les options viennent d'actions reliées à l'info, à valeur constante.
-                "linked_options": all(o.linked for o in options),
             },
         )

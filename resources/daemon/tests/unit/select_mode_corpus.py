@@ -24,7 +24,7 @@ SEUL_ETAT_ID = 9824       # MODE_STATE sans action : rien
 VOLET_ID = 9830           # volet : info texte 1/0 posée par FLAP_UP / FLAP_DOWN reliées
 VOITURE_ID = 9831         # lumière : info texte « OnOff fictif » posée par LIGHT_ON / LIGHT_OFF reliées
 ROUTEUR_ID = 9832         # routeur solaire : actions « liste » reliées à des infos numériques publiées en capteurs
-MODES_ID = 9833           # « Modes » : 7 actions MODE_SET_STATE reliées par infoId/value, 3 non reliées
+MODES_ID = 9833           # « Modes » (forme réelle, plugin mode) : 7 actions reliées par la « Valeur » du cœur, 3 non
 BORNE_ID = 9834           # borne (forme 583) : trois trios SWITCH_* par nom, action_ev action, ordres à deux liens
 SERRURE_ID = 9835         # serrure virtuelle : état texte posé par LOCK_OPEN / LOCK_CLOSE reliées
 
@@ -85,7 +85,7 @@ def mode_eq_logics() -> List[Dict[str, Any]]:
 
 def real_shape_eq_logics() -> List[Dict[str, Any]]:
     routeur_list = "0|bal-off_rad-off;1|bal-manu_rad-off;2|bal-auto_rad-off;4|baloff_rad-manu;5|bal-manu_rad-manu"
-    modes = ["Jour", "Nuit", "Absent", "Vacances", "Soirée", "Cinéma", "Réveil"]
+    modes = ["Absent", "Normal", "Vacances scolaires", "Travail", "Soirée", "Nuit", "Réveil"]
     return [
         _eq(VOLET_ID, "Volet bassin", [
             _cmd(983001, "Etat", "FLAP_STATE", "info", "string"),
@@ -105,14 +105,22 @@ def real_shape_eq_logics() -> List[Dict[str, Any]]:
             _cmd(983204, "Commande 1", None, "action", "select", linked_value="983202", list_value=routeur_list),
             _cmd(983205, "Commande 2", None, "action", "select", linked_value="983203", list_value=routeur_list),
         ], eq_type="msunpv"),
-        _eq(MODES_ID, "Modes maison", [
-            _cmd(983301, "Mode", "MODE_STATE", "info", "string"),
-            *[_cmd(983310 + i, name, "MODE_SET_STATE", "action", "other",
-                   virtual_info_id="983301", virtual_value=name) for i, name in enumerate(modes)],
-            _cmd(983320, "Rejouer", "MODE_SET_STATE", "action", "other"),
-            _cmd(983321, "Retour mode précédent", "MODE_SET_STATE", "action", "other"),
-            _cmd(983322, "Aller au mode suivant", "MODE_SET_STATE", "action", "other"),
-        ]),
+        # Forme réelle de « Modes » (plugin mode, relue en prod) : MODE_STATE « currentMode » (valeur
+        # « Normal »), 7 actions MODE_SET_STATE reliées par la seule « Valeur » du cœur (le plugin écrit
+        # leur NOM dans l'info), 3 actions MODE_SET_STATE non reliées, dont « Rejouer » qui porte
+        # aujourd'hui le bouton d'équipement ; lock / unlock sans type générique.
+        _eq(MODES_ID, "Modes", [
+            _cmd(983375, "Rejouer", "MODE_SET_STATE", "action", "other"),
+            _cmd(983301, "currentMode", "MODE_STATE", "info", "string", current_value="Normal"),
+            _cmd(983302, "previousMode", "DONT", "info", "string"),
+            _cmd(983303, "lock_state", None, "info", "binary"),
+            *[_cmd(983310 + i, name, "MODE_SET_STATE", "action", "other", linked_value="983301")
+              for i, name in enumerate(modes)],
+            _cmd(983352, "Retour mode précédent", "MODE_SET_STATE", "action", "other", linked_value=""),
+            _cmd(983376, "Aller au mode suivant", "MODE_SET_STATE", "action", "other"),
+            _cmd(983377, "lock", None, "action", "other", linked_value="983303"),
+            _cmd(983378, "unlock", None, "action", "other", linked_value="983303"),
+        ], eq_type="mode"),
         # Forme réelle de la borne (583) : trois trios SWITCH_* regroupés par nom, infos GENERIC_INFO, et
         # « action_ev » qui est une ACTION. Chaque ordre porte deux liens : son état (updateCmdId) et
         # l'info texte « Mode de charge » (infoId + value) — candidat select dont toutes les actions sont

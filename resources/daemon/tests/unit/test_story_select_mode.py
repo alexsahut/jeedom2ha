@@ -530,28 +530,20 @@ async def _project(aiohttp_client):
 
 @pytest.mark.asyncio
 async def test_existing_installation_only_gains_selects(aiohttp_client):
-    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (b81d81d), même scène, formes réelles comprises.
-
-    Seuls des select s'ajoutent, avec UN retrait explicite (décision d'Alexandre) : le bouton de
-    « Modes » posé sur une action de mode reprise par le select de ce mode.
-    """
+    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (b81d81d), même scène, formes réelles comprises."""
     base = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     _app, _cli, now = await _project(aiohttp_client)
     assert len(base["entities"]) > 80, "scène trop pauvre pour être une preuve"
     changed = {u for u in set(base["entities"]) | set(now["entities"])
                if base["entities"].get(u) != now["entities"].get(u)}
-    added_selects = {"jeedom2ha_eq_554_select_5489", "jeedom2ha_eq_9820_select_982002",
-                     "jeedom2ha_eq_9821_select_982104", f"jeedom2ha_eq_{MODES_ID}_select_983301"}
-    assert changed == added_selects | {f"jeedom2ha_eq_{MODES_ID}"}
-    assert all(u not in base["entities"] and now["entities"][u]["type"] == "select" for u in added_selects)
-    assert base["entities"][f"jeedom2ha_eq_{MODES_ID}"]["type"] == "button"
-    assert f"jeedom2ha_eq_{MODES_ID}" not in now["entities"]  # le seul retrait
+    assert changed == {"jeedom2ha_eq_554_select_5489", "jeedom2ha_eq_9820_select_982002",
+                       "jeedom2ha_eq_9821_select_982104", f"jeedom2ha_eq_{MODES_ID}_select_983301"}
+    assert all(u not in base["entities"] and now["entities"][u]["type"] == "select" for u in changed)
 
     def key(call):
         return json.dumps(call, sort_keys=True)
     b, a = Counter(map(key, base["mqtt"])), Counter(map(key, now["mqtt"]))
-    removed = [json.loads(k) for k in (b - a).elements()]
-    assert [c["topic"] for c in removed] == [f"homeassistant/button/jeedom2ha_{MODES_ID}/config"]
+    assert list((b - a).elements()) == []  # aucun message existant ne change ni ne disparaît
     added = [json.loads(k) for k in (a - b).elements()]
     assert sorted(c["topic"] for c in added) == [
         "homeassistant/select/jeedom2ha_554_select_5489/config",
@@ -559,9 +551,9 @@ async def test_existing_installation_only_gains_selects(aiohttp_client):
         "homeassistant/select/jeedom2ha_9821_select_982104/config",
         f"homeassistant/select/jeedom2ha_{MODES_ID}_select_983301/config",
     ]
-    others = [MODES_ID]
-    assert [c for c in now["mqtt"] if c not in added and not any(f"jeedom2ha_{i}" in c["topic"] for i in others)] == \
-        [c for c in base["mqtt"] if c not in removed and not any(f"jeedom2ha_{i}" in c["topic"] for i in others)]
+    assert [c for c in now["mqtt"] if c not in added] == base["mqtt"]  # ordre identique pour le reste
+    # « Modes » : le bouton d'équipement (sur « Rejouer ») reste tel quel, le select s'ajoute.
+    assert base["entities"][f"jeedom2ha_eq_{MODES_ID}"] == now["entities"][f"jeedom2ha_eq_{MODES_ID}"]
     # Formes réelles (volet, lumière, routeur à listes sur infos numériques, borne, serrure à état
     # texte) : aucun select, aucun doublon.
     for eq_id in (VOLET_ID, VOITURE_ID, ROUTEUR_ID, BORNE_ID, SERRURE_ID):
@@ -607,85 +599,95 @@ def test_a_taken_unique_id_is_never_reused():
     assert SelectMapper().map_all(eq, snapshot, carried_cmd_ids={5489}) == []  # l'info portée : rien
 
 
-# --- « Modes » (décision d'Alexandre) : le bouton d'une action de mode cède sa place au select ----------
+# --- « Modes » (forme réelle relue en prod, plugin mode) ---------------------------------------------
 
-_MODE_NAMES = ["Jour", "Nuit", "Absent", "Vacances", "Soirée", "Cinéma", "Réveil"]
-_UNLINKED = ["Rejouer", "Retour mode précédent", "Aller au mode suivant"]
-
-
-def _modes_cmds(links=True, unlinked_first=False):
-    linked = [{"id": 1010 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
-               **({"virtual_info_id": "1001", "virtual_value": n} if links else {})} for i, n in enumerate(_MODE_NAMES)]
-    unlinked = [{"id": 1020 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"}
-                for i, n in enumerate(_UNLINKED)]
-    state = [{"id": 1001, "name": "Mode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string"}]
-    return state + (unlinked + linked if unlinked_first else linked + unlinked)
+_MODE_NAMES = ["Absent", "Normal", "Vacances scolaires", "Travail", "Soirée", "Nuit", "Réveil"]
 
 
-def _modes_map(**kwargs):
-    snapshot = _snapshot([_raw(100, _modes_cmds(**kwargs), name="Modes", eq_type="mode")])
-    return MapperRegistry().map_all(snapshot.eq_logics[100], snapshot)
+def _real_modes_cmds():
+    return [
+        {"id": 3775, "name": "Rejouer", "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"},
+        {"id": 651, "name": "currentMode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string",
+         "current_value": "Normal"},
+        {"id": 1730, "name": "previousMode", "generic_type": "DONT", "type": "info", "sub_type": "string"},
+        {"id": 3376, "name": "lock_state", "type": "info", "sub_type": "binary"},
+        *[{"id": cid, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+           "linked_value": "651"} for cid, n in zip((657, 658, 659, 1657, 1654, 1655, 1658), _MODE_NAMES)],
+        {"id": 652, "name": "Retour mode précédent", "generic_type": "MODE_SET_STATE", "type": "action",
+         "sub_type": "other", "linked_value": ""},
+        {"id": 3375, "name": "Aller au mode suivant", "generic_type": "MODE_SET_STATE", "type": "action",
+         "sub_type": "other"},
+        {"id": 3377, "name": "lock", "type": "action", "sub_type": "other", "linked_value": "3376"},
+        {"id": 3378, "name": "unlock", "type": "action", "sub_type": "other", "linked_value": "3376"},
+    ]
 
 
-def test_modes_select_takes_the_mode_actions_and_the_button_is_retired(caplog):
-    with caplog.at_level("WARNING"):
-        results = _modes_map()
-    assert [(r.ha_entity_type, r.ha_name) for r in results] == [("select", "Modes")]
-    assert results[0].reason_details["options"] == _MODE_NAMES  # les 7 reliées, jamais les 3 autres
-    assert not {1020, 1021, 1022} & set(results[0].reason_details["option_commands"][o]["cmd_id"]
-                                        for o in _MODE_NAMES)
-    assert any("reprise par le select" in r.message for r in caplog.records)
+def _real_modes():
+    snapshot = _snapshot([_raw(104, _real_modes_cmds(), name="Modes", eq_type="mode")])
+    return snapshot.eq_logics[104], snapshot
 
 
-def test_a_button_on_an_unlinked_mode_action_is_kept():
-    """Le bouton d'équipement est sur une action NON reliée (« Rejouer ») : il reste, le select s'ajoute."""
-    results = _modes_map(unlinked_first=True)
-    assert [(r.ha_entity_type, r.ha_unique_id) for r in results] == [
-        ("button", "jeedom2ha_eq_100"), ("select", "jeedom2ha_eq_100_select_1001")]
-    assert [c.id for c in results[0].commands.values()] == [1020]
-
-
-def test_without_links_the_button_stays_as_before():
-    results = _modes_map(links=False)
-    assert [r.ha_entity_type for r in results] == ["button"]
-
-
-def test_only_a_mode_button_yields_never_another_entity():
-    """Un switch qui porte des actions ne les cède jamais à un select."""
-    cmds = _modes_cmds() + [{"id": 1030, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info",
-                             "sub_type": "binary"}]
-    cmds[1]["generic_type"] = "ENERGY_ON"
-    cmds[2]["generic_type"] = "ENERGY_OFF"
-    snapshot = _snapshot([_raw(100, cmds, name="Modes", eq_type="mode")])
-    results = MapperRegistry().map_all(snapshot.eq_logics[100], snapshot)
-    assert results[0].ha_entity_type == "switch"
-    assert {c.id for c in results[0].commands.values()} >= {1010, 1011}  # le switch garde ses ordres
-    for select in _selects(results):
-        assert not {1010, 1011} & MapperRegistry._result_cmd_ids(select)
+def test_real_modes_get_a_select_of_the_seven_linked_modes_and_keep_the_replay_button():
+    eq, snapshot = _real_modes()
+    registry = MapperRegistry()
+    before = registry._map_all_base(eq, snapshot)
+    assert [(r.ha_entity_type, r.ha_unique_id) for r in before] == [("button", "jeedom2ha_eq_104")]
+    assert [c.id for c in before[0].commands.values()] == [3775]  # « Rejouer », non reliée
+    results = registry.map_all(eq, snapshot)
+    assert results[:1] == before  # le bouton reste tel quel, aucun retrait
+    select = results[1]
+    assert (select.ha_entity_type, select.ha_unique_id) == ("select", "jeedom2ha_eq_104_select_651")
+    assert select.reason_details["options"] == _MODE_NAMES  # les NOMS des 7 actions reliées
+    ids = {e["cmd_id"] for e in select.reason_details["option_commands"].values()}
+    assert ids == {657, 658, 659, 1657, 1654, 1655, 1658}
+    assert not ids & {3775, 652, 3375, 3377, 3378}  # jamais Rejouer, Retour, Suivant, lock, unlock
 
 
 @pytest.mark.asyncio
-async def test_the_retired_button_is_emptied_in_home_assistant(aiohttp_client):
-    """Deux synchros : sans liens (bouton publié), puis avec liens (select) : la configuration retenue du
-    bouton est vidée par le chemin de retrait existant, aucune entité fantôme."""
-    app = create_app(local_secret=SECRET)
-    bridge = _RawBridge()
-    app["mqtt_bridge"] = bridge
-    cli = await aiohttp_client(app)
+async def test_real_modes_state_is_the_current_mode_or_unknown():
+    eq, snapshot = _real_modes()
+    primary = MapperRegistry().map(eq, snapshot)
+    _decision(primary)
+    for secondary in primary.additional_mappings:
+        _decision(secondary)
+    bridge = _StateBridge()
+    sync = StateSynchronizer(app={"publications": {104: primary.publication_decision_ref}}, mqtt_bridge=bridge)
+    assert await sync.handle_state_message(104, 651, "Normal") is True
+    assert await sync.handle_state_message(104, 651, "Inconnu") is True
+    assert bridge.published == [("jeedom2ha/104/select_651/state", "Normal"),
+                                ("jeedom2ha/104/select_651/state", SELECT_UNKNOWN_PAYLOAD)]
 
-    def body(links, request_id):
-        return {"action": "sync", "payload": {
-            "objects": [{"id": 1, "name": "Salon"}],
-            "eq_logics": [{**_raw(100, _modes_cmds(links=links), name="Modes", eq_type="mode"),
-                           "status": {"timeout": 0}, "is_excluded": False, "is_visible": True}],
-            "sync_config": {"confidence_policy": "sure_probable"}}, "request_id": request_id,
-            "timestamp": "2026-11-15T00:00:00Z"}
 
-    assert (await cli.post("/action/sync", json=body(False, "a"), headers=H)).status == 200
-    button_topic = "homeassistant/button/jeedom2ha_100/config"
-    assert any(c["topic"] == button_topic and c["payload"] for c in bridge.calls)
-    bridge.calls = []
-    assert (await cli.post("/action/sync", json=body(True, "b"), headers=H)).status == 200
-    assert {"topic": button_topic, "payload": "", "qos": 1, "retain": True} in bridge.calls
-    assert any(c["topic"] == "homeassistant/select/jeedom2ha_100_select_1001/config" and c["payload"]
-               for c in bridge.calls)
+@pytest.mark.asyncio
+async def test_real_modes_option_runs_its_action():
+    eq, snapshot = _real_modes()
+    sync, _bridge = _cmd_sync(MapperRegistry().map(eq, snapshot))
+    assert await sync.handle_command_message("jeedom2ha/104/select_651/set", "Vacances scolaires") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(659, {})
+
+
+def test_core_value_link_with_a_non_constant_written_value_is_still_refused(caplog):
+    """La règle « nom de l'action » ne vaut que pour la « Valeur » du cœur seule : une action qui
+    porte aussi un updateCmdId vers l'info avec une valeur calculée reste refusée."""
+    cmds = _real_modes_cmds()
+    for cmd in cmds:
+        if cmd["id"] == 657:
+            cmd.update({"update_cmd_id": "651", "update_cmd_to_value": "#slider#"})
+    snapshot = _snapshot([_raw(104, cmds, name="Modes", eq_type="mode")])
+    with caplog.at_level("WARNING"):
+        select = _selects(MapperRegistry().map_all(snapshot.eq_logics[104], snapshot))[0]
+    assert "Absent" not in select.reason_details["options"]
+    assert any("sans valeur constante" in r.message for r in caplog.records)
+
+
+def test_outside_mode_types_a_constant_value_is_still_required():
+    """Hors du couple MODE_STATE / MODE_SET_STATE, un lien par la « Valeur » du cœur sans valeur écrite
+    ne donne jamais d'option (pas de repli sur le nom)."""
+    cmds = [
+        {"id": 1, "name": "Programme", "type": "info", "sub_type": "string"},
+        {"id": 2, "name": "Jour", "type": "action", "sub_type": "other", "linked_value": "1"},
+        {"id": 3, "name": "Nuit", "type": "action", "sub_type": "other", "linked_value": "1"},
+        {"id": 4, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info", "sub_type": "binary"},
+    ]
+    snapshot = _snapshot([_raw(10, cmds)])
+    assert _selects(MapperRegistry().map_all(snapshot.eq_logics[10], snapshot)) == []

@@ -834,7 +834,7 @@
   },
   "jeedom2ha_eq_9833": {
    "commands": {
-    "MODE_SET_STATE": 983310
+    "MODE_SET_STATE": 983375
    },
    "confidence": "sure",
    "type": "button"
@@ -1834,7 +1834,7 @@
    "topic": "homeassistant/sensor/jeedom2ha_9832_983203/config"
   },
   {
-   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9833\", \"object_id\": \"jeedom2ha_9833\", \"command_topic\": \"jeedom2ha/9833/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9833\"], \"name\": \"Modes maison\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9833\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9833/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9833\", \"object_id\": \"jeedom2ha_9833\", \"command_topic\": \"jeedom2ha/9833/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9833\"], \"name\": \"Modes\", \"manufacturer\": \"Jeedom (mode)\", \"model\": \"mode\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9833\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9833/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
    "qos": 1,
    "retain": true,
    "topic": "homeassistant/button/jeedom2ha_9833/config"
