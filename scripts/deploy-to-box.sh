@@ -491,6 +491,33 @@ DEPLOY_SINCE=""
 PREVIOUS_WORK=""
 # Le démon tournait-il avant la bascule ? (arrêté pour la bascule, relancé ensuite)
 DAEMON_WAS_RUNNING=0
+# Trap EXIT de secours armé dès l'arrêt du démon : à toute sortie avant sa
+# relance normale (étape 3), il le relance si l'arbre en place est
+# démarrable — sans jamais réactiver le plugin — et garde le code de retour.
+DAEMON_RESCUE_ARMED=0
+jeedom2ha_daemon_rescue_on_exit() {
+  local _rc=$?
+  trap - EXIT
+  if [[ "${DAEMON_RESCUE_ARMED}" == "1" ]]; then
+    DAEMON_RESCUE_ARMED=0
+    echo "" >&2
+    echo "--- Sortie anticipée (code ${_rc}) alors que le démon a été arrêté pour la bascule : tentative de relance..." >&2
+    local _out
+    _out=$(
+      { printf 'V_JEEDOM_ROOT=%q\nset -uo pipefail\n' "${JEEDOM_ROOT}"
+        cat "${PROMOTE_LIB}"
+        printf 'jeedom2ha_restart_daemon_if_startable "${V_JEEDOM_ROOT}"\n'
+      } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
+    ) || true
+    printf '%s\n' "${_out}" | grep -v '^__JEEDOM2HA_' >&2 || true
+    case "$(sed -n 's/^__JEEDOM2HA_DAEMON_RESTART__=//p' <<< "${_out}" | tail -n 1)" in
+      OK)   echo "  Démon relancé sur la version en place. Le déploiement reste en échec (code ${_rc})." >&2 ;;
+      SKIP) echo "  Démon NON relancé : le plugin en place n'est pas démarrable vu de Jeedom (le script ne le réactive pas)." >&2 ;;
+      *)    echo "  Démon NON relancé (échec de la relance) : à relancer depuis Jeedom." >&2 ;;
+    esac
+  fi
+  exit "${_rc}"
+}
 
 # jeedom2ha_capture_deploy_since — fatal si indisponible : on est encore avant
 # toute modification, rien n'a été touché.
@@ -780,7 +807,11 @@ _stop_out=$(
   } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
 ) || { printf '%s\n' "${_stop_out}"; _fail "Pré-contrôle ou arrêt du démon en échec : bascule annulée, plugin non modifié."; }
 printf '%s\n' "${_stop_out}" | grep -v '^__JEEDOM2HA_' || true
-[[ "$(sed -n 's/^__JEEDOM2HA_DAEMON_WAS_RUNNING__=//p' <<< "${_stop_out}" | tail -n 1)" == "1" ]] && DAEMON_WAS_RUNNING=1
+if [[ "$(sed -n 's/^__JEEDOM2HA_DAEMON_WAS_RUNNING__=//p' <<< "${_stop_out}" | tail -n 1)" == "1" ]]; then
+  DAEMON_WAS_RUNNING=1
+  DAEMON_RESCUE_ARMED=1
+  trap jeedom2ha_daemon_rescue_on_exit EXIT
+fi
 
 echo "  1b. promotion atomique → ${JEEDOM_BOX_PATH}/"
 _promote_rc=0
@@ -793,16 +824,7 @@ _promote_out=$(
 printf '%s\n' "${_promote_out}"
 PREVIOUS_WORK=$(sed -n 's/^__JEEDOM2HA_PREVIOUS_WORK__=//p' <<< "${_promote_out}" | tail -n 1)
 if [[ "${_promote_rc}" -ne 0 ]]; then
-  if [[ "${DAEMON_WAS_RUNNING}" == "1" ]]; then
-    echo "  Promotion annulée : relance du démon sur la version en place..." >&2
-    ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash <<REMOTE || echo "WARNING: relance du démon échouée — à relancer depuis Jeedom." >&2
-sudo -u www-data env JEEDOM_ROOT="${JEEDOM_ROOT}" php -r '
-require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
-require_once getenv("JEEDOM_ROOT") . "/plugins/jeedom2ha/core/class/jeedom2ha.class.php";
-jeedom2ha::deamon_start();
-'
-REMOTE
-  fi
+  # Démon relancé par le trap EXIT de secours s'il tournait.
   _fail "Promotion échouée (code ${_promote_rc}) : voir ci-dessus."
 fi
 echo ""
@@ -972,6 +994,8 @@ if (!\$ok) { fwrite(STDERR, "deamon_start() returned false\n"); exit(1); }
 '
 echo "  deamon_start() OK."
 REMOTE
+  # Démon relancé normalement : le trap de secours est désarmé.
+  DAEMON_RESCUE_ARMED=0
 
   # Lire le secret généré/lu par deamon_start
   jeedom2ha_refresh_secret || _fail "localSecret toujours vide après deamon_start."

@@ -667,6 +667,43 @@ def test_verify_fails_on_new_plugin_log_errors_only(tmp_path):
     assert "Plugin introuvable (json invalide) : jeedom2ha" in new.stderr
 
 
+_CLASS_WITH_START = (
+    "<?php class jeedom2ha { public static function deamon_start() {"
+    " file_put_contents(dirname(__DIR__, 4) . '/started', 'yes'); return true; } }\n"
+)
+
+
+@needs_php
+def test_rescue_restart_starts_daemon_when_plugin_is_startable(tmp_path):
+    root = _fake_jeedom(tmp_path)
+    _write(root / "plugins" / "jeedom2ha" / "core" / "class" / "jeedom2ha.class.php", _CLASS_WITH_START, 0o644)
+    result = _bash('jeedom2ha_restart_daemon_if_startable "$1"', str(root))
+    assert result.returncode == 0, result.stderr
+    assert "__JEEDOM2HA_DAEMON_RESTART__=OK" in result.stdout
+    assert (root / "started").read_text() == "yes"
+
+
+@needs_php
+def test_rescue_restart_never_starts_or_reactivates_a_disabled_plugin(tmp_path):
+    root = _fake_jeedom(tmp_path, active=0)
+    _write(root / "plugins" / "jeedom2ha" / "core" / "class" / "jeedom2ha.class.php", _CLASS_WITH_START, 0o644)
+    result = _bash('jeedom2ha_restart_daemon_if_startable "$1"', str(root))
+    assert result.returncode != 0
+    assert "__JEEDOM2HA_DAEMON_RESTART__=SKIP" in result.stdout
+    assert not (root / "started").exists()
+    assert '"jeedom2ha": 0' in (root / "config.json").read_text()
+
+
+def test_rescue_trap_is_armed_at_daemon_stop_and_disarmed_after_normal_start():
+    text = SCRIPT.read_text()
+    arm = text.index("trap jeedom2ha_daemon_rescue_on_exit EXIT")
+    stop = text.index('jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"')
+    start_ok = text.index('echo "  deamon_start() OK."')
+    disarm = text.index("DAEMON_RESCUE_ARMED=0", start_ok)
+    assert stop < arm < start_ok < disarm
+    assert 'exit "${_rc}"' in text
+
+
 # --- Câblage dans deploy-to-box.sh -----------------------------------------
 
 def test_verify_function_never_requires_the_plugin_class_explicitly():

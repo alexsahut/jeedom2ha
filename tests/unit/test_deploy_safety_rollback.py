@@ -63,6 +63,21 @@ printf 'ARGS: %s\n' "$*" >> "$MOCK_SSH_LOG"
 stdin=$(cat)
 printf '%s\n' "$stdin" >> "$MOCK_SSH_STDIN"
 case "$*" in *"bash -s"*) _is_remote_program=true ;; *) _is_remote_program=false ;; esac
+# MOCK_SCENARIO=deploy: just enough of a box for a full deploy run to reach
+# step 1c (backup marker, daemon stop, promotion, VERSION write).
+if [ "$MOCK_SCENARIO" = deploy ]; then
+  case "$stdin" in
+    *'jeedom2ha_restart_daemon_if_startable "${V_JEEDOM_ROOT}"'*)
+      echo restart >> "$MOCK_SSH_LOG.restart"
+      printf '__JEEDOM2HA_DAEMON_RESTART__=OK\n'; exit 0 ;;
+    *'jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"'*)
+      printf '__JEEDOM2HA_DAEMON_WAS_RUNNING__=%s\n' "${MOCK_DAEMON_WAS_RUNNING:-0}"; exit 0 ;;
+    *'jeedom2ha_promote_plugin_dir "${V_STAGING}"'*)
+      printf '  promoted\n'; exit "${MOCK_PROMOTE_EXIT:-0}" ;;
+    *jeedom2ha_write_version_file_atomic*) exit "${MOCK_VERSION_EXIT:-0}" ;;
+    *__JEEDOM2HA_BACKUP_ARCHIVE__*) printf '__JEEDOM2HA_BACKUP_ARCHIVE__=/home/test/b.tar.gz\n'; exit 0 ;;
+  esac
+fi
 # Read-only probes of deploy-promote-lib.sh (Jeedom timestamp before any
 # change, plugin check after promotion/rollback) answer as a healthy box.
 case "$stdin" in
@@ -786,3 +801,54 @@ def test_rollback_restores_through_atomic_switch_not_rm_then_mv(tmp_path):
     remote_program = (tmp_path / "ssh.stdin").read_text()
     assert 'jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback' in remote_program
     assert 'sudo rm -rf "${PLUGIN_PATH}"' not in remote_program
+
+
+def _run_deploy(tmp_path: Path, **env_overrides: str) -> subprocess.CompletedProcess:
+    """Full (non --dry-run) deploy against the mocked box, with a no-op local
+    rsync so the run gets past step 1a."""
+    bin_dir = _write_mock_tools(tmp_path)
+    (bin_dir / "rsync").write_text("#!/bin/sh\nexit 0\n")
+    (bin_dir / "rsync").chmod(0o755)
+    env = os.environ | {
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "JEEDOM_BOX_HOST": "mock-box",
+        "MOCK_GIT_STATE": "clean",
+        "MOCK_CI_STATUS": "completed",
+        "MOCK_CI_CONCLUSION": "success",
+        "MOCK_SSH_LOG": str(tmp_path / "ssh.log"),
+        "MOCK_SSH_STDIN": str(tmp_path / "ssh.stdin"),
+        "MOCK_SCENARIO": "deploy",
+    } | env_overrides
+    return subprocess.run(
+        [str(SCRIPT), "--sha", MOCK_HEAD_SHA], cwd=REPO_ROOT, env=env,
+        capture_output=True, text=True, timeout=60,
+    )
+
+
+def test_daemon_is_restarted_when_version_write_fails_after_a_good_promotion(tmp_path):
+    # Codex P2 (4c9a978) : toute sortie anticipée après l'arrêt du démon pour
+    # la bascule (ici l'écriture de VERSION, sous set -e) doit le relancer
+    # s'il tournait, sans masquer l'échec.
+    result = _run_deploy(tmp_path, MOCK_DAEMON_WAS_RUNNING="1", MOCK_VERSION_EXIT="1")
+
+    assert result.returncode != 0
+    assert "promoted" in result.stdout
+    assert (tmp_path / "ssh.log.restart").read_text().count("restart") == 1
+    assert "Sortie anticipée (code" in result.stderr
+    assert "Démon relancé sur la version en place" in result.stderr
+    assert "Deploy complete." not in result.stdout
+
+
+def test_daemon_is_restarted_when_promotion_fails(tmp_path):
+    result = _run_deploy(tmp_path, MOCK_DAEMON_WAS_RUNNING="1", MOCK_PROMOTE_EXIT="1")
+
+    assert result.returncode != 0
+    assert "Promotion échouée" in result.stderr
+    assert (tmp_path / "ssh.log.restart").read_text().count("restart") == 1
+
+
+def test_daemon_not_restarted_by_rescue_when_it_was_not_running(tmp_path):
+    result = _run_deploy(tmp_path, MOCK_DAEMON_WAS_RUNNING="0", MOCK_VERSION_EXIT="1")
+
+    assert result.returncode != 0
+    assert not (tmp_path / "ssh.log.restart").exists()

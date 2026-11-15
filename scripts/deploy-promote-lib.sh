@@ -387,6 +387,33 @@ jeedom2ha_promote_plugin_dir() {
   )
 }
 
+# jeedom2ha_restart_daemon_if_startable <jeedom_root> [user]
+# Relance de secours du démon (deploy-to-box.sh, trap EXIT armé à l'arrêt
+# du démon) : seulement si l'arbre en place est démarrable vu de Jeedom —
+# info.json lisible et class_exists("jeedom2ha") par l'autoload du cœur
+# (faux si le plugin est désactivé : on ne le réactive JAMAIS). Imprime
+# __JEEDOM2HA_DAEMON_RESTART__=OK|SKIP|FAIL.
+jeedom2ha_restart_daemon_if_startable() {
+  local jeedom_root="$1" user="${2:-www-data}" rc=0 out
+  out=$(sudo -u "${user}" env JEEDOM_ROOT="${jeedom_root}" php -r '
+require_once getenv("JEEDOM_ROOT") . "/core/php/core.inc.php";
+if (!is_readable(plugin::getPathById("jeedom2ha"))) { fwrite(STDERR, "info.json illisible\n"); exit(10); }
+if (!class_exists("jeedom2ha")) { fwrite(STDERR, "classe jeedom2ha non chargée par Jeedom (plugin désactivé ?)\n"); exit(11); }
+if (!jeedom2ha::deamon_start()) { fwrite(STDERR, "deamon_start() a renvoyé false\n"); exit(12); }
+echo "started";
+' 2>&1) || rc=$?
+  printf '%s\n' "${out}" | grep -v '^started$' | sed 's/^/    /' >&2 || true
+  if [[ "${rc}" -eq 0 ]]; then
+    echo "__JEEDOM2HA_DAEMON_RESTART__=OK"
+  elif [[ "${rc}" -eq 10 || "${rc}" -eq 11 ]]; then
+    echo "__JEEDOM2HA_DAEMON_RESTART__=SKIP"
+    return 1
+  else
+    echo "__JEEDOM2HA_DAEMON_RESTART__=FAIL"
+    return 1
+  fi
+}
+
 # jeedom2ha_box_now
 # Horodatage courant au format des journaux Jeedom ([Y-m-d H:i:s]), calculé
 # par PHP avec la configuration Jeedom chargée (même fuseau que log::add).
