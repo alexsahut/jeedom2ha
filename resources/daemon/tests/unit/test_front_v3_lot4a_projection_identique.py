@@ -206,6 +206,7 @@ async def test_statut_expose_la_liste_des_scenarios(aiohttp_client):
         "id": 20, "name": "Scène soirée", "group": "Ambiances", "mode": "provoke",
         "has_trigger": False, "has_schedule": False, "manual": True, "is_active": True,
         "published": True, "is_new": False, "in_ha": True,
+        "withdraw_pending": False, "ha_pending": False,  # front v3 (Lot 8) : champs additifs
         "ha_entity_id": "button.jeedom2ha_scenario_20",
     }
     assert rows[21]["is_active"] is False and rows[21]["in_ha"] is True

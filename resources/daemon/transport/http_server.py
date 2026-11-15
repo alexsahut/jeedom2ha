@@ -2182,6 +2182,7 @@ def _scenario_status_rows(app) -> list:
     if topology is None:
         return []
     decisions = app.get("scenario_publications") or {}
+    failed_ids = app.get("scenario_publication_failed_ids") or set()
     rows = []
     for scenario_id in sorted(topology.scenarios):
         scenario = topology.scenarios[scenario_id]
@@ -2200,6 +2201,14 @@ def _scenario_status_rows(app) -> list:
             "in_ha": bool(getattr(decisions.get(scenario_id), "discovery_published", False)),
             "ha_entity_id": f"button.jeedom2ha_scenario_{scenario_id}" if published else None,
         })
+        # Front v3 (Lot 8, revue P2 #406) — un retrait en échec (`scenario_not_selected_pending`) ne prouve pas
+        # l'absence du bouton : `in_ha` devient inconnu (None) et `withdraw_pending` le dit. `ha_pending` :
+        # publication, disponibilité ou retrait pas encore confirmé par la dernière synchro. Champs additifs.
+        withdraw_pending = getattr(decisions.get(scenario_id), "reason", None) == SCENARIO_NOT_SELECTED_PENDING
+        rows[-1]["withdraw_pending"] = withdraw_pending
+        rows[-1]["ha_pending"] = withdraw_pending or scenario_id in failed_ids
+        if withdraw_pending:
+            rows[-1]["in_ha"] = None
     return rows
 
 
@@ -2691,6 +2700,12 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         request.app["publications"].pop(old_eq_id, None)
     request.app["scenario_publications"].clear()
     request.app["scenario_publications"].update(scenario_publications)
+    # Front v3 (Lot 8) — scénarios dont le bouton (ou sa disponibilité) n'a pas pu être publié ou retiré à
+    # cette synchro : le statut les expose (`ha_pending`) tant qu'une synchro ne les a pas confirmés.
+    failed_memo = request.app.get("scenario_publication_failed_ids")
+    if isinstance(failed_memo, set):
+        failed_memo.clear()
+        failed_memo.update(scenario_publication_failed_ids)
 
     # Store detailed decisions in RAM for Epic 4 (diagnostic)
     request.app["mappings"].update(mappings)
@@ -5680,6 +5695,7 @@ def create_app(local_secret: str) -> web.Application:
     app["mappings"] = {}       # Dict[int, MappingResult]
     app["publications"] = {}   # Dict[int, PublicationDecision]
     app["scenario_publications"] = {}  # Dict[int, PublicationDecision] — scénarios Story 10.1
+    app["scenario_publication_failed_ids"] = set()  # Front v3 (Lot 8) — scénarios non confirmés à la dernière synchro
     app["decision_memo"] = DecisionMemo()  # Story 24.2 — verdicts mémorisés au sync / « Publier »
     app["published_scope"] = None  # Dict[str, Any] | None — canonical contract populated on sync
     app["pending_discovery_unpublish"] = {}  # Dict[int, str]
