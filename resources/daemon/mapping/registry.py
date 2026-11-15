@@ -86,17 +86,66 @@ class MapperRegistry:
         before = self._map_all_base(eq, snapshot)
         # Une commande déjà portée par une entité (info d'un capteur, ordre d'un volet, d'une lumière,
         # d'une serrure…) ne passe jamais dans un select ; un identifiant déjà pris non plus.
+        # Seule exception (décision d'Alexandre) : un bouton posé sur une action de mode
+        # (``MODE_SET_STATE``) cède sa place au select de ce mode, qui la reprend.
+        yielding = [r for r in before if self._is_mode_button(r)]
         carried = set()
         for result in before:
-            carried |= self._result_cmd_ids(result)
+            if result not in yielding:
+                carried |= self._result_cmd_ids(result)
         selects = self._select_mapper.map_all(
-            eq, snapshot, carried_cmd_ids=carried, taken_unique_ids={r.ha_unique_id for r in before},
+            eq, snapshot, carried_cmd_ids=carried,
+            taken_unique_ids={r.ha_unique_id for r in before if r not in yielding},
         )
+        # Un bouton de mode ne cède sa place qu'à un select dont toutes les options viennent d'actions
+        # reliées à l'info, à valeur constante ; un select tiré des NOMS d'actions non reliées ne
+        # reprend jamais l'action d'un bouton existant.
+        yielding_ids = set()
+        for result in yielding:
+            yielding_ids |= self._result_cmd_ids(result)
+        selects = [
+            sel for sel in selects
+            if (sel.reason_details or {}).get("linked_options") or not (self._result_cmd_ids(sel) & yielding_ids)
+        ]
         if not selects:
             return before
+        before = self._without_mode_buttons_taken_by(eq, before, yielding, selects)
         if not before:
             return self._apply_entity_name_rule(eq, selects)
         return [*before, *selects]
+
+    @staticmethod
+    def _is_mode_button(result: MappingResult) -> bool:
+        """Bouton posé sur une action de mode (``MODE_SET_STATE``) : il peut céder sa place à un select."""
+        if result.ha_entity_type != "button":
+            return False
+        cmds = list((result.commands or {}).values())
+        return bool(cmds) and all(getattr(c, "generic_type", None) == "MODE_SET_STATE" for c in cmds)
+
+    def _without_mode_buttons_taken_by(
+        self, eq: JeedomEqLogic, before: List[MappingResult], yielding: List[MappingResult],
+        selects: List[MappingResult],
+    ) -> List[MappingResult]:
+        """Retire le bouton dont l'action de mode est reprise par un select (WARNING), jamais un autre.
+
+        Le bouton n'est pas re-projeté sur une autre action : son identifiant n'est jamais réutilisé
+        pour une autre commande. Sa configuration est vidée dans Home Assistant par les chemins de
+        retrait existants (changement de type du principal, retrait d'un secondaire).
+        """
+        taken = set()
+        for select in selects:
+            taken |= self._result_cmd_ids(select)
+        kept: List[MappingResult] = []
+        for result in before:
+            used = self._result_cmd_ids(result)
+            if result in yielding and used & taken:
+                _LOGGER.warning(
+                    "[MAPPING] eq_id=%d: bouton %s retiré, son action de mode %s est reprise par le select",
+                    eq.id, result.ha_unique_id, sorted(used & taken),
+                )
+                continue
+            kept.append(result)
+        return kept
 
     def _map_all_base(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         """API additive Story 11.1 : retourne tous les mappings du premier mapper

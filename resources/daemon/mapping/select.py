@@ -179,12 +179,15 @@ def _warn_not_constant(eq: JeedomEqLogic, info: JeedomCmd, action: JeedomCmd) ->
 
 
 class _Option:
-    __slots__ = ("value", "action", "select_value")
+    __slots__ = ("value", "action", "select_value", "linked")
 
-    def __init__(self, value: str, action: JeedomCmd, select_value: Optional[str] = None) -> None:
+    def __init__(self, value: str, action: JeedomCmd, select_value: Optional[str] = None,
+                 linked: bool = True) -> None:
         self.value = value
         self.action = action
         self.select_value = select_value
+        # Faux seulement pour une option tirée du NOM d'une action non reliée (type générique « Mode »).
+        self.linked = linked
 
 
 class SelectMapper:
@@ -262,7 +265,7 @@ class SelectMapper:
                     options.append(_Option(value, action))
             elif len(states) == 1:
                 # Aucune action reliée : convention du type générique « Mode », l'option est le nom.
-                options = [_Option(a.name, a) for a in orders if not a.linked_info_ids()]
+                options = [_Option(a.name, a, linked=False) for a in orders if not a.linked_info_ids()]
             yield state, options, {}
 
     @staticmethod
@@ -361,5 +364,7 @@ class SelectMapper:
                 "option_commands": option_commands,
                 "value_to_option": dict(value_to_option),
                 "select_source": source,
+                # Toutes les options viennent d'actions reliées à l'info, à valeur constante.
+                "linked_options": all(o.linked for o in options),
             },
         )

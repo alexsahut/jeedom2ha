@@ -530,29 +530,41 @@ async def _project(aiohttp_client):
 
 @pytest.mark.asyncio
 async def test_existing_installation_only_gains_selects(aiohttp_client):
-    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (b81d81d), même scène, formes réelles comprises."""
+    """Ligne de base capturée sur le correctif fix/switch-appariement-etat (b81d81d), même scène, formes réelles comprises.
+
+    Seuls des select s'ajoutent, avec UN retrait explicite (décision d'Alexandre) : le bouton de
+    « Modes » posé sur une action de mode reprise par le select de ce mode.
+    """
     base = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     _app, _cli, now = await _project(aiohttp_client)
     assert len(base["entities"]) > 80, "scène trop pauvre pour être une preuve"
     changed = {u for u in set(base["entities"]) | set(now["entities"])
                if base["entities"].get(u) != now["entities"].get(u)}
-    assert changed == {"jeedom2ha_eq_554_select_5489", "jeedom2ha_eq_9820_select_982002", "jeedom2ha_eq_9821_select_982104"}
-    assert all(u not in base["entities"] and now["entities"][u]["type"] == "select" for u in changed)
+    added_selects = {"jeedom2ha_eq_554_select_5489", "jeedom2ha_eq_9820_select_982002",
+                     "jeedom2ha_eq_9821_select_982104", f"jeedom2ha_eq_{MODES_ID}_select_983301"}
+    assert changed == added_selects | {f"jeedom2ha_eq_{MODES_ID}"}
+    assert all(u not in base["entities"] and now["entities"][u]["type"] == "select" for u in added_selects)
+    assert base["entities"][f"jeedom2ha_eq_{MODES_ID}"]["type"] == "button"
+    assert f"jeedom2ha_eq_{MODES_ID}" not in now["entities"]  # le seul retrait
 
     def key(call):
         return json.dumps(call, sort_keys=True)
     b, a = Counter(map(key, base["mqtt"])), Counter(map(key, now["mqtt"]))
-    assert list((b - a).elements()) == []  # aucun message existant ne change ni ne disparaît
+    removed = [json.loads(k) for k in (b - a).elements()]
+    assert [c["topic"] for c in removed] == [f"homeassistant/button/jeedom2ha_{MODES_ID}/config"]
     added = [json.loads(k) for k in (a - b).elements()]
     assert sorted(c["topic"] for c in added) == [
         "homeassistant/select/jeedom2ha_554_select_5489/config",
         "homeassistant/select/jeedom2ha_9820_select_982002/config",
         "homeassistant/select/jeedom2ha_9821_select_982104/config",
+        f"homeassistant/select/jeedom2ha_{MODES_ID}_select_983301/config",
     ]
-    assert [c for c in now["mqtt"] if c not in added] == base["mqtt"]  # ordre identique pour le reste
-    # Formes réelles (volet, lumière, routeur à listes sur infos numériques, « Modes » dont les actions
-    # sont des boutons, borne à info « other », serrure à état texte) : aucun select, aucun doublon.
-    for eq_id in (VOLET_ID, VOITURE_ID, ROUTEUR_ID, MODES_ID, BORNE_ID, SERRURE_ID):
+    others = [MODES_ID]
+    assert [c for c in now["mqtt"] if c not in added and not any(f"jeedom2ha_{i}" in c["topic"] for i in others)] == \
+        [c for c in base["mqtt"] if c not in removed and not any(f"jeedom2ha_{i}" in c["topic"] for i in others)]
+    # Formes réelles (volet, lumière, routeur à listes sur infos numériques, borne, serrure à état
+    # texte) : aucun select, aucun doublon.
+    for eq_id in (VOLET_ID, VOITURE_ID, ROUTEUR_ID, BORNE_ID, SERRURE_ID):
         mine = [u for u in now["entities"] if u == f"jeedom2ha_eq_{eq_id}" or u.startswith(f"jeedom2ha_eq_{eq_id}_")]
         assert mine and all(now["entities"][u]["type"] != "select" for u in mine), eq_id
     assert not any(c["topic"].startswith("homeassistant/select/") and c not in added for c in now["mqtt"])
@@ -593,3 +605,87 @@ def test_a_taken_unique_id_is_never_reused():
     assert SelectMapper().map_all(eq, snapshot, taken_unique_ids={"jeedom2ha_eq_554_select_5489"}) == []
     assert SelectMapper().map_all(eq, snapshot, carried_cmd_ids={5490}) == []  # une action portée : rien
     assert SelectMapper().map_all(eq, snapshot, carried_cmd_ids={5489}) == []  # l'info portée : rien
+
+
+# --- « Modes » (décision d'Alexandre) : le bouton d'une action de mode cède sa place au select ----------
+
+_MODE_NAMES = ["Jour", "Nuit", "Absent", "Vacances", "Soirée", "Cinéma", "Réveil"]
+_UNLINKED = ["Rejouer", "Retour mode précédent", "Aller au mode suivant"]
+
+
+def _modes_cmds(links=True, unlinked_first=False):
+    linked = [{"id": 1010 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other",
+               **({"virtual_info_id": "1001", "virtual_value": n} if links else {})} for i, n in enumerate(_MODE_NAMES)]
+    unlinked = [{"id": 1020 + i, "name": n, "generic_type": "MODE_SET_STATE", "type": "action", "sub_type": "other"}
+                for i, n in enumerate(_UNLINKED)]
+    state = [{"id": 1001, "name": "Mode", "generic_type": "MODE_STATE", "type": "info", "sub_type": "string"}]
+    return state + (unlinked + linked if unlinked_first else linked + unlinked)
+
+
+def _modes_map(**kwargs):
+    snapshot = _snapshot([_raw(100, _modes_cmds(**kwargs), name="Modes", eq_type="mode")])
+    return MapperRegistry().map_all(snapshot.eq_logics[100], snapshot)
+
+
+def test_modes_select_takes_the_mode_actions_and_the_button_is_retired(caplog):
+    with caplog.at_level("WARNING"):
+        results = _modes_map()
+    assert [(r.ha_entity_type, r.ha_name) for r in results] == [("select", "Modes")]
+    assert results[0].reason_details["options"] == _MODE_NAMES  # les 7 reliées, jamais les 3 autres
+    assert not {1020, 1021, 1022} & set(results[0].reason_details["option_commands"][o]["cmd_id"]
+                                        for o in _MODE_NAMES)
+    assert any("reprise par le select" in r.message for r in caplog.records)
+
+
+def test_a_button_on_an_unlinked_mode_action_is_kept():
+    """Le bouton d'équipement est sur une action NON reliée (« Rejouer ») : il reste, le select s'ajoute."""
+    results = _modes_map(unlinked_first=True)
+    assert [(r.ha_entity_type, r.ha_unique_id) for r in results] == [
+        ("button", "jeedom2ha_eq_100"), ("select", "jeedom2ha_eq_100_select_1001")]
+    assert [c.id for c in results[0].commands.values()] == [1020]
+
+
+def test_without_links_the_button_stays_as_before():
+    results = _modes_map(links=False)
+    assert [r.ha_entity_type for r in results] == ["button"]
+
+
+def test_only_a_mode_button_yields_never_another_entity():
+    """Un switch qui porte des actions ne les cède jamais à un select."""
+    cmds = _modes_cmds() + [{"id": 1030, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info",
+                             "sub_type": "binary"}]
+    cmds[1]["generic_type"] = "ENERGY_ON"
+    cmds[2]["generic_type"] = "ENERGY_OFF"
+    snapshot = _snapshot([_raw(100, cmds, name="Modes", eq_type="mode")])
+    results = MapperRegistry().map_all(snapshot.eq_logics[100], snapshot)
+    assert results[0].ha_entity_type == "switch"
+    assert {c.id for c in results[0].commands.values()} >= {1010, 1011}  # le switch garde ses ordres
+    for select in _selects(results):
+        assert not {1010, 1011} & MapperRegistry._result_cmd_ids(select)
+
+
+@pytest.mark.asyncio
+async def test_the_retired_button_is_emptied_in_home_assistant(aiohttp_client):
+    """Deux synchros : sans liens (bouton publié), puis avec liens (select) : la configuration retenue du
+    bouton est vidée par le chemin de retrait existant, aucune entité fantôme."""
+    app = create_app(local_secret=SECRET)
+    bridge = _RawBridge()
+    app["mqtt_bridge"] = bridge
+    cli = await aiohttp_client(app)
+
+    def body(links, request_id):
+        return {"action": "sync", "payload": {
+            "objects": [{"id": 1, "name": "Salon"}],
+            "eq_logics": [{**_raw(100, _modes_cmds(links=links), name="Modes", eq_type="mode"),
+                           "status": {"timeout": 0}, "is_excluded": False, "is_visible": True}],
+            "sync_config": {"confidence_policy": "sure_probable"}}, "request_id": request_id,
+            "timestamp": "2026-11-15T00:00:00Z"}
+
+    assert (await cli.post("/action/sync", json=body(False, "a"), headers=H)).status == 200
+    button_topic = "homeassistant/button/jeedom2ha_100/config"
+    assert any(c["topic"] == button_topic and c["payload"] for c in bridge.calls)
+    bridge.calls = []
+    assert (await cli.post("/action/sync", json=body(True, "b"), headers=H)).status == 200
+    assert {"topic": button_topic, "payload": "", "qos": 1, "retain": True} in bridge.calls
+    assert any(c["topic"] == "homeassistant/select/jeedom2ha_100_select_1001/config" and c["payload"]
+               for c in bridge.calls)
