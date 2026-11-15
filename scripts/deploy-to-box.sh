@@ -404,7 +404,9 @@ jeedom2ha_validate_rollback_archive "${ARCHIVE}"
 
 _parent=$(dirname "${PLUGIN_PATH}")
 _work=$(sudo mktemp -d "${_parent}/.jeedom2ha-rollback.XXXXXX")
-cleanup() { sudo rm -rf "${_work}"; }
+# Après un échange, ${_work} contient l'ANCIEN arbre (et ses data/) : on ne
+# le supprime plus jamais (conservé ensuite en .jeedom2ha.prev-<ts>).
+cleanup() { [[ "${JEEDOM2HA_SWITCH_MODE:-}" == "exchange" ]] || sudo rm -rf "${_work}"; }
 trap cleanup EXIT
 sudo tar -xzf "${ARCHIVE}" -C "${_work}"
 sudo test -d "${_work}/jeedom2ha" || { echo "ERROR: jeedom2ha/ absente après extraction." >&2; exit 1; }
@@ -442,6 +444,8 @@ jeedom2ha_stop_daemon_with_pid_fallback "/tmp/jeedom/jeedom2ha/deamon.pid"
 jeedom2ha_normalize_plugin_tree "${_work}/jeedom2ha" www-data:www-data
 sudo chmod 711 "${_work}"
 jeedom2ha_check_tree_readable "${_work}/jeedom2ha" www-data
+# Une coupure SSH ne doit pas interrompre la bascule.
+trap '' HUP INT TERM PIPE
 jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback
 if [[ "${JEEDOM2HA_SWITCH_MODE}" == "exchange" ]]; then
   trap - EXIT
@@ -768,11 +772,13 @@ echo ""
 # --restart-daemon.
 echo "  1b-0. arrêt du démon pour la bascule"
 _stop_out=$(
-  { printf 'V_JEEDOM_ROOT=%q\nset -euo pipefail\n' "${JEEDOM_ROOT}"
+  { printf 'V_JEEDOM_ROOT=%q\nV_PLUGIN_PATH=%q\nset -euo pipefail\n' "${JEEDOM_ROOT}" "${JEEDOM_BOX_PATH}"
     cat "${PROMOTE_LIB}"
+    # Reste d'une bascule interrompue (data/ hors du plugin) : arrêt avant tout.
+    printf 'jeedom2ha_check_leftovers "${V_PLUGIN_PATH}"\n'
     printf 'jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"\n'
   } | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" bash -s 2>&1
-) || { printf '%s\n' "${_stop_out}"; _fail "Arrêt du démon impossible : bascule annulée, plugin non modifié."; }
+) || { printf '%s\n' "${_stop_out}"; _fail "Pré-contrôle ou arrêt du démon en échec : bascule annulée, plugin non modifié."; }
 printf '%s\n' "${_stop_out}" | grep -v '^__JEEDOM2HA_' || true
 [[ "$(sed -n 's/^__JEEDOM2HA_DAEMON_WAS_RUNNING__=//p' <<< "${_stop_out}" | tail -n 1)" == "1" ]] && DAEMON_WAS_RUNNING=1
 

@@ -349,10 +349,129 @@ jeedom2ha_exchange_dirs() { case "$1" in */.probe-a) _real_exchange "$@" ;; *) r
     result, watcher = _promote(staging, live, prelude=prelude)
 
     assert result.returncode != 0
-    assert "échange atomique en échec" in result.stderr
+    assert "bascule interrompue" in result.stderr
     assert _inodes(live) == inodes
     assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
     assert watcher.problems == []
+
+
+# --- Interruptions pendant « déplacement → échange » ---------------------
+# Le trap EXIT ne doit plus jamais supprimer le dossier de travail une fois
+# data/ déplacé, et une coupure SSH (SIGHUP) ne doit pas interrompre la
+# section protégée.
+
+_REAL_EXCHANGE = (
+    "eval \"$(declare -f jeedom2ha_exchange_dirs | sed '1s/jeedom2ha_exchange_dirs/_real_exchange/')\"\n"
+)
+
+
+def _after_data_move(action: str) -> str:
+    """Prélude qui exécute <action> juste après le déplacement de data/ vers
+    l'arbre préparé, avant celui du venv."""
+    return r"""
+eval "$(declare -f sudo | sed '1s/^sudo/_stub_sudo/')"
+sudo() {
+  _stub_sudo "$@"
+  local rc=$?
+  if [ "$1" = mv ] && [[ "$3" == */jeedom2ha/data && "$4" == */.jeedom2ha-deploy.*/jeedom2ha/data ]]; then
+    %s
+  fi
+  return $rc
+}
+""" % action
+
+
+def _just_before_exchange(action: str) -> str:
+    return _REAL_EXCHANGE + r"""
+jeedom2ha_exchange_dirs() {
+  case "$1" in */.probe-a) _real_exchange "$@"; return ;; esac
+  %s
+  _real_exchange "$@"
+}
+""" % action
+
+
+def _work_dirs(live: Path) -> "list[Path]":
+    return [p for p in live.parent.iterdir() if p.name.startswith(".jeedom2ha-deploy.")]
+
+
+def test_sighup_just_before_exchange_does_not_interrupt_the_switch(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    result, watcher = _promote(staging, live, prelude=_just_before_exchange('kill -HUP "$BASHPID"; kill -TERM "$BASHPID"'))
+
+    assert result.returncode == 0, result.stderr
+    assert watcher.problems == []
+    _assert_promoted(live, inodes)
+
+
+def test_sighup_between_data_and_venv_moves_does_not_interrupt_the_switch(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    result, _ = _promote(staging, live, prelude=_after_data_move('kill -HUP "$BASHPID"; kill -INT "$BASHPID"'))
+
+    assert result.returncode == 0, result.stderr
+    _assert_promoted(live, inodes)
+
+
+def test_abrupt_exit_just_before_exchange_restores_data_and_venv(tmp_path):
+    # Sortie brutale à l'instant le plus délicat (tout est déplacé, rien
+    # n'est échangé) : le trap remet data/ et le venv, ne supprime rien.
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    result, watcher = _promote(staging, live, prelude=_just_before_exchange("exit 9"))
+
+    assert result.returncode == 9
+    assert "bascule interrompue" in result.stderr
+    assert _inodes(live) == inodes
+    assert (live / "data" / "overrides.json").read_text() == '{"user": "config"}\n'
+    assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+    works = _work_dirs(live)
+    assert len(works) == 1 and (works[0] / "jeedom2ha" / "core").is_dir(), "dossier de travail supprimé"
+    assert str(works[0]) in result.stderr
+    assert watcher.problems == []
+
+
+def test_abrupt_exit_between_data_and_venv_moves_restores_data(tmp_path):
+    staging, live = _build(tmp_path)
+    inodes = _inodes(live)
+    result, _ = _promote(staging, live, prelude=_after_data_move("exit 9"))
+
+    assert result.returncode == 9
+    assert _inodes(live) == inodes
+    assert len(_work_dirs(live)) == 1
+
+
+def test_leftover_with_data_blocks_next_deploy_and_deletes_nothing(tmp_path):
+    # Trace d'une bascule tuée net (SIGKILL) : data/ resté dans le dossier
+    # de travail, absent du plugin en place.
+    staging, live = _build(tmp_path)
+    leftover = live.parent / ".jeedom2ha-deploy.abc123"
+    (live / "data").rename(tmp_path / "moved-data")
+    (leftover / "jeedom2ha").mkdir(parents=True)
+    (tmp_path / "moved-data").rename(leftover / "jeedom2ha" / "data")
+
+    result, _ = _promote(staging, live)
+
+    assert result.returncode != 0
+    assert "bascule précédente interrompue" in result.stderr
+    assert str(leftover / "jeedom2ha" / "data") in result.stderr
+    assert (leftover / "jeedom2ha" / "data" / "overrides.json").read_text() == '{"user": "config"}\n'
+    assert (live / "core" / "class" / "jeedom2ha.class.php").read_text() == "<?php // v1\n"
+    assert _work_dirs(live) == [leftover]
+
+
+def test_leftover_check_runs_before_the_daemon_is_stopped():
+    text = SCRIPT.read_text()
+    assert text.index('jeedom2ha_check_leftovers "${V_PLUGIN_PATH}"') \
+        < text.index('jeedom2ha_stop_daemon_for_switch "${V_JEEDOM_ROOT}"')
+
+
+def test_rollback_cleanup_never_removes_the_previous_tree_after_exchange():
+    text = SCRIPT.read_text()
+    assert 'cleanup() { [[ "${JEEDOM2HA_SWITCH_MODE:-}" == "exchange" ]] || sudo rm -rf "${_work}"; }' in text
+    switch = text.index('jeedom2ha_switch_plugin_dir "${_work}/jeedom2ha" "${PLUGIN_PATH}" rollback')
+    assert text.rindex("trap '' HUP INT TERM PIPE", 0, switch) > text.index("cleanup() {")
 
 
 def test_fallback_without_atomic_exchange_leaves_data_in_place(tmp_path):

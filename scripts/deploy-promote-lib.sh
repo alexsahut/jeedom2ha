@@ -251,6 +251,33 @@ jeedom2ha_retain_previous() {
   echo "  Ancienne version conservée : ${dest}/jeedom2ha (une seule génération)."
 }
 
+# jeedom2ha_check_leftovers <live>
+# Au démarrage, avant toute modification : un plugins/.jeedom2ha-deploy.* ou
+# .jeedom2ha-rollback.* qui contient data/ (ou le venv) alors que le plugin
+# en place n'en a pas est la trace d'une bascule interrompue brutalement
+# (SIGKILL, coupure de courant) : les choix de l'utilisateur sont peut-être
+# là. Arrêt avec un message clair ; rien n'est supprimé ni déplacé.
+jeedom2ha_check_leftovers() {
+  local live="$1" parent d rel found=""
+  parent=$(dirname "${live}")
+  while IFS= read -r d; do
+    [[ -n "${d}" ]] || continue
+    for rel in data resources/python_venv; do
+      if sudo test -e "${d}/jeedom2ha/${rel}" && ! sudo test -e "${live}/${rel}"; then
+        found+="    ${d}/jeedom2ha/${rel} (absent de ${live}/${rel})"$'\n'
+      fi
+    done
+  done < <(sudo find "${parent}" -mindepth 1 -maxdepth 1 -type d \
+             \( -name '.jeedom2ha-deploy.*' -o -name '.jeedom2ha-rollback.*' \) 2>/dev/null)
+  if [[ -n "${found}" ]]; then
+    echo "ERROR: bascule précédente interrompue — des données du plugin sont restées hors du plugin en place :" >&2
+    printf '%s' "${found}" >&2
+    echo "  Rien n'a été modifié ni supprimé. Remettre ces dossiers à leur place dans ${live}/ (mv, même système de fichiers)," >&2
+    echo "  vérifier le plugin dans Jeedom, puis relancer le déploiement." >&2
+    return 1
+  fi
+}
+
 # jeedom2ha_promote_plugin_dir <staging> <live> <owner>
 # Étape 1b de deploy-to-box.sh. Le plugin en place est un prérequis (l'étape
 # 1a-bis refuse déjà de déployer sans lui, faute de rollback sûr), et le
@@ -259,6 +286,16 @@ jeedom2ha_retain_previous() {
 # `set -e`, que bash neutralise si l'appelant écrit `… || …`.
 # Après un échange, imprime __JEEDOM2HA_PREVIOUS_WORK__=<work> : l'ancien
 # arbre y reste (jamais supprimé ici) jusqu'à jeedom2ha_retain_previous.
+#
+# Sortie anticipée (erreur, signal) — le trap EXIT dépend de la phase :
+#   prepare : <work> ne contient que le code préparé → supprimé ;
+#   moving  : dès le PREMIER déplacement, plus aucun rm : data/ et le venv
+#             encore dans <work> sont remis dans le plugin en place (s'il ne
+#             les a pas), puis <work> est laissé tel quel et signalé ;
+#   done    : échange fait → rien (l'ancien arbre attend le contrôle).
+# Pendant « déplacement → échange », HUP/INT/TERM/PIPE sont ignorés : une
+# coupure SSH ne peut pas interrompre la section (la commande distante est
+# déjà entièrement lue en mémoire par bash).
 jeedom2ha_promote_plugin_dir() {
   local staging="$1" live="$2" owner="$3"
   local user="${owner%%:*}"
@@ -266,12 +303,37 @@ jeedom2ha_promote_plugin_dir() {
     set -euo pipefail
     sudo test -d "${live}" || { echo "ERROR: plugin absent à ${live}." >&2; exit 1; }
     sudo test -d "${staging}" || { echo "ERROR: staging absent à ${staging}." >&2; exit 1; }
-    local parent work next rel fs_live fs
-    local -a moved=()
+    jeedom2ha_check_leftovers "${live}" || exit 1
+    local parent work next rel fs_live fs phase=prepare
     parent=$(dirname "${live}")
     work=$(sudo mktemp -d "${parent}/.jeedom2ha-deploy.XXXXXX") || exit 1
-    # Tant que rien n'a basculé, <work> ne contient que le code préparé.
-    trap 'sudo rm -rf -- "${work}"' EXIT
+
+    # Remet data/ et le venv dans le plugin en place s'ils sont encore dans
+    # l'arbre préparé. Fondé sur l'existence (pas sur un compteur) : sûr
+    # quel que soit l'instant de l'interruption, y compris après l'échange
+    # (l'arbre à ${next} est alors l'ancien, sans data/).
+    jeedom2ha__restore_moved() {
+      local r
+      for r in resources/python_venv data; do
+        if sudo test -e "${next}/${r}" && ! sudo test -e "${live}/${r}"; then
+          sudo mv -T "${next}/${r}" "${live}/${r}" \
+            || echo "ERROR: impossible de remettre ${r} : il est dans ${next}/${r}" >&2
+        fi
+      done
+    }
+    jeedom2ha__on_exit() {
+      local rc=$?
+      case "${phase}" in
+        prepare) sudo rm -rf -- "${work}" ;;
+        moving)
+          jeedom2ha__restore_moved
+          echo "ERROR: bascule interrompue (code ${rc}) : data/ et venv remis dans ${live} ; dossier de travail conservé, rien supprimé : ${work}" >&2 || true
+          ;;
+        *) ;;
+      esac
+    }
+    trap jeedom2ha__on_exit EXIT
+
     # 711 : www-data peut traverser (contrôle de lisibilité ci-dessous) sans
     # pouvoir lister.
     sudo chmod 711 "${work}" || exit 1
@@ -307,40 +369,21 @@ jeedom2ha_promote_plugin_dir() {
       echo "ERROR: le démon jeedom2ha tourne : bascule annulée pour ne pas croiser ses écritures dans data/." >&2
       exit 1
     fi
+    sudo mkdir -p "${next}/resources" || exit 1
 
-    # Retour arrière des déplacements si la bascule n'a pas lieu.
-    jeedom2ha__restore_moved() {
-      local r i
-      for (( i=${#moved[@]}-1; i>=0; i-- )); do
-        r="${moved[$i]}"
-        sudo mv -T "${next}/${r}" "${live}/${r}" \
-          || echo "ERROR: impossible de remettre ${r} : il est dans ${next}/${r}" >&2
-      done
-    }
+    # ---- Section protégée : déplacement → échange ------------------------
+    trap '' HUP INT TERM PIPE
+    phase=moving
     for rel in data resources/python_venv; do
       sudo test -e "${live}/${rel}" || continue
-      sudo mkdir -p "$(dirname "${next}/${rel}")" || { jeedom2ha__restore_moved; trap - EXIT; exit 1; }
-      if ! sudo mv -T "${live}/${rel}" "${next}/${rel}"; then
-        jeedom2ha__restore_moved; trap - EXIT
-        echo "ERROR: déplacement de ${rel} impossible — bascule annulée." >&2
-        exit 1
-      fi
-      moved+=("${rel}")
+      sudo mv -T "${live}/${rel}" "${next}/${rel}" || exit 1   # trap : remise en place
     done
-
-    if ! jeedom2ha_exchange_dirs "${next}" "${live}"; then
-      jeedom2ha__restore_moved
-      # Les données sont revenues (ou le message ci-dessus dit où elles
-      # sont) : on ne supprime pas <work> par précaution.
-      trap - EXIT
-      echo "ERROR: échange atomique en échec — plugin en place inchangé, dossier de travail conservé : ${work}" >&2
-      exit 1
-    fi
-    # L'ancien arbre est désormais dans <work> : plus jamais supprimé ici.
-    trap - EXIT
-    echo "  Bascule atomique (renameat2 RENAME_EXCHANGE) : ${live} remplacé d'un seul coup ; data/ et venv déplacés (rename), jamais copiés."
-    echo "__JEEDOM2HA_PREVIOUS_WORK__=${work}"
-    echo "  Permissions OK (www-data, 755/644, main.py +x)."
+    jeedom2ha_exchange_dirs "${next}" "${live}" || exit 1      # trap : remise en place
+    phase=done
+    # ----------------------------------------------------------------------
+    echo "  Bascule atomique (renameat2 RENAME_EXCHANGE) : ${live} remplacé d'un seul coup ; data/ et venv déplacés (rename), jamais copiés." || true
+    echo "__JEEDOM2HA_PREVIOUS_WORK__=${work}" || true
+    echo "  Permissions OK (www-data, 755/644, main.py +x)." || true
   )
 }
 
