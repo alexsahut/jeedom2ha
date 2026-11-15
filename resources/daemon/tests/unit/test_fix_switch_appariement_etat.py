@@ -217,7 +217,9 @@ def test_ambiguous_equipment_keeps_its_secondary_entities_and_names_the_cause():
     for cmd_id in (5706, 5707, 5490, 5491, 5708):
         assert by_cmd[cmd_id].reason == "ambiguous_skipped"  # plus « sans équivalent »
     cause = resolve_cause_ux("ambiguous_skipped", 2, SWITCH_PAIRING_AMBIGUOUS)
-    assert "On/Off" in cause["cause_label"] and "Valeur" in cause["cause_action"]
+    assert "On/Off" in cause["cause_label"]
+    assert "Commande information à mettre à jour" in cause["cause_action"]
+    assert "commande d'état liée" in cause["cause_action"] and "Valeur" not in cause["cause_action"]
 
 
 def test_forcing_the_publication_never_pilots_an_ambiguous_switch():
@@ -376,3 +378,56 @@ async def test_4d_contract_is_unchanged_for_the_scene(aiohttp_client):
     ambiguous = equipments[CHAUFFE_EAU_SANS_LIEN_ID]
     assert ambiguous["perimetre"] == "inclus"
     assert ambiguous["ecart"] is compute_ecart("inclus", ambiguous["statut"])
+
+
+# --- Relecture : un seul sens en double, et ordre des infos d'état --------------------------------
+
+def _two_on_one_off(off_extra):
+    cmds = [
+        {"id": 31, "name": "Etat", "generic_type": "ENERGY_STATE", "type": "info", "sub_type": "binary"},
+        {"id": 32, "name": "Mode", "type": "info", "sub_type": "string"},
+        {"id": 33, "name": "On", "generic_type": "ENERGY_ON", "type": "action", "sub_type": "other", "update_cmd_id": "31"},
+        {"id": 34, "name": "Manu", "generic_type": "ENERGY_ON", "type": "action", "sub_type": "other", "virtual_info_id": "32"},
+        {"id": 35, "name": "Off", "generic_type": "ENERGY_OFF", "type": "action", "sub_type": "other", **off_extra},
+    ]
+    snapshot = _snapshot_of([_eq_raw(30, cmds, name="Ballon")])
+    return snapshot.eq_logics[30], snapshot
+
+
+@pytest.mark.parametrize("off_extra", [{}, {"update_cmd_id": "31"}])
+def test_single_order_kept_when_the_other_side_is_chosen_by_its_link(off_extra):
+    """Deux On (un relié à l'état), un seul Off non relié (ou relié) : le switch existant est gardé."""
+    eq, snapshot = _two_on_one_off(off_extra)
+    switch = MapperRegistry().map(eq, snapshot)
+    assert (switch.confidence, switch.reason_code) == ("sure", "switch_on_off_state")
+    assert _roles(switch) == {"ENERGY_STATE": 31, "ENERGY_ON": 33, "ENERGY_OFF": 35}
+
+
+def test_single_order_linked_to_another_info_stays_ambiguous():
+    eq, snapshot = _two_on_one_off({"update_cmd_id": "32"})
+    switch = MapperRegistry().map(eq, snapshot)
+    assert (switch.confidence, switch.reason_code) == ("ambiguous", SWITCH_PAIRING_AMBIGUOUS)
+
+
+@pytest.mark.parametrize("state_order", [(5530, 5708), (5708, 5530)])
+def test_state_targeted_by_linked_actions_whatever_the_order(state_order):
+    """Deux ENERGY_STATE (« Routage réel » numérique et « activé ») : l'état retenu est celui que
+    visent les actions reliées, quel que soit l'ordre des commandes dans Jeedom."""
+    cmds = chauffe_eau_cmds()
+    states = {c["id"]: c for c in cmds if c["id"] in state_order}
+    others = [c for c in cmds if c["id"] not in state_order]
+    ordered = [states[state_order[0]], *others, states[state_order[1]]]
+    snapshot = _snapshot_of([_eq_raw(CHAUFFE_EAU_ID, ordered)])
+    switch = MapperRegistry().map(snapshot.eq_logics[CHAUFFE_EAU_ID], snapshot)
+    assert (switch.confidence, switch.reason_code) == ("sure", "switch_on_off_state")
+    assert _roles(switch) == {"ENERGY_STATE": 5708, "ENERGY_ON": 5706, "ENERGY_OFF": 5707}
+
+
+def test_state_choice_without_links_keeps_the_last_one_seen():
+    """Sans lien, rien n'est deviné : l'état reste le dernier vu (comportement d'avant), et le
+    switch à plusieurs paires reste ambigu."""
+    from mapping.pairing import choose_state
+    s1, s2 = JeedomCmd(id=1, name="a"), JeedomCmd(id=2, name="b")
+    on1, on2 = JeedomCmd(id=3, name="c"), JeedomCmd(id=4, name="d")
+    assert choose_state([s1, s2], [on1, on2], []).id == 2
+    assert choose_state([s1, s2], [on1], []).id == 2  # une seule paire : inchangé

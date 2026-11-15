@@ -619,7 +619,7 @@
     switch_state_orphan: 'état sans ordre On/Off — rien à piloter ; choisissez le type binary_sensor dans « Type HA », puis « Toujours »',
     conflicting_generic_types: 'types génériques en conflit — précisez-les dans Jeedom',
     // fix/switch-appariement-etat — plusieurs paires On/Off, aucune reliée de façon sûre à l'info d'état.
-    switch_pairing_ambiguous: 'plusieurs ordres On/Off — reliez à l’état ceux qui pilotent l’appareil (champ « Valeur » dans Jeedom)',
+    switch_pairing_ambiguous: 'plusieurs ordres On/Off — reliez à l’état, dans Jeedom, ceux qui pilotent l’appareil',
     probable_skipped: 'confiance « probable » exclue par la politique « sûr uniquement »',
     disabled_eqlogic: 'équipement désactivé dans Jeedom',
     no_supported_generic_type: 'type non couvert par la V1 du plugin',

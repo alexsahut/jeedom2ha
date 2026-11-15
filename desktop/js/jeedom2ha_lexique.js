@@ -121,8 +121,8 @@
         quoi: 'Non publié en interrupteur : l’équipement a plusieurs ordres On et Off.',
         pourquoi: 'Aucun n’est relié de façon sûre à l’état de l’appareil : le plugin ne devine pas lequel le pilote.',
         actions: ['equipment'],
-        aide: 'Dans Jeedom, reliez l’ordre On et l’ordre Off qui pilotent l’appareil à son état (champ « Valeur » de '
-          + 'chaque action), sans toucher aux types génériques. ' + RELOAD_HELP,
+        aide: 'Dans Jeedom, reliez l’ordre On et l’ordre Off qui pilotent l’appareil à son état : pour un virtuel, « Commande information à mettre à jour » de chaque action ; pour un autre plugin, la commande d’état liée de l’action. '
+          + 'Ne changez ni la valeur que l’action écrit, ni les types génériques. ' + RELOAD_HELP,
       };
     },
     switch_state_orphan: function () {

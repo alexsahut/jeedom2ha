@@ -183,13 +183,15 @@ _STATE_ONLY_CAUSE = {
 
 # fix/switch-appariement-etat — cause précise « plusieurs paires On/Off » (`switch_pairing_ambiguous`,
 # mapping `ambiguous`) : le plugin ne sait pas quelle paire pilote l'état, il ne devine pas. Le
-# remède est dans Jeedom : relier les ordres On/Off à leur info d'état (champ « Valeur » de l'action,
-# ou « mise à jour de la commande » en configuration avancée) ; les types génériques restent intacts.
+# remède est dans Jeedom : relier les ordres On/Off à leur info d'état (virtuel : « Commande information
+# à mettre à jour » ; autre plugin : commande d'état liée de l'action) ; types génériques et valeurs intacts.
 _PAIRING_MAPPING_REASON = "switch_pairing_ambiguous"
 _PAIRING_CAUSE = {
     "label": "Plusieurs ordres On/Off — aucun relié de façon sûre à l'état, non publié en interrupteur",
     "action": "Dans Jeedom, relier l'action On et l'action Off qui pilotent l'appareil à leur info d'état "
-              "(champ « Valeur » de l'action), puis relancer une synchronisation.",
+              "(pour un virtuel, « Commande information à mettre à jour » de chaque action ; pour un autre "
+              "plugin, la commande d'état liée de l'action), sans changer la valeur écrite ni les types "
+              "génériques, puis relancer une synchronisation.",
 }
 
 # Alias fermés provenant de la taxonomie decision_trace.reason_code.

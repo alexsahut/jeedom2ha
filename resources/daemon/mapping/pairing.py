@@ -7,8 +7,12 @@ Règles (pas de devinette) :
 
 - au plus une action par sens : comportement d'avant, inchangé (rétrocompatibilité), que l'action
   soit reliée à une info ou non ;
-- plusieurs actions d'un même sens : pour chaque sens présent, on garde l'unique action reliée à
-  l'info d'état retenue ; zéro ou plusieurs actions reliées dans un sens → ``ambiguous``.
+- plusieurs actions d'un même sens : pour chaque sens en double, on garde l'unique action reliée à
+  l'info d'état retenue (zéro ou plusieurs reliées → ``ambiguous``) ; un sens qui n'a qu'une action
+  la garde si elle est reliée à l'état, ou si elle n'est reliée à rien alors que l'autre sens a été
+  retenu par son lien (une action unique reliée à une AUTRE info → ``ambiguous``) ;
+- plusieurs infos d'état candidates (cas « plusieurs paires » seulement) : l'état retenu est celui
+  que visent les actions reliées, s'il est unique (``choose_state``), sinon le dernier vu (avant).
 
 Le lien d'une action vers une info se lit dans Jeedom, en lecture seule
 (``JeedomCmd.linked_info_ids``) : champ « Valeur » du cœur (``linked_value``), configuration
@@ -68,14 +72,43 @@ def pair_on_off(
 
     state_id = int(state.id)
     chosen: Dict[str, Optional[JeedomCmd]] = {}
+    by_link: Dict[str, bool] = {}
     for key, cmds in ((on_key, ons), (off_key, offs)):
         if not cmds:
             chosen[key] = None
             continue
         linked = [c for c in cmds if _linked_to(c, state_id)]
-        if len(linked) != 1:
-            return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
-        chosen[key] = linked[0]
+        if len(linked) == 1:
+            chosen[key], by_link[key] = linked[0], True
+            continue
+        if len(cmds) == 1 and not cmds[0].linked_info_ids():
+            chosen[key], by_link[key] = cmds[0], False  # sens unique, non relié : décidé ci-dessous
+            continue
+        return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
+    # Une action unique non reliée n'est gardée que si l'autre sens a été retenu par son lien.
+    if by_link and not any(by_link.values()):
+        return OnOffPairing(on=None, off=None, status=PAIRING_AMBIGUOUS, candidates=candidates)
     return OnOffPairing(
         on=chosen[on_key], off=chosen[off_key], status=PAIRING_LINKED, candidates=candidates
     )
+
+
+def choose_state(states: List[JeedomCmd], ons: List[JeedomCmd], offs: List[JeedomCmd]) -> Optional[JeedomCmd]:
+    """Info d'état retenue quand plusieurs paires On/Off existent.
+
+    Plusieurs infos d'état candidates : celle que visent les actions reliées, si elle est unique ;
+    sinon la dernière vue (comportement d'avant). Ainsi l'ordre des commandes dans Jeedom ne
+    change pas le résultat dès que les actions sont reliées.
+    """
+    if not states:
+        return None
+    if len(states) == 1 or (len(ons) <= 1 and len(offs) <= 1):
+        return states[-1]
+    state_ids = {int(c.id) for c in states}
+    targeted = set()
+    for cmd in [*ons, *offs]:
+        targeted |= set(cmd.linked_info_ids()) & state_ids
+    if len(targeted) == 1:
+        target = next(iter(targeted))
+        return next(c for c in states if int(c.id) == target)
+    return states[-1]

@@ -11,7 +11,7 @@ const M = require('../../desktop/js/jeedom2ha_mapping_override.js');
 const L = require('../../desktop/js/jeedom2ha_lexique.js');
 
 const CODE = 'switch_pairing_ambiguous';
-const LABEL = 'plusieurs ordres On/Off — reliez à l’état ceux qui pilotent l’appareil (champ « Valeur » dans Jeedom)';
+const LABEL = 'plusieurs ordres On/Off — reliez à l’état, dans Jeedom, ceux qui pilotent l’appareil';
 
 function ambiguousView() {
   return {
@@ -34,7 +34,10 @@ describe('fix/switch-appariement-etat — cause « plusieurs ordres On/Off »', 
     const sheet = L.causeSheet(CODE);
     assert.match(sheet.quoi, /plusieurs ordres On et Off/);
     assert.deepEqual(sheet.actions.map((a) => a.key), ['equipment']);
-    assert.match(sheet.aide, /champ « Valeur »/);
+    assert.match(sheet.aide, /« Commande information à mettre à jour »/);
+    assert.match(sheet.aide, /commande d’état liée/);
+    assert.match(sheet.aide, /Ne changez ni la valeur/);
+    assert.doesNotMatch(sheet.aide, /champ « Valeur »/);
     assert.doesNotMatch(sheet.aide, /type générique[^s]/);
   });
 
@@ -44,6 +47,25 @@ describe('fix/switch-appariement-etat — cause « plusieurs ordres On/Off »', 
     const overview = fs.readFileSync(path.join(root, 'desktop/js/jeedom2ha_overview.js'), 'utf8');
     assert.ok(surface.includes("switch_pairing_ambiguous: '{{Ordres On/Off en double}}'"));
     assert.ok(overview.includes("switch_pairing_ambiguous: '{{Ordres On / Off en double}}'"));
+  });
+
+  it('libellé, fiche, cause du démon, doc et changelog disent le même remède (champs réels de Jeedom)', () => {
+    const root = path.resolve(__dirname, '../..');
+    const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').replace(/[’]/g, "'");
+    const texts = {
+      lexique: L.causeSheet(CODE).aide.replace(/[’]/g, "'"),
+      cause: read('resources/daemon/models/cause_mapping.py').replace(/"\s*\n\s*"/g, ''),
+      doc: read('docs/fr_FR/index.md'),
+    };
+    for (const [name, text] of Object.entries(texts)) {
+      assert.match(text, /« Commande information à mettre à jour »/, name);
+      assert.match(text, /commande d'état liée de l'action/, name);
+    }
+    const changelog = read('docs/fr_FR/changelog_beta.md');
+    assert.ok(changelog.includes(LABEL.replace(/[’]/g, "'")) || fs.readFileSync(path.join(root, 'docs/fr_FR/changelog_beta.md'), 'utf8').includes(LABEL));
+    assert.match(changelog, /« Commande information à mettre à jour »/);
+    assert.doesNotMatch(changelog, /configuration avancée du cœur/);
+    assert.doesNotMatch(texts.doc.split('\n').find((l) => l.includes(LABEL.replace(/[’]/g, "'"))) || '', /champ « Valeur » de chaque action/);
   });
 
   it('la documentation reprend le libellé mot pour mot', () => {
