@@ -480,8 +480,6 @@
 .j2ha-v3-type-head .j2ha-v2-type-title { flex: 1 1 auto; min-width: 0; }
 .j2ha-v3-type-generic { flex: 0 0 auto; font-size: 12.5px; color: var(--link-color, var(--j2ha-todo)); white-space: nowrap; }
 .j2ha-v3-type-modal .j2ha-v2-type-idchange { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 0; }
-.j2ha-v3-info { display: inline-block; cursor: help; color: var(--j2ha-neutral); padding: 0 2px; }
-.j2ha-v3-info:focus { outline: 2px solid var(--j2ha-todo); outline-offset: 1px; }
 /* « Choisir ce qui est publié » : en-tête d'une ligne (regroupement, ⓘ, « En cas de doute »), compteur n/m, marque ⏻. */
 .j2ha-v3-excl-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
 .j2ha-v3-excl-head .j2ha-v2-seg { margin: 0; }
@@ -998,3 +996,60 @@
   .j2ha-v3-sc-filters { margin-left: 0; }
   .j2ha-v3-sc-filters .j2ha-v3-sc-search { width: 140px; }
 }
+
+/* --- front-v3 Lot 6 : info-bulles ⓘ (jeedom2ha_infotip.js) --- */
+/* ⓘ : un vrai bouton, sans habillage ; la bulle s'ouvre au clic, au toucher, à Entrée / Espace, ou après 300 ms de survol. */
+button.j2ha-info.j2ha-v3-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 2px 3px;
+  border: 0;
+  border-radius: var(--border-radius, 0);
+  background: transparent;
+  color: var(--j2ha-neutral);
+  font: inherit;
+  line-height: 1;
+  vertical-align: baseline;
+  cursor: pointer;
+  box-shadow: none;
+}
+button.j2ha-info.j2ha-v3-info:hover,
+button.j2ha-info.j2ha-v3-info.is-open { color: var(--j2ha-todo); }
+button.j2ha-info.j2ha-v3-info:focus { outline: none; }
+button.j2ha-info.j2ha-v3-info:focus-visible,
+.j2ha-tip.j2ha-v3-tip:focus-visible { outline: 2px solid var(--j2ha-todo); outline-offset: 1px; }
+.j2ha-tip.j2ha-v3-tip { cursor: pointer; }
+.j2ha-tip.j2ha-v3-tip.is-open { text-decoration: underline dotted; }
+/* La bulle : sur body, position fixe, au-dessus de tout (fenêtre « Corriger le type » et boîtes du cœur comprises). */
+.j2ha-info-pop.j2ha-v3-pop {
+  position: fixed;
+  z-index: 100000;
+  box-sizing: border-box;
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--j2ha-line);
+  border-radius: var(--border-radius, 0);
+  background: var(--j2ha-menu-bg);
+  color: var(--j2ha-text);
+  box-shadow: 0 4px 16px var(--j2ha-line);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.j2ha-v3-pop .j2ha-v3-pop-more { color: var(--j2ha-todo); text-decoration: underline; white-space: nowrap; }
+.j2ha-v3-pop .j2ha-v3-pop-arrow {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  background: var(--j2ha-menu-bg);
+  border: 1px solid var(--j2ha-line);
+  transform: rotate(45deg);
+}
+.j2ha-v3-pop[data-side="below"] .j2ha-v3-pop-arrow { top: -6px; border-right: 0; border-bottom: 0; }
+.j2ha-v3-pop[data-side="above"] .j2ha-v3-pop-arrow { bottom: -6px; border-left: 0; border-top: 0; }

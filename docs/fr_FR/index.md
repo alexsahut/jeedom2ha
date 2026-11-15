@@ -4,7 +4,7 @@
 
 > **Vous découvrez le plugin ?** Commencez par **[Premiers pas](premiers-pas.md)** : une page, de l'installation à votre premier équipement dans Home Assistant.
 
-L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleur, à son icône et à son mot, et chaque bouton a son info-bulle. Cette documentation est le « En savoir plus » : une section par écran, avec les mots de l'écran.
+L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleur, à son icône et à son mot, et chaque bouton a son info-bulle. Pour lire une aide, cliquez (ou touchez) **ⓘ**, une pastille ou une marque : la bulle s'ouvre, avec « En savoir plus » vers la section concernée ; un second clic, Échap ou un clic ailleurs la ferme. Cette documentation est le « En savoir plus » : une section par écran, avec les mots de l'écran.
 
 ---
 
@@ -89,7 +89,7 @@ Sur la page maison, les trois derniers sont regroupés dans la puce **« exclus 
 
 | Mot | Couleur | Icône | Où | Ce que cela veut dire |
 |---|---|---|---|---|
-| **Conseil** | bleu | ampoule ou ⓘ | « À faire », fiche | Un équipement publié pourrait faire mieux. Ce n'est pas un état. |
+| **Conseil** | bleu | ampoule | « À faire », fiche | Un équipement publié pourrait faire mieux. Ce n'est pas un état. |
 | « 2 bloquées » | orange | triangle ⚠ | fiche, arbre | Des commandes d'un équipement publié sont bloquées. Ce n'est pas un état. |
 | **Actif**, **Connecté**, « Vu à 21:04 » | point vert | — | barre d'état | Le démon, le broker ou Home Assistant répond. |
 | **Non confirmé**, « Inconnu » | point gris, « ? » | — | barre d'état | Pas encore vérifié ; pas une panne. |

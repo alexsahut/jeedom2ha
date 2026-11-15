@@ -190,7 +190,8 @@ function openFiche(tree) {
 // Assistant » d'une ligne par entité, « Détails techniques » dans le menu ⋯). Les cinq constats de la démo restent vérifiés, sur
 // le nouveau rendu : la phrase longue de chaque cause passe dans l'info-bulle ⓘ, le « comment faire » dans « Détails techniques ».
 describe('Lot 2 — fiche rendue : acceptation sur les cinq constats de la démo', () => {
-  const info = (ui, P, scope) => plain(ui.$(P + scope + ' .j2ha-eq-band-info').attr('title') || '');
+  // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+  const info = (ui, P, scope) => plain(ui.$(P + scope + ' .j2ha-eq-band-info').attr('data-j2ha-tip') || '');
   const tech = (ui, P) => plain(ui.$(P + '.j2ha-eq-tech').text()).replace(/\s+/g, ' ');
 
   it('1. multiprise : « Publié », 3 capteurs binaires en lecture seule, conseil « 3 sorties pilotables » avec le remède du champ « Valeur »', () => {
@@ -289,7 +290,7 @@ describe('Lot 2 — fiche rendue : en-tête, bloc Home Assistant, tableau, régl
     assert.equal(text('.j2ha-eq-meta-facts'), 'Virtuel · 9 commandes');
     assert.equal(ui.$(P + '.j2ha-eq-meta-facts').attr('title'), '3 états, 3 ordres On, 3 ordres Off');
     assert.equal(ui.$(P + '.j2ha-eq-open-jeedom').attr('href'), 'index.php?v=d&m=virtual&p=virtual&id=142');
-    assert.match(plain(ui.$(P + '.j2ha-v2-where-toggle').attr('title')), /Paramètres › Appareils et services › MQTT, puis l’appareil « Multiprise Bureau »/);
+    assert.match(plain(ui.$(P + '.j2ha-v2-where-toggle').attr('data-j2ha-tip')), /Paramètres › Appareils et services › MQTT, puis l’appareil « Multiprise Bureau »/);
     assert.equal(text('.j2ha-eq-ha-title').replace(/3 entités$/, '').trim(), 'Dans Home Assistant');
     assert.match(plain(ui.$(P + '.j2ha-eq-entity-id').attr('title')), /Home Assistant peut ajuster cet identifiant/);
   });

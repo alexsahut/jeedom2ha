@@ -121,9 +121,9 @@ describe('Lot 7 / E2 — bloc « À faire »', () => {
     assert.ok(byId['102'] && byId['106'], 'les deux équipements bloqués');
     assert.equal(plain(ui.$(byId['102']).find('.j2ha-v3-todo-icon').attr('aria-label')), 'Bloqué');
     assert.equal(plain(ui.$(byId['102']).find('.j2ha-v2-todo-cause').text()), 'Type ambigu');
-    assert.equal(plain(ui.$(byId['102']).find('.j2ha-v2-todo-cause').attr('title')), 'Le plugin hésite sur le type de cet équipement.');
+    assert.equal(plain(ui.$(byId['102']).find('.j2ha-v2-todo-cause').attr('data-j2ha-tip')), 'Le plugin hésite sur le type de cet équipement.');
     assert.equal(plain(ui.$(byId['106']).find('.j2ha-v2-todo-cause').text()), 'Sans type générique');
-    assert.equal(plain(ui.$(byId['106']).find('.j2ha-v2-todo-cause').attr('title')), 'Jeedom ne sait pas à quoi servent ces commandes.');
+    assert.equal(plain(ui.$(byId['106']).find('.j2ha-v2-todo-cause').attr('data-j2ha-tip')), 'Jeedom ne sait pas à quoi servent ces commandes.');
     // Garde levée (front v2, Lot 9a, point 9) : l'équipement hésitant propose « Publier quand même » (le type corrigé ne
     // le débloquerait pas) ; le bouton ouvre la fiche, où l'action du même nom règle « Toujours ».
     const fix = ui.$(byId['102']).find('.j2ha-v2-todo-action');

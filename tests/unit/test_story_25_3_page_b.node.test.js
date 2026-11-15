@@ -47,7 +47,8 @@ describe('25.3 / AC9 — barre de santé compacte, actions, menu « ⋯ »', () 
     }
     // Garde levée (front v3, Lot 1) : pastilles « point + mot » (Démon, MQTT, Home Assistant), le mot porté par `data-word`
     // et le détail en info-bulle ; « Relu HH:MM » ; « Dernière opération » masquée sauf échec ; plus d'intitulés <strong>.
-    const words = [...main.matchAll(/class="j2ha-v3-pill" data-word="([^"]*)"/g)].map((m) => plain(m[1]));
+    // Garde levée (front v3, Lot 6) : chaque pastille porte aussi `j2ha-tip` (bulle au clic, au toucher, au clavier).
+    const words = [...main.matchAll(/class="j2ha-v3-pill j2ha-tip j2ha-v3-tip"[^>]*? data-word="([^"]*)"/g)].map((m) => plain(m[1]));
     assert.deepEqual(words, ['Démon', 'MQTT', 'Home Assistant', '']);
     assert.doesNotMatch(main, /<strong>\{\{(Dernière relecture|Dernière opération)\}\}<\/strong>/);
     // « Republier tout » passe dans le menu ⋯ ; « Appliquer (n) » (masqué tant que n = 0) précède « Relire Jeedom ».

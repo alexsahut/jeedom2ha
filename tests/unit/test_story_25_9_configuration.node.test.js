@@ -135,7 +135,8 @@ test('front v3 (Lot 3) réel — aucune case de plugin ; lien « Choisir ce qui 
     const link = page.locator('#lnk_j2haChoosePublished');
     assert.equal((await link.innerText()).trim(), 'Choisir ce qui est publié');
     assert.equal(await link.getAttribute('href'), 'index.php?v=d&m=jeedom2ha&p=jeedom2ha#j2ha-choisir');
-    assert.match(await page.locator('#p_j2haChoosePublished .fa-info-circle').getAttribute('title'), /En cas de doute/);
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(await page.locator('#p_j2haChoosePublished .j2ha-info').getAttribute('data-j2ha-tip'), /En cas de doute/);
     const keys = await page.evaluate(() => [...document.querySelectorAll('#div_plugin_configuration .configKey')].map((el) => el.getAttribute('data-l1key')));
     assert.ok(keys.every((k) => /^mqtt/.test(k)), keys.join(','));
     assert.deepEqual(ctx.requests.map((r) => r.action), ['getMqttConfig']);
@@ -152,7 +153,8 @@ test('front v3 (Lot 3) réel — avertissement cron5 d\'une ligne, seulement si 
     const note = page.locator('#p_cron5Note');
     assert.equal(await note.isVisible(), true);
     assert.equal((await note.innerText()).trim(), 'cron5 désactivé : mises à jour manuelles');
-    assert.match(await note.locator('.fa-info-circle').getAttribute('title'), /Toutes les 5 minutes/);
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(await note.locator('.j2ha-info').getAttribute('data-j2ha-tip'), /Toutes les 5 minutes/);
     // La case du cœur (bloc « Fonctionnalités ») recochée sur la même page : l'avertissement disparaît.
     await page.evaluate(() => {
       $('body').append('<input type="checkbox" class="configKey" data-l1key="functionality::cron5::enable">');
@@ -373,9 +375,11 @@ test('Lot 4 réel — en-tête, retour à la page du plugin, avertissement d\'un
     await withConfigurationPage(t, fixture, async (page) => {
       const text = (await page.locator('#div_plugin_configuration').innerText()).replace(/\s+/g, ' ');
       assert.doesNotMatch(text, /Indiquez le broker que Home Assistant utilise déjà/);
-      assert.match(await page.locator('#i_mqttBrokerIntro').getAttribute('title'), /Indiquez le broker que Home Assistant utilise déjà/);
+      // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+      assert.match(await page.locator('#i_mqttBrokerIntro').getAttribute('data-j2ha-tip'), /Indiquez le broker que Home Assistant utilise déjà/);
       assert.equal((await page.locator('#p_mqttOneInstance').innerText()).trim(), 'Une seule installation jeedom2ha par broker MQTT.');
-      assert.match(await page.locator('#p_mqttOneInstance .fa-info-circle').getAttribute('title'), /retirerait les boutons de scénario/);
+      // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+      assert.match(await page.locator('#p_mqttOneInstance .j2ha-info').getAttribute('data-j2ha-tip'), /retirerait les boutons de scénario/);
       assert.match(text, /Tester, enregistrer et redémarrer le démon/);
       assert.match(text, /Tester seulement/);
       assert.equal(await page.locator('#p_j2haBackTop a, #p_j2haBackBottom a').count(), 2);

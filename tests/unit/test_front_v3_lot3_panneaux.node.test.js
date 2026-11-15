@@ -147,7 +147,8 @@ test('Lot 3 (2) réel — panneau sans phrase : ⓘ, « En cas de doute » dans 
       const panel = page.locator('.bootbox .j2ha-v2-excl');
       await panel.waitFor();
       assert.equal(await panel.locator('p').count(), 0, 'aucun paragraphe');
-      assert.match(await panel.locator('.j2ha-v2-excl-rule').getAttribute('title'), /ni lui-même, ni par sa pièce, ni par son plugin/);
+      // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+      assert.match(await panel.locator('.j2ha-v2-excl-rule').getAttribute('data-j2ha-tip'), /ni lui-même, ni par sa pièce, ni par son plugin/);
       const head = panel.locator('.j2ha-v3-excl-head');
       assert.equal(plain(await head.locator('.j2ha-v3-excl-doubt-label').innerText()), 'En cas de doute');
       assert.equal(await head.locator('.j2ha-v3-excl-doubt button[data-policy="sure_probable"]').getAttribute('aria-pressed'), 'true');
@@ -190,7 +191,7 @@ for (const theme of ['Light', 'Dark']) {
         await page.locator('#j2ha_v2_guide .j2ha-v2-step').first().waitFor();
         const m = await page.$$eval('#j2ha_v2_guide .j2ha-v2-step', (steps) => steps.map((s) => ({
           h: Math.round(s.getBoundingClientRect().height), ps: s.querySelectorAll('p').length,
-          info: !!s.querySelector('.j2ha-v3-info[title]'), title: s.querySelector('.j2ha-v2-step-title').childNodes[0].textContent.trim(),
+          info: !!s.querySelector('button.j2ha-info.j2ha-v3-info[data-j2ha-tip]'), title: s.querySelector('.j2ha-v2-step-title').childNodes[0].textContent.trim(),
         })));
         assert.equal(m.length, 4);
         assert.deepEqual(m.map((s) => s.title), ['1. Connecter le broker', '2. Vérifier Home Assistant', '3. Choisir ce qui est publié', '4. Publier les équipements']);
@@ -242,7 +243,8 @@ test('Lot 3 (4) — [Vu] / [Pas vu] pour Home Assistant (faux DOM, code réel)',
   const row = modal.find('.j2ha-v2-check[data-check="ha"]');
   assert.equal(plain(row.find('.j2ha-v2-check-haseen').text()), 'Vu');
   assert.equal(plain(row.find('.j2ha-v2-check-hahelp').text()), 'Pas vu');
-  assert.match(plain(row.find('.j2ha-v3-check-info').attr('title')), /Home Assistant se signale sur le broker/);
+  // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+  assert.match(plain(row.find('.j2ha-v3-check-info').attr('data-j2ha-tip')), /Home Assistant se signale sur le broker/);
 });
 
 // --- Revue Codex (#403, P2) : clavier dans la fenêtre « Corriger le type » ---

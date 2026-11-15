@@ -21,6 +21,15 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
+
   // Clés du stockage local (préférences de ce navigateur seulement ; illisible = valeurs par défaut).
   var STORAGE_KEYS = {
     dismissed: 'jeedom2ha.guide.dismissed',
@@ -479,11 +488,15 @@
       return $node;
     }
 
-    // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
+    // ⓘ : bouton d'aide (front v3, Lot 6) : la bulle s'ouvre au clic, au toucher ou au clavier (jeedom2ha_infotip.js) ; le
+    // guide renvoie à sa section de la documentation, « Vérifier l'installation » à la sienne.
     function info(text, cls) {
-      return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').addClass(cls || '').attr('title', text).attr('aria-label', text)
-        .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
+      var T = infoTipApi();
+      if (!T) return $('<span class="j2ha-info j2ha-v3-info"></span>').addClass(cls || '').attr('data-j2ha-tip', text).attr('title', text);
+      var doc = /j2ha-v3-(check|support)-info/.test(cls || '') ? 'vérifier-linstallation' : 'le-guide-de-démarrage';
+      return T.button($, text, { cls: 'j2ha-v3-info ' + (cls || ''), doc: doc });
     }
+    function tipEl($el, text) { var T = infoTipApi(); return T ? T.attach($el, text) : $el; }
 
     function button(label, cls, onClick) {
       var $b = $('<button type="button" class="btn btn-sm"></button>').addClass(cls || 'btn-default').text(label);
@@ -586,7 +599,7 @@
       var $title = el('<div class="j2ha-v2-step-title"></div>', step.number + '. ' + text.title + ' ');
       var $lbl = stepLabel(step);
       if ($lbl) {
-        if (step.cause) $lbl.attr('title', step.cause).attr('aria-label', step.cause);
+        if (step.cause) tipEl($lbl.attr('title', step.cause).attr('aria-label', step.cause));
         $title.append($lbl);
       }
       if (step.short) $title.append(el('<span class="j2ha-v2-small j2ha-v3-step-cause j2ha-v2-step-cause"></span>', step.short));

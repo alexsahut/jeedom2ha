@@ -22,6 +22,18 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function (M, O) {
   'use strict';
 
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
+  // Pastille ou marque purement informative : focusable, cliquable, même bulle que ⓘ ; son `title` reste en complément.
+  function infoTip($el, opts) { var T = infoTipApi(); return T ? T.attach($el, undefined, opts) : $el; }
+
+
   // Seuil de repli entre la disposition large (deux colonnes) et la disposition étroite (panneau repliable) : UNE
   // constante, reprise à l'identique par la media query CSS de la vue (test d'égalité). Valeur MESURÉE (Task 7) :
   // voir tests/fixtures/story_25_4_mesure_seuil.json ; confirmée ou révisée par la preuve terrain sur l'iPad mural.
@@ -1193,8 +1205,8 @@
         // Front v3 (Lot 2) : une pièce saine montre « ✓ Rien à faire » (la phrase passe en info-bulle) puis ses équipements,
         // chacun avec son état (icône et mot), cliquables.
         var $empty = $('<div class="j2ha-wv-todo-empty"></div>');
-        $empty.append($('<span class="j2ha-v2-lbl is-ok j2ha-wv-todo-none"></span>').attr('title', noActionSentence(ov.summary))
-          .append($('<i class="fas fa-check" aria-hidden="true"></i>')).append(doc.createTextNode(' {{Rien à faire}}')));
+        $empty.append(infoTip($('<span class="j2ha-v2-lbl is-ok j2ha-wv-todo-none"></span>').attr('title', noActionSentence(ov.summary))
+          .append($('<i class="fas fa-check" aria-hidden="true"></i>')).append(doc.createTextNode(' {{Rien à faire}}'))));
         var $eqs = $('<ul class="j2ha-wv-todo-list j2ha-wv-room-eqs"></ul>');
         ov.equipments.forEach(function (r) {
           var eq = eqOf(room, r.eq_id);
@@ -1235,7 +1247,7 @@
       ov.equipments.filter(function (row) { return row.advice === true; }).forEach(function (row) {
         var $row = $('<li class="j2ha-wv-todo-row j2ha-wv-advice-row"></li>').attr('data-eq-id', row.eq_id);
         var $main = $('<div class="j2ha-wv-todo-main"></div>')
-          .append($('<span class="j2ha-v2-lbl is-tip"></span>').append($('<i class="fas fa-info-circle" aria-hidden="true"></i>')).append(doc.createTextNode(' ' + '{{Conseil}}')))
+          .append($('<span class="j2ha-v2-lbl is-tip"></span>').append($('<i class="fas fa-lightbulb" aria-hidden="true"></i>')).append(doc.createTextNode(' ' + '{{Conseil}}')))
           .append($('<span class="j2ha-wv-todo-name j2ha-free-name"></span>').text(row.eq_name));
         $row.append($main);
         $row.on('click', function () { selectEquipment(room.object_id, row.eq_id, { user: true }); });

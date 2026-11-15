@@ -19,6 +19,18 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
+  // Front v3 (Lot 6) : composant d'aide unique (jeedom2ha_infotip.js), chargé avant ce module dans la page ; sous node, requis.
+  function infoTipApi() {
+    var g = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (g && g.Jeedom2haInfoTip) return g.Jeedom2haInfoTip;
+    if (typeof require === 'function') { try { return require('./jeedom2ha_infotip.js'); } catch (e) { return null; } }
+    return null;
+  }
+
+  // Pastille ou marque purement informative : focusable, cliquable, même bulle que ⓘ ; son `title` reste en complément.
+  function infoTip($el, opts) { var T = infoTipApi(); return T ? T.attach($el, undefined, opts) : $el; }
+
+
   var AJAX_URL = 'plugins/jeedom2ha/core/ajax/jeedom2ha.ajax.php';
   var AJAX_TIMEOUT_MS = 90000; // la route relit Jeedom : même budget client que « Relire Jeedom »
 
@@ -340,7 +352,7 @@
       }
       keys.forEach(function (key) {
         var m = MODES.filter(function (x) { return x.key === key; })[0];
-        $cell.append($('<span class="j2ha-v3-sc-tag"></span>').addClass('j2ha-v3-sc-mode-' + key).attr('title', m.option).append(icon(m.icon), textNode(' ' + m.word)));
+        $cell.append(infoTip($('<span class="j2ha-v3-sc-tag"></span>').addClass('j2ha-v3-sc-mode-' + key).attr('title', m.option).append(icon(m.icon), textNode(' ' + m.word))));
       });
       return $cell;
     }
@@ -349,15 +361,15 @@
       var $cell = $('<td class="j2ha-v3-sc-hacell"></td>');
       // État réel côté Home Assistant (`in_ha`), pas seulement le choix enregistré.
       if ((s.published === true) !== (s.in_ha === true)) {
-        return $cell.append($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-hawait"></span>')
+        return $cell.append(infoTip($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-hawait"></span>')
           .attr('title', s.published === true ? '{{Choisi, mais le bouton n’est pas encore dans Home Assistant}}' : '{{Retiré de vos choix, mais le bouton est encore dans Home Assistant}}')
-          .append($('<span aria-hidden="true">◷</span>'), textNode(' {{En attente de Home Assistant}}')));
+          .append($('<span aria-hidden="true">◷</span>'), textNode(' {{En attente de Home Assistant}}'))));
       }
       if (s.published !== true) return $cell.append($('<span class="j2ha-v3-sc-muted"></span>').text('—').attr('title', '{{Pas publié}}'));
       if (s.is_active !== true) {
-        return $cell.append($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-muted j2ha-v3-sc-unavail"></span>')
+        return $cell.append(infoTip($('<span class="j2ha-v3-sc-tag j2ha-v3-sc-muted j2ha-v3-sc-unavail"></span>')
           .attr('title', '{{Le bouton existe, mais ne fait rien tant que le scénario est inactif}}')
-          .append(icon('fa-info-circle'), textNode(' {{Indisponible}}')));
+          .append(icon('fa-ban'), textNode(' {{Indisponible}}'))));
       }
       if (typeof s.ha_entity_id !== 'string' || s.ha_entity_id === '') {
         return $cell.append($('<span class="j2ha-v3-sc-muted"></span>').text('—').attr('title', '{{Identifiant pas encore connu}}'));
@@ -382,7 +394,7 @@
       });
       $tr.append($('<td class="j2ha-v3-sc-cb"></td>').append($check));
       var $name = $('<td class="j2ha-v3-sc-namecell"></td>').append($('<span class="j2ha-v3-sc-name"></span>').text(s.name || ('#' + s.id)));
-      if (s.is_new === true) $name.append($('<span class="j2ha-v3-sc-new"></span>').attr('title', '{{Apparu depuis votre dernier choix}}').text('✱ {{nouveau}}'));
+      if (s.is_new === true) $name.append(infoTip($('<span class="j2ha-v3-sc-new"></span>').attr('title', '{{Apparu depuis votre dernier choix}}').text('✱ {{nouveau}}')));
       if (typeof s.group === 'string' && s.group !== '') $name.append($('<span class="j2ha-v3-sc-group-tag"></span>').text(s.group));
       $tr.append($name);
       $tr.append(modeCell(s));

@@ -642,7 +642,7 @@
     $notice.append($('<span class="j2ha-notice-text"></span>').text(' ' + shown));
     if (cause.kind === 'plugin') {
       var tip = '{{Les équipements de ce plugin ne sont pas publiés. À rétablir dans « Choisir ce qui est publié », par plugin.}}';
-      $notice.append(document.createTextNode(' ')).append(typeInfo(tip));
+      $notice.append(document.createTextNode(' ')).append(typeInfo(tip, 'choisir-ce-qui-est-publié'));
       $notice.append(choosePublishedButton({ mode: 'plugin', plugin: eqType || '' }, 'j2ha-open-plugin-config'));
     } else if (cause.kind === 'piece') {
       $notice.append(choosePublishedButton({ mode: 'room', roomId: roomIdOfEquipment(eqId) }, 'j2ha-open-room-choose'));
@@ -1050,7 +1050,7 @@
     var $mention = $panel.find('.j2ha-eq-blocked-mention').first().empty();
     if (resolved.blocked_mention > 0) {
       var mentionText = resolved.blocked_mention + ' ' + (resolved.blocked_mention > 1 ? 'bloquées' : 'bloquée');
-      $mention.append($('<i class="fas fa-exclamation-triangle" role="img"></i>').attr('title', mentionText).attr('aria-label', mentionText));
+      $mention.append(infoTip($('<i class="fas fa-exclamation-triangle" role="img"></i>').attr('title', mentionText).attr('aria-label', mentionText)));
     }
     renderMentions($panel, tree.jeedom_eq_id, resolved.state);
     return resolved;
@@ -1326,6 +1326,8 @@
     var first = nodes[0];
     var last = nodes[nodes.length - 1];
     var active = typeof document !== 'undefined' ? document.activeElement : null;
+    // Front v3 (Lot 6) : la bulle d'aide ouverte depuis la fenêtre (posée sur body) fait partie de la fenêtre pour le clavier.
+    if (active && active.closest && active.closest('.j2ha-info-pop')) return;
     var inside = !!active && root.contains(active);
     if (event.shiftKey && (!inside || active === first)) {
       event.preventDefault();
@@ -1361,11 +1363,16 @@
     return null;
   }
 
-  // ⓘ : l'explication en info-bulle (title + aria-label), atteignable au clavier.
-  function typeInfo(text) {
-    return $('<span class="j2ha-v3-info" role="img" tabindex="0"></span>').attr('title', text).attr('aria-label', text)
-      .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>'));
+  // ⓘ : bouton d'aide (front v3, Lot 6) : la bulle s'ouvre au clic, au toucher ou au clavier (jeedom2ha_infotip.js, chargé
+  // avant ce fichier). `doc` : ancre « En savoir plus » de la documentation (par défaut, « Corriger le type »).
+  function infoTipApi() { return window.Jeedom2haInfoTip || null; }
+  function typeInfo(text, doc, cls) {
+    var T = infoTipApi();
+    if (!T) return $('<span class="j2ha-info j2ha-v3-info"></span>').addClass(cls || '').attr('data-j2ha-tip', text).attr('title', text);
+    return T.button($, text, { cls: cls || 'j2ha-v3-info', doc: doc === undefined ? 'corriger-le-type' : doc });
   }
+  // Pastille ou marque purement informative : focusable, cliquable, même bulle ; son `title` reste en complément.
+  function infoTip($el) { var T = infoTipApi(); return T ? T.attach($el) : $el; }
 
   // Choix possibles en boutons radio (« Automatique » et le choix courant toujours visibles) ; types refusés par le démon
   // repliés sous une seule ligne dépliable, noms seulement (la raison est la même pour tous : dite une fois).
@@ -1905,8 +1912,8 @@
       .append(document.createTextNode(' ' + label)));
     var why = [sheet.quoi, sheet.pourquoi].filter(function (t) { return typeof t === 'string' && t; }).join(' ');
     if (why) {
-      $band.append($('<span class="j2ha-eq-band-info" role="img" tabindex="0"></span>').attr('title', why).attr('aria-label', why)
-        .append($('<i class="fas fa-info-circle" aria-hidden="true"></i>')));
+      // Front v3 (Lot 6) : ⓘ cliquable ; « En savoir plus » de la bande vise déjà la section des causes.
+      $band.append(typeInfo(why, null, 'j2ha-eq-band-info'));
     }
     $band.append($('<span class="j2ha-eq-band-spacer"></span>'));
     var $error = $('<div class="j2ha-publication-error text-danger j2ha-eq-band-error"></div>').hide();
@@ -2135,9 +2142,9 @@
     }
     if (showEntities) {
       var where = '{{Dans Home Assistant : Paramètres › Appareils et services › MQTT, puis l’appareil}} « ' + name + ' »';
-      $links.append($('<span class="j2ha-eq-meta-link j2ha-v2-where-toggle" tabindex="0" role="img"></span>').attr('title', where)
+      $links.append(infoTip($('<span class="j2ha-eq-meta-link j2ha-v2-where-toggle" tabindex="0" role="img"></span>').attr('title', where)
         .attr('aria-label', where).append($('<i class="fas fa-question-circle" aria-hidden="true"></i>'))
-        .append(document.createTextNode(' Home Assistant')));
+        .append(document.createTextNode(' Home Assistant'))));
     }
 
     // Bloc « Dans Home Assistant ».
@@ -2567,7 +2574,7 @@
     }] : []).concat([
       // Front v3 (Lot 2) : « Détails techniques » (codes, identifiants, décomptes d'origine) passe dans le menu ⋯.
       {
-        key: 'tech', className: 'j2ha-eq-tech-toggle', icon: 'fa-info-circle', label: '{{Détails techniques}}',
+        key: 'tech', className: 'j2ha-eq-tech-toggle', icon: 'fa-code', label: '{{Détails techniques}}',
         onClick: function () { toggleEquipmentTech($panel); },
       },
       { separator: true },
@@ -2717,8 +2724,8 @@
     $title.append($('<span class="j2ha-eq-name j2ha-free-name"></span>').text(eq.eq_name || ('#' + eq.eq_id)));
     if (!eq.enabled) {
       // Front v3 (Lot 2) : « désactivé dans Jeedom » devient une icône, le mot passe en info-bulle et en nom accessible.
-      $title.append($('<span class="j2ha-eq-off" role="img"></span>').attr('title', '{{désactivé dans Jeedom}}')
-        .attr('aria-label', '{{désactivé dans Jeedom}}').append($('<i class="fas fa-power-off" aria-hidden="true"></i>')));
+      $title.append(infoTip($('<span class="j2ha-eq-off" role="img"></span>').attr('title', '{{désactivé dans Jeedom}}')
+        .attr('aria-label', '{{désactivé dans Jeedom}}').append($('<i class="fas fa-power-off" aria-hidden="true"></i>'))));
     }
     // Un seul badge d'état (front v2) : il est aussi « l'état de l'en-tête » (`j2ha-eq-head-state`). Front v3 (Lot 2) : le mot
     // « désactivé dans Jeedom » et le décompte des bloquées ne sont plus des textes de l'en-tête (le badge dit l'état).

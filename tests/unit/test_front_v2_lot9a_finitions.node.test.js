@@ -120,7 +120,8 @@ describe('Lot 9a — panneau « Corriger le type » : portée réelle du choix',
     assert.equal(box.length, 1, 'jamais un bouton grisé muet');
     // Garde levée (front v3, Lot 3) : une ligne « Le type seul ne suffit pas » ; l'explication passe en info-bulle ⓘ.
     assert.match(plain(box.text()), /Le type seul ne suffit pas/);
-    assert.match(plain(box.find('.j2ha-v3-info').attr('title')), /garde le type choisi et ajoute le réglage « Toujours »/);
+    // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
+    assert.match(plain(box.find('.j2ha-v3-info').attr('data-j2ha-tip')), /garde le type choisi et ajoute le réglage « Toujours »/);
     ui.click(panel + '.j2ha-v2-type-anyway');
     assert.equal(ui.$('.j2ha-v3-type-modal[data-eq-id="231"] .j2ha-v2-type-panel').length, 1, 'le panneau reste ouvert, le type choisi aussi');
     assert.equal(ui.$(`${panel}input[data-type="light"]`).prop('checked'), true);
@@ -271,9 +272,9 @@ describe('Lot 9a — compteurs : pourquoi il manque un équipement', () => {
     // « ⏻ 1 » dit le désactivé.
     assert.equal(count(), '2/3');
     const countNode = res.root.find('.j2ha-v2-excl-group .j2ha-v2-excl-count');
-    assert.equal(plain(countNode.attr('title')), '3 équipements · 2 non exclus dont 1 désactivé dans Jeedom · « Non exclu » ne veut pas dire « publié »');
+    assert.equal(plain(countNode.attr('data-j2ha-tip')), '3 équipements · 2 non exclus dont 1 désactivé dans Jeedom · « Non exclu » ne veut pas dire « publié »');
     assert.equal(plain(res.root.find('.j2ha-v2-excl-group .j2ha-v3-excl-off').text()), '1');
-    assert.equal(plain(res.root.find('.j2ha-v2-excl-group .j2ha-v3-excl-off').attr('title')), '1 désactivé dans Jeedom');
+    assert.equal(plain(res.root.find('.j2ha-v2-excl-group .j2ha-v3-excl-off').attr('data-j2ha-tip')), '1 désactivé dans Jeedom');
     res.root.find('.j2ha-v2-excl-mode button[data-mode="plugin"]').list[0].handlers.click.call(null, {});
     assert.equal(plain(res.root.find('.j2ha-v2-excl-group[data-kind="plugin"] .j2ha-v2-excl-names').text()), 'Exclu : Sèche-linge');
   });

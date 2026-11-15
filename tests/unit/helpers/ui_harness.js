@@ -26,6 +26,8 @@ const HA_SIDE = require('../../../desktop/js/jeedom2ha_ha_side.js');
 const EXCL = require('../../../desktop/js/jeedom2ha_exclusions.js');
 // Front v2 (Lot 5) : panneau « Corriger le type » (module pur), lu par la surface au clic comme dans la page.
 const TYPE_PANEL = require('../../../desktop/js/jeedom2ha_type_panel.js');
+// Front v3 (Lot 6) : composant d'aide ⓘ, chargé avant la surface dans la page (la surface lit `window.Jeedom2haInfoTip`).
+const INFOTIP = require('../../../desktop/js/jeedom2ha_infotip.js');
 const home = fs.readFileSync('desktop/js/jeedom2ha.js', 'utf8');
 const surface = fs.readFileSync('desktop/js/jeedom2ha_mapping_surface.js', 'utf8');
 const homeSlice = home.slice(home.indexOf('function refreshBridgeStatus'), home.indexOf('/* Permet la réorganisation'));
@@ -141,6 +143,7 @@ function createUi(rooms, options) {
     Jeedom2haHaSide: HA_SIDE,
     Jeedom2haExclusions: EXCL,
     Jeedom2haTypePanel: TYPE_PANEL,
+    Jeedom2haInfoTip: INFOTIP,
     j2haRoomsTree: rooms || [],
     j2haAncestors: opts.ancestors || [],
     j2haPluginNames: opts.pluginNames || {},

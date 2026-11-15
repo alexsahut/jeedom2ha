@@ -212,7 +212,7 @@ test('Lot 1 réel — pastille Home Assistant toujours visible : grise avec « ?
     const r = await page.evaluate(() => {
       const ha = document.querySelector('#span_healthHa');
       return { visible: ha.getBoundingClientRect().width > 0 && getComputedStyle(document.querySelector('#div_healthHa')).display !== 'none',
-        level: ha.getAttribute('data-level'), title: ha.getAttribute('title'), q: getComputedStyle(ha.querySelector('.j2ha-v3-pill-q')).display };
+        level: ha.getAttribute('data-level'), title: ha.getAttribute('data-j2ha-tip'), q: getComputedStyle(ha.querySelector('.j2ha-v3-pill-q')).display };
     });
     assert.equal(r.visible, true);
     assert.equal(r.level, 'unknown');

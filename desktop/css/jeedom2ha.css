@@ -1346,7 +1346,7 @@ body[data-theme*="Dark"] {
 .j2ha-wv .j2ha-eq-band .j2ha-eq-band-what { margin: 0; font-weight: 600; }
 .j2ha-wv .j2ha-eq-band .j2ha-eq-band-what > i { color: var(--j2ha-warn); }
 .j2ha-wv .j2ha-eq-band.is-advice .j2ha-eq-band-what > i { color: var(--j2ha-todo); }
-.j2ha-wv .j2ha-eq-band .j2ha-eq-band-info { color: var(--j2ha-neutral); cursor: help; }
+.j2ha-wv .j2ha-eq-band .j2ha-eq-band-info { color: var(--j2ha-neutral); }
 .j2ha-wv .j2ha-eq-band .j2ha-eq-band-spacer { flex: 1 1 0; }
 .j2ha-wv .j2ha-eq-band .j2ha-eq-band-acts { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0; }
 .j2ha-wv .j2ha-eq-band .j2ha-eq-band-acts > * { box-sizing: border-box; white-space: nowrap; }
