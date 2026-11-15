@@ -93,6 +93,12 @@ _STREAMED_TYPES = _STREAMED_TYPES + _LOCK_ACTIONABLE
 _CLIMATE_ACTIONABLE = ("climate",)
 _ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _CLIMATE_ACTIONABLE
 _STREAMED_TYPES = _STREAMED_TYPES + _CLIMATE_ACTIONABLE
+# story/select-mode: select option from its state info (exact value, else ``None`` = unknown).
+_SELECT_ACTIONABLE = ("select",)
+_ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _SELECT_ACTIONABLE
+_STREAMED_TYPES = _STREAMED_TYPES + _SELECT_ACTIONABLE
+# Payload that resets a Home Assistant MQTT select to « unknown » (never an invented option).
+SELECT_UNKNOWN_PAYLOAD = "None"
 
 # Readback (info) command keys per actionable type — used to pick the state
 # command, NOT the action commands (e.g. switch ENERGY_ON/ENERGY_OFF).
@@ -817,6 +823,10 @@ class StateSynchronizer:
             return None
 
         ha_type = mapping.ha_entity_type
+        if ha_type == "select":
+            # story/select-mode — the exact Jeedom value is an option (case and spaces kept); a
+            # ``listValue`` label maps to its value; anything else is unknown, never an option.
+            return self._translate_select_value(mapping, value)
         if ha_type == "climate":
             # Story 24.15 (D1, D2, D3).
             # Raw value: a mode name is compared exactly (spaces included); blank and
@@ -885,6 +895,18 @@ class StateSynchronizer:
         if ha_type in _ONOFF_TYPES or ha_type == "light":
             return "ON" if text.lower() in _BINARY_TRUE else "OFF"
         return text
+
+    @staticmethod
+    def _translate_select_value(mapping: MappingResult, value: Any) -> str:
+        reason_details = mapping.reason_details or {}
+        options = list(reason_details.get("options") or [])
+        raw = str(value)
+        if raw in options:
+            return raw
+        labels = reason_details.get("option_labels") or {}
+        if raw in labels and labels[raw] in options:
+            return labels[raw]
+        return SELECT_UNKNOWN_PAYLOAD
 
     def _translate_climate_value(
         self,

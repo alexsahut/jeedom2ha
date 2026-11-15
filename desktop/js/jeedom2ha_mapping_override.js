@@ -42,6 +42,11 @@
       return HA_ENTITY_TYPE_OPTIONS.slice();
     }
     var options = HA_ENTITY_TYPE_OPTIONS.filter(function (t) { return r.override_types_allowed.indexOf(t) !== -1; });
+    // story/select-mode : « Mode (état) » / « Mode (commande) » n'est proposé que là où le démon l'annonce (jamais dans la
+    // liste complète d'avant) ; c'est un rôle de la commande, jamais un type générique Jeedom.
+    if (r.override_types_allowed.indexOf('select') !== -1) {
+      options.push('select');
+    }
     var current = r.override_applied ? r.effective_ha : null;
     if (current && options.indexOf(current) === -1) {
       options.push(current);
@@ -78,6 +83,8 @@
       // démon). null = champ absent (démon plus ancien, ou commande non évaluable) : liste complète.
       override_types_allowed: Array.isArray(r.override_types_allowed)
         ? r.override_types_allowed.filter(function (t) { return typeof t === 'string'; }) : null,
+      // story/select-mode (champ additif du démon) : rôle « Mode » que prendrait la commande ; null si absent.
+      mode_role: r.mode_role === 'state' || r.mode_role === 'command' ? r.mode_role : null,
     };
   }
 
@@ -750,6 +757,11 @@
     if (isDisabledDiagnostic(r.diagnostic)) {
       return { active: false, reason: 'Équipement désactivé dans Jeedom : son type HA ne peut pas être réglé ici.' };
     }
+    // story/select-mode : une commande non couverte peut recevoir le rôle « Mode » quand le démon le propose.
+    if (r.covered === false && r.override_types_allowed !== null && r.override_types_allowed.indexOf('select') !== -1
+      && !(r.jeedom_cmd_id !== null && countEntitiesCarryingCommand(entities, r.jeedom_cmd_id) > 1)) {
+      return { active: true, reason: null };
+    }
     if (r.covered === false && shouldShowUncoveredLabel(r.diagnostic)) {
       return { active: false, reason: 'Aucun type Home Assistant ne couvre cette commande : son type HA ne peut pas être réglé ici.' };
     }
@@ -1118,6 +1130,7 @@
     cover: 'Volet',
     light: 'Lumière',
     lock: 'Serrure',
+    select: 'Mode', // story/select-mode
     sensor: 'Capteur',
     switch: 'Interrupteur',
     valve: 'Vanne',

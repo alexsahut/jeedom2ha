@@ -115,6 +115,8 @@ def capabilities_from_payload(ha_entity_type: str, payload: Optional[dict]) -> O
         add("mode")
     if ha_entity_type == "lock" and has_command:
         add("lock")
+    if ha_entity_type == "select" and has_command:
+        add("mode")  # story/select-mode
     if ha_entity_type == "button" and has_command:
         add("press")
     if any(_is_read_key(key) and value for key, value in payload.items()):

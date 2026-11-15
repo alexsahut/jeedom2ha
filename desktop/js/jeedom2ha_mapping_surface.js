@@ -1626,7 +1626,8 @@
     var cmdId = row.jeedom_cmd_id;
     var $panel = ctx.current.$panel;
     var $tr = $panel.find('tr.mapping-override-cmd[data-cmd-id="' + cmdId + '"]').first();
-    if (!$tr.length) return false;
+    // story/select-mode : une commande « ignorée » (repliée, sans ligne) peut ouvrir le panneau depuis son lien « Mode… ».
+    if (!$tr.length && !(o.origin && o.origin.length)) return false;
     if (ctx.typePanel && ctx.typePanel.eqId === eqId && ctx.typePanel.cmdId === cmdId) {
       closeTypePanel(true);
       return true;
@@ -2247,6 +2248,30 @@
     if (node && typeof node.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' });
   }
 
+  // story/select-mode : une commande ignorée à laquelle le démon propose le rôle « Mode » garde un lien vers « Corriger le
+  // type » (« Mode (état) » pour une info, « Mode (commande) » pour une action). Rien n'est écrit au clic.
+  function appendModeLink($li, eqId, tree, cmdId) {
+    var row = null;
+    (tree && Array.isArray(tree.commands) ? tree.commands : []).forEach(function (r) {
+      if (r && r.jeedom_cmd_id === cmdId) row = r;
+    });
+    var allowed = row && Array.isArray(row.override_types_allowed) ? row.override_types_allowed : [];
+    if (!row || allowed.indexOf('select') === -1 || !M.getOverrideSelectorState(row, tree.entities).active) return;
+    var label = M.normalizeCommandRow(row).mode_role === 'state' ? '{{Mode (état)…}}' : '{{Mode (commande)…}}';
+    if (row.override_applied === true) label = '{{Personnalisé :}} ' + label.replace('…', '');
+    var $link = $('<a class="j2ha-type-link j2ha-mode-link cursor" role="button" tabindex="0"></a>')
+      .attr('title', '{{Changer le type}}').attr('data-cmd-id', cmdId).text(label);
+    var open = function (event) {
+      if (event && event.preventDefault) event.preventDefault();
+      openTypePanel({ eqId: eqId, cmdIds: [cmdId], origin: $link });
+    };
+    $link.on('click', open);
+    $link.on('keydown', function (event) {
+      if (event && (event.key === 'Enter' || event.key === ' ')) open(event);
+    });
+    $li.append(document.createTextNode(' · ')).append($link);
+  }
+
   // AC15 : les commandes sans équivalent HA ne sont pas des lignes du tableau mais une ligne repliée,
   // dépliable au clic et au clavier.
   function renderIgnored($host, eqId, tree) {
@@ -2266,6 +2291,7 @@
       if (item.not_supported_by_plugin) {
         $li.append(document.createTextNode(' — {{non pris en charge par le plugin}}'));
       }
+      appendModeLink($li, eqId, tree, item.cmd_id);
       $list.append($li);
     });
     $toggle.on('click', function () {

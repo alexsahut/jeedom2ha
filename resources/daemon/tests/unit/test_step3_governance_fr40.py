@@ -60,6 +60,7 @@ _GOVERNED_SCOPE = {
     "alarm_control_panel": "test_governance_fr40_proof_alarm_control_panel",
     "valve": "test_governance_fr40_proof_valve",  # Story 24.8
     "lock": "test_governance_fr40_proof_lock",  # Story 24.9
+    "select": "test_governance_fr40_proof_select",  # story/select-mode
 }
 # 3 conditions FR40 — mécanismes d'enforcement (AR13) :
 #
@@ -366,5 +367,27 @@ def test_governance_fr40_proof_lock():
     assert result_fail_state.reason_code == "ha_missing_state_topic"
 
     result_fail_cmd = validate_projection("lock", LockCapabilities(has_state=True, has_command=False))
+    assert result_fail_cmd.is_valid is False
+    assert result_fail_cmd.reason_code == "ha_missing_command_topic"
+
+
+# ---------------------------------------------------------------------------
+# Preuve de gouvernance FR40 : select (story/select-mode)
+# ---------------------------------------------------------------------------
+
+def test_governance_fr40_proof_select():
+    """Preuve de gouvernance FR40 pour select : au moins une action et au moins deux options."""
+    from models.mapping import SelectCapabilities
+
+    result_nominal = validate_projection(
+        "select", SelectCapabilities(has_state=True, has_command=True, has_options=True, options=["manu", "auto"]))
+    assert result_nominal.is_valid is True
+    assert result_nominal.reason_code is None
+
+    result_fail_options = validate_projection("select", SelectCapabilities(has_state=True, has_command=True))
+    assert result_fail_options.is_valid is False
+    assert result_fail_options.reason_code == "ha_missing_required_option"
+
+    result_fail_cmd = validate_projection("select", SelectCapabilities(has_state=True, has_options=True))
     assert result_fail_cmd.is_valid is False
     assert result_fail_cmd.reason_code == "ha_missing_command_topic"

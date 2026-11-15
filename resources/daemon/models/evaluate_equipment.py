@@ -70,6 +70,7 @@ from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, List, Optional
 
 from mapping.overrides import apply_type_override, mapping_cmd_ids, resolve_publication_override
+from mapping.overrides import with_mode_roles  # story/select-mode
 from models.decide_publication import (
     DEFAULT_CONFIDENCE_POLICY,
     decide_publication as _default_decide_publication,
@@ -395,6 +396,10 @@ def evaluate_equipment(
 
     # I5 — équipement éligible : mapping (registre injecté) → fusion overrides → validation
     # → décision, sans mapping ni projection fournis en entrée. Jamais None, jamais omise.
+    # story/select-mode — rôles « Mode (état) » / « Mode (commande) » posés par « Corriger le type »
+    # (override `ha_entity_type: "select"` sur la commande) : lus ici, avant le mapping, sur une copie
+    # superficielle du snapshot (jamais mutée, aucune copie profonde), et jamais écrits dans Jeedom.
+    snapshot = with_mode_roles(snapshot, eq, merged_overrides)
     raw_mapping = mapper_registry.map(eq, snapshot)
 
     if raw_mapping is None:

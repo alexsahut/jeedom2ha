@@ -363,6 +363,33 @@ class DiscoveryPublisher:
             )
         return ok
 
+    async def publish_select(self, mapping: MappingResult, snapshot: TopologySnapshot) -> bool:
+        """Publish a select discovery config to MQTT (story/select-mode).
+
+        Node-scoped topic (by its state info command), like a secondary sensor: the select is
+        ADDED next to the entities of the equipment, it never takes over one of their topics.
+        """
+        reason_details = mapping.reason_details or {}
+        _nid = reason_details.get("node_id")
+        node_id = _nid if isinstance(_nid, str) else None
+        topic = self._build_topic(mapping.jeedom_eq_id, entity_type="select", node_id=node_id)
+        payload = self._build_select_payload(mapping, snapshot)
+        payload_json = json.dumps(payload, ensure_ascii=False)
+
+        _LOGGER.info(
+            "[DISCOVERY] Publishing select config: topic=%s eq_id=%d name='%s' confidence=%s",
+            topic, mapping.jeedom_eq_id, mapping.ha_name, mapping.confidence,
+        )
+        _LOGGER.debug("[DISCOVERY] Payload: %s", payload_json)
+
+        ok = self._mqtt_bridge.publish_message(topic, payload_json, qos=1, retain=True)
+        if not ok:
+            _LOGGER.error(
+                "[DISCOVERY] Failed to publish select config for eq_id=%d (bridge unavailable)",
+                mapping.jeedom_eq_id,
+            )
+        return ok
+
     async def unpublish(self, ha_unique_id: str) -> bool:
         """Remove a discovery config by publishing empty payload with retain.
 
@@ -883,6 +910,36 @@ class DiscoveryPublisher:
             },
         }
         self._add_default_entity_id(payload, "lock")
+        payload.update(self._build_availability_fields(mapping, snapshot))
+        return payload
+
+    def _build_select_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
+        """Build the MQTT Discovery JSON payload for a select entity (story/select-mode).
+
+        ``options`` are the exact values written by the Jeedom actions (case kept). The state
+        comes from the info command (``sync/state.py``: a value outside the options publishes
+        ``None``, i.e. unknown); an option received on ``command_topic`` runs its own action
+        (``sync/command.py``). ``optimistic: false``: never an invented state.
+        """
+        eq_id = mapping.jeedom_eq_id
+        device = self._build_device_block(mapping, snapshot)
+        reason_details = mapping.reason_details or {}
+        object_id = reason_details.get("object_id") or f"jeedom2ha_{eq_id}"
+        payload = {
+            "name": self._entity_name_for_payload(mapping, device),
+            "unique_id": mapping.ha_unique_id,
+            "object_id": object_id,
+            "command_topic": reason_details.get("command_topic") or f"jeedom2ha/{eq_id}/set",
+            "state_topic": reason_details.get("state_topic") or f"jeedom2ha/{eq_id}/state",
+            "options": list(reason_details.get("options") or getattr(mapping.capabilities, "options", [])),
+            "optimistic": False,
+            "device": device,
+            "origin": {
+                "name": "jeedom2ha",
+                "sw_version": _SW_VERSION,
+            },
+        }
+        self._add_default_entity_id(payload, "select")
         payload.update(self._build_availability_fields(mapping, snapshot))
         return payload
 

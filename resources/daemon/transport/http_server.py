@@ -138,6 +138,9 @@ def _resolve_state_topic(mapping: MappingResult) -> str:
             return state_topic
         if mapping.ha_entity_type == "switch" and isinstance(state_topic, str) and state_topic:
             return state_topic
+        # story/select-mode — a select too (node-scoped by its state info command).
+        if mapping.ha_entity_type == "select" and isinstance(state_topic, str) and state_topic:
+            return state_topic
         return f"jeedom2ha/{mapping.jeedom_eq_id}/state"
 
     return ""
@@ -3431,6 +3434,33 @@ async def _handle_overrides_preview(request: web.Request) -> web.Response:
     # résolution par `cmd_id` dans `command_decisions`, `mapping=None` — même contrat que la
     # branche `diag_mapping=None` de `_build_mapping_override_tree`.
     auto_target = _resolve_command_mapping(auto_evaluation, proposed_cmd_id)
+    if auto_target is None and proposed_type == "select" and isinstance(proposed_cmd_id, int):
+        # story/select-mode — rôle « Mode » proposé sur une commande que rien ne couvre : l'aperçu
+        # montre le select que ce rôle produit (lecture seule ; rien n'est écrit, aucun type
+        # générique Jeedom n'est touché). Sans select produit, la réponse « non couverte » d'avant.
+        role_overrides = {f"{eq_id}:{proposed_cmd_id}": {"ha_entity_type": "select", "source": "preview"}}
+        role_evaluation = evaluate_equipment(
+            eq, snapshot, eligibility,
+            mapper_registry=mapper_registry,
+            confidence_policy=confidence_policy,
+            persisted_overrides=persisted_overrides,
+            persisted_equipment_overrides=persisted_equipment_overrides,
+            proposed_overrides=role_overrides,
+        )
+        role_target = _resolve_command_mapping(role_evaluation, proposed_cmd_id)
+        if role_target is not None and role_target.ha_entity_type == "select":
+            return web.json_response({
+                "status": "ok",
+                "payload": {
+                    "jeedom_eq_id": eq_id,
+                    "mapped": True,
+                    "covered": True,
+                    "auto": _view_for_ineligible_or_unmapped(auto_evaluation, proposed_cmd_id),
+                    "overridden": _view_from_evaluation(role_evaluation, proposed_cmd_id),
+                    "native_generic_types": native_generic_types,
+                    **_preview_entities_fields(auto_evaluation, role_evaluation, snapshot),
+                },
+            })
     if auto_target is None:
         return web.json_response({
             "status": "ok",
@@ -3623,11 +3653,44 @@ def _projection_valid_override_types(
             proposed_overrides={f"{eq.id}:{cmd_id}": {"ha_entity_type": ha_type, "source": "preview"}},
         )
         target = _resolve_command_mapping(evaluation, cmd_id)
+        if ha_type == "select" and getattr(target, "ha_entity_type", None) != "select":
+            # story/select-mode — « Mode (état) / Mode (commande) » n'est proposé que s'il produit
+            # réellement un select portant cette commande (sinon ce n'est qu'un rôle sans effet).
+            continue
         validity = getattr(target, "projection_validity", None) if target is not None else None
         if validity is not None and validity.is_valid is False:
             continue
         allowed.append(ha_type)
     return allowed
+
+
+def _mode_role_override_types(eq, snapshot, eligibility, mapper_registry, confidence_policy,
+                              persisted_overrides, persisted_equipment_overrides, cmd):
+    """story/select-mode — commande qu'aucune entité ne couvre : le rôle « Mode » est-il possible ?
+
+    Rend ``["select"]`` (« Mode (état) » pour une info texte, « Mode (commande) » pour une action)
+    quand l'aperçu avec ce rôle proposé produit un select valide qui porte la commande — exactement
+    ce que montrera « Corriger le type » ; ``[]`` sinon (champ absent, comportement d'avant).
+    Lecture seule : rien n'est écrit, aucun type générique Jeedom n'est touché.
+    """
+    kind = ((cmd.type or "").lower(), (cmd.sub_type or "").lower())
+    if kind not in (("info", "string"), ("action", "other"), ("action", "select")):
+        return []
+    evaluation = evaluate_equipment(
+        eq, snapshot, eligibility,
+        mapper_registry=mapper_registry,
+        confidence_policy=confidence_policy,
+        persisted_overrides=persisted_overrides,
+        persisted_equipment_overrides=persisted_equipment_overrides,
+        proposed_overrides={f"{eq.id}:{cmd.id}": {"ha_entity_type": "select", "source": "preview"}},
+    )
+    target = _resolve_command_mapping(evaluation, cmd.id)
+    validity = getattr(target, "projection_validity", None)
+    if getattr(target, "ha_entity_type", None) != "select":
+        return []
+    if validity is not None and validity.is_valid is False:
+        return []
+    return ["select"]
 
 
 def _build_mapping_override_tree(
@@ -3739,6 +3802,19 @@ def _build_mapping_override_tree(
                     overrides_cache, equipment_overrides_cache, cmd.id,
                 )
             row["override_types_allowed"] = list(allowed_by_mapping[group])
+        # story/select-mode — commande non couverte : seul le rôle « Mode » peut être proposé, et
+        # seulement s'il produit un select (sinon le champ reste absent, comportement d'avant).
+        if include_override_types and diag_mapping is None:
+            mode_types = _mode_role_override_types(
+                eq, snapshot, eligibility, MapperRegistry(), confidence_policy,
+                overrides_cache, equipment_overrides_cache, cmd,
+            )
+            if mode_types:
+                row["override_types_allowed"] = mode_types
+        # story/select-mode (champ additif, présent seulement si « select » est proposé ou posé) :
+        # rôle « Mode » que prendrait la commande — l'écran dit « Mode (état) » / « Mode (commande) ».
+        if "select" in (row.get("override_types_allowed") or []) or override_type == "select":
+            row["mode_role"] = "state" if (cmd.type or "").lower() == "info" else "command"
         # Front v2 Lot 3 (additif, route unitaire seulement) : type, sous-type et état relié.
         if ha_side_fields:
             row.update(ha_side.command_fields(cmd))

@@ -23,7 +23,9 @@
  *   à jour après l'exécution ; écran du virtuel : « Commande information à mettre à jour ») ;
  * - plugin virtual, `virtualCmd::execute()` : configuration `infoId` (id de l'info virtuelle écrite).
  *   Lue pour le seul plugin virtual.
- * Seul le lien est exporté : la valeur écrite n'est pas utile pour apparier un switch.
+ * story/select-mode — la valeur écrite (`updateCmdToValue` du cœur, `value` du virtual, seulement si le
+ * lien correspondant est renseigné) et la liste d'une action « select » (`listValue` du cœur,
+ * `valeur|libellé;…`) sont aussi exportées : options d'un select Home Assistant.
  *
  * Rend uniquement les clés renseignées (aucune clé vide sur chaque commande : la topologie est
  * envoyée en entier à chaque synchro). Une info commande n'a jamais ces clés.
@@ -41,6 +43,21 @@ function jeedom2ha_action_links(string $_type, string $_eqType, callable $_confi
   foreach ($keys as $field => $configKey) {
     $raw = $_config($configKey);
     if ($raw === null || !is_scalar($raw) || is_bool($raw) || trim(strval($raw)) === '') {
+      continue;
+    }
+    $out[$field] = strval($raw);
+  }
+  // story/select-mode — valeurs écrites (avec leur lien seulement) et liste d'une action « select ».
+  $values = array('list_value' => 'listValue');
+  if (isset($out['update_cmd_id'])) {
+    $values['update_cmd_to_value'] = 'updateCmdToValue';
+  }
+  if (isset($out['virtual_info_id'])) {
+    $values['virtual_value'] = 'value';
+  }
+  foreach ($values as $field => $configKey) {
+    $raw = $_config($configKey);
+    if ($raw === null || !is_scalar($raw) || is_bool($raw) || strval($raw) === '') {
       continue;
     }
     $out[$field] = strval($raw);
