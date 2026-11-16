@@ -738,6 +738,9 @@
   // (lecture de `entities[].command_ids`, aucune décision recalculée).
   function countEntitiesCarryingCommand(entities, cmdId) {
     return (Array.isArray(entities) ? entities : []).filter(function (entity) {
+      // story/barrier-state-sensor : le capteur « État » d'une cover barrière lit l'état de la cover sans
+      // le porter pour son propre compte (il suit la cover, l'override vise la cover) : il ne compte pas.
+      if (entity && entity.reason_details && entity.reason_details.barrier_companion_of) return false;
       return entity && Array.isArray(entity.command_ids) && entity.command_ids.indexOf(cmdId) !== -1;
     }).length;
   }

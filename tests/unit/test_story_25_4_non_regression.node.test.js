@@ -328,6 +328,18 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/tests/unit/test_story_9_3_button_mapper.py::\"light\", \"cover\", \"switch\", \"sensor\", \"binary_sensor\", \"button\", \"climate\", \"alarm_control_panel\", \"valve\", \"lock\"",
   ];
 
+  // story/barrier-state-sensor : le capteur « État » des covers barrière (exception assumée à « une commande = une
+  // entité »). Démon : une ligne remplacée dans `sync/state.py` (l'état de la cover alimente aussi son compagnon) ; tests
+  // de 24.7 / 24.8 : le compagnon s'ajoute à la cover, le reste de la projection est inchangé. Admis dans leur fichier.
+  const REPLACED_BY_BARRIER_STATE_SENSOR = [
+    "resources/daemon/sync/state.py::return [(candidate, b) for b in bindings]",
+    "resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::assert not mapping.additional_mappings",
+    "resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::assert await sync.publish_initial_states(decision) == 1",
+    "resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::assert bridge.published == [(f\"jeedom2ha/{GATE_ID}/state\", \"open\", 1, True)]",
+    "resources/daemon/tests/unit/test_story_24_7_portail_garage_cover.py::assert bridge.published == [(f\"jeedom2ha/{GARAGE_ID}/state\", expected, 1, True)]",
+    "resources/daemon/tests/unit/test_story_24_8_vanne_arrosage_valve.py::assert [_shape(r) for r in _all(eq)] == [_shape(r) for r in _pre_story_projection(eq)]",
+  ];
+
   it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
     const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
     if (diff !== null) assert.equal(diff, '');
@@ -356,7 +368,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
         && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`)
         && !REPLACED_BY_24_17.includes(`${f}::${line}`)
         && !REPLACED_BY_FIX_SWITCH_APPARIEMENT.includes(`${f}::${line}`)
-        && !REPLACED_BY_SELECT_MODE.includes(`${f}::${line}`))
+        && !REPLACED_BY_SELECT_MODE.includes(`${f}::${line}`)
+        && !REPLACED_BY_BARRIER_STATE_SENSOR.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

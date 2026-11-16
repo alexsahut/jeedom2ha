@@ -6,6 +6,13 @@
 
 ---
 
+# 2026-11-16 — Portails et portes motorisées : capteur « État »
+
+- Un portail ou une porte motorisée publié comme **ouvrant** (types génériques de portail ou de porte motorisée, avec un état numérique) gagne un capteur **« État »** sur le même appareil : il affiche les cinq états de la convention barrière (`closed`, `closing`, `stopped`, `opening`, `open`), dont l'état **arrêté** que Home Assistant ne sait pas afficher pour un ouvrant. Une valeur hors de la table n'est pas publiée.
+- Le capteur est en lecture seule et suit l'ouvrant : pas de capteur si l'ouvrant est exclu, non publié ou retypé. L'ouvrant, son identifiant, sa découverte et ses ordres ne changent pas.
+
+---
+
 # 2026-11-15 — Modes publiés en liste de choix
 
 - Un **mode** Jeedom (une info texte posée par plusieurs actions qui écrivent chacune une valeur fixe, par exemple `manu`, `auto` ou `Absence` pour un chauffe-eau virtuel) est publié dans Home Assistant comme une **liste de choix** (`select`) : les choix sont les valeurs exactes, l'état suit l'info (une valeur inconnue donne un état inconnu), et choisir une option exécute l'action qui l'écrit.

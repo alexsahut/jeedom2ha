@@ -980,6 +980,9 @@ class DiscoveryPublisher:
             payload["unit_of_measurement"] = unit_of_measurement
         if state_class is not None:
             payload["state_class"] = state_class
+        if device_class == "enum" and reason_details.get("options"):
+            # story/barrier-state-sensor — capteur « État » d'une barrière : ses 5 états (lecture seule).
+            payload["options"] = list(reason_details["options"])
 
         return payload
 

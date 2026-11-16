@@ -71,6 +71,8 @@ from typing import Callable, Dict, List, Optional
 
 from mapping.overrides import apply_type_override, mapping_cmd_ids, resolve_publication_override
 from mapping.overrides import with_mode_roles  # story/select-mode
+from mapping.barrier_state_sensor import is_barrier_state_sensor  # story/barrier-state-sensor
+from sync.readback import barrier_mode  # story/barrier-state-sensor
 from models.decide_publication import (
     DEFAULT_CONFIDENCE_POLICY,
     decide_publication as _default_decide_publication,
@@ -272,6 +274,49 @@ def _decide_for_mapping(
     return working_mapping, decision
 
 
+def _companions_follow_their_cover(
+    primary_mapping: MappingResult,
+    primary_decision: PublicationDecision,
+    secondaries: List[MappingResult],
+    decisions: List[PublicationDecision],
+) -> "tuple[List[MappingResult], List[PublicationDecision]]":
+    """story/barrier-state-sensor — le capteur « État » suit sa cover barrière.
+
+    - cover absente ou qui n'est plus une cover barrière (retypée par « Corriger le type ») :
+      le compagnon disparaît (il n'existe qu'à côté d'une cover barrière) ;
+    - cover non publiée (exclue, refusée) : le compagnon ne l'est pas non plus, avec la même raison.
+    Toute autre entité est rendue telle quelle (même objet, même décision).
+    """
+    if not any(is_barrier_state_sensor(s) for s in secondaries):
+        return secondaries, decisions
+    entities = [(primary_mapping, primary_decision), *zip(secondaries, decisions)]
+    covers = {m.ha_unique_id: (m, d) for m, d in entities if not is_barrier_state_sensor(m)}
+    kept_mappings: List[MappingResult] = []
+    kept_decisions: List[PublicationDecision] = []
+    for secondary, decision in zip(secondaries, decisions):
+        if is_barrier_state_sensor(secondary):
+            cover, cover_decision = covers.get(
+                (secondary.reason_details or {}).get("barrier_companion_of"), (None, None)
+            )
+            if cover is None or barrier_mode(cover) is None:
+                continue
+            if not cover_decision.should_publish and decision.should_publish:
+                decision = PublicationDecision(
+                    should_publish=False,
+                    reason=cover_decision.reason,
+                    reason_details={
+                        **(cover_decision.reason_details or {}),
+                        "barrier_companion_of": cover.ha_unique_id,
+                    },
+                )
+                _finalize_cross_reference(
+                    secondary, decision, additional_mappings=secondary.additional_mappings
+                )
+        kept_mappings.append(secondary)
+        kept_decisions.append(decision)
+    return kept_mappings, kept_decisions
+
+
 def _finalize_cross_reference(
     working_mapping: MappingResult,
     decision: PublicationDecision,
@@ -445,6 +490,10 @@ def evaluate_equipment(
         patched_secondary = _apply_type_override_with_proposed_priority(
             raw_secondary, merged_overrides, proposed_overrides
         )
+        if is_barrier_state_sensor(raw_secondary):
+            # story/barrier-state-sensor — le capteur compagnon d'une cover barrière n'a pas
+            # d'override de type propre : un override posé sur l'état vise la cover (il la suit).
+            patched_secondary = raw_secondary
         working_secondary, secondary_decision = _decide_for_mapping(
             patched_secondary,
             confidence_policy=confidence_policy,
@@ -462,6 +511,10 @@ def evaluate_equipment(
         )
         secondary_decisions.append(secondary_decision)
         updated_secondaries.append(working_secondary)
+
+    updated_secondaries, secondary_decisions = _companions_follow_their_cover(
+        primary_mapping, primary_decision, updated_secondaries, secondary_decisions
+    )
 
     # Finalisation étape 4 du primaire une fois les secondaires eux-mêmes finalisées, pour
     # que `primary_decision.mapping_result.additional_mappings` reflète les décisions

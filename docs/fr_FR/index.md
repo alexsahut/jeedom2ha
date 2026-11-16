@@ -415,7 +415,7 @@ Un équipement Jeedom qui porte les types « Portail ou garage » est publié co
 | un bouton de bascule (toggle), avec ou sans boutons d'ouverture et de fermeture | un ouvrant piloté **par la bascule seule** : « Ouvrir » ne l'envoie que si le portail est **fermé**, « Fermer » que s'il est **ouvert**. Les boutons d'ouverture et de fermeture sont ignorés (sur un équipement virtuel, ils peuvent n'écrire que l'état, sans rien actionner). |
 | des boutons d'ouverture **et** de fermeture, sans bascule | un ouvrant dont « Ouvrir » et « Fermer » appellent ces boutons, sauf vers la position déjà atteinte ou en cours d'atteinte (« Ouvrir » refusé s'il est ouvert ou en ouverture, « Fermer » s'il est fermé ou en fermeture) et sauf état inconnu |
 
-La classe vient de la commande d'état : « Garage (ouvrant) Etat » donne une porte de garage, « Portail (ouvrant) Etat » un portail. Les commandes de l'équipement sont toutes reprises par l'ouvrant : il n'y a pas de bouton ni de capteur en double.
+La classe vient de la commande d'état : « Garage (ouvrant) Etat » donne une porte de garage, « Portail (ouvrant) Etat » un portail. Les commandes de l'équipement sont toutes reprises par l'ouvrant : il n'y a pas de bouton ni de capteur en double, à une exception près : le capteur « État » décrit plus bas.
 
 L'état numérique suit la convention « barrière » (celle de Z-Wave et du plugin Homebridge de Jeedom) :
 
@@ -426,6 +426,8 @@ L'état numérique suit la convention « barrière » (celle de Z-Wave et du plu
 | 253 | arrêté (Home Assistant l'affiche « ouvert », ou « fermé » s'il était en fermeture) |
 | 254 | en ouverture |
 | 255 | ouvert |
+
+**Capteur « État ».** Home Assistant n'a pas d'état « arrêté » pour un ouvrant. Pour voir les cinq états, l'ouvrant est accompagné d'un capteur nommé **« État »**, sur le même appareil, qui affiche la valeur traduite : `closed` (fermé), `closing` (en fermeture), `stopped` (arrêté), `opening` (en ouverture) ou `open` (ouvert), avec la même table que l'ouvrant. Une valeur hors de la table n'est pas publiée. Ce capteur est en lecture seule : il n'envoie aucun ordre. Il n'existe qu'à côté d'un ouvrant portail ou garage : si l'ouvrant est exclu, n'est pas publié ou change de type par « Corriger le type », le capteur ne l'est pas non plus. C'est la seule entité qui lit une commande déjà reprise par une autre entité ; elle s'ajoute sans rien changer à l'ouvrant (`sensor.jeedom2ha_<id>_<id de l'état>_barrier_state`).
 
 Limites à connaître :
 

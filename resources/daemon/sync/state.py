@@ -679,9 +679,40 @@ class StateSynchronizer:
                     return []
                 if not getattr(cand_decision, "discovery_published", False):
                     return []
-                return [(candidate, b) for b in bindings]
+                # story/barrier-state-sensor — exception assumée à « une commande = une entité » :
+                # l'état d'une cover barrière alimente aussi son capteur compagnon « État ».
+                return [(candidate, b) for b in bindings] + self._barrier_companion_targets(
+                    mapping, candidate, decision, eq_id, cmd_id
+                )
 
         return []
+
+    def _barrier_companion_targets(
+        self,
+        mapping: MappingResult,
+        cover: MappingResult,
+        decision: PublicationDecision,
+        eq_id: int,
+        cmd_id: int,
+    ) -> List[Tuple[MappingResult, "_Binding"]]:
+        """story/barrier-state-sensor — the published « État » sensor of ``cover`` fed by ``cmd_id``."""
+        targets: List[Tuple[MappingResult, "_Binding"]] = []
+        for candidate in self._iter_streamed_candidates(mapping):
+            details = getattr(candidate, "reason_details", None) or {}
+            if candidate is cover or not details.get("barrier_companion_of"):
+                continue
+            if details.get("barrier_companion_of") != getattr(cover, "ha_unique_id", None):
+                continue
+            cand_decision = getattr(candidate, "publication_decision_ref", None) or decision
+            if not getattr(cand_decision, "should_publish", False):
+                continue
+            if not getattr(cand_decision, "discovery_published", False):
+                continue
+            targets.extend(
+                (candidate, b) for b in self._candidate_bindings(candidate, cand_decision, eq_id)
+                if b.cmd_id == cmd_id
+            )
+        return targets
 
     def _candidate_bindings(
         self,
@@ -854,6 +885,11 @@ class StateSynchronizer:
             # fixed by the mapper (Homebridge); any other value publishes nothing.
             polarity = (mapping.reason_details or {}).get("lock_polarity")
             return lock_state(text, polarity)
+
+        if ha_type == "sensor" and (mapping.reason_details or {}).get("barrier_companion_of"):
+            # story/barrier-state-sensor: the barrier « État » sensor shows the cover's 5 states
+            # with the same table (``barrier_state``); any other value publishes nothing.
+            return barrier_state(text)
 
         if ha_type == "cover" and is_barrier_state_command(cmd):
             # Story 24.7 (D1): gate / garage barrier value -> closed/closing/stopped/
