@@ -119,7 +119,9 @@ def test_gate_with_toggle_open_close_and_state_uses_the_toggle_mode():
     }
     # GB_OPEN / GB_CLOSE ignorés pour l'ordre mais consommés : aucun button en double.
     assert set(mapping.commands) == {"GB_OPEN", "GB_CLOSE", "GB_TOGGLE", "BARRIER_STATE"}
-    assert not mapping.additional_mappings
+    # story/barrier-state-sensor : seul s'ajoute le capteur « État » (5 états), en lecture seule.
+    assert [m.ha_unique_id for m in mapping.additional_mappings] == [
+        f"jeedom2ha_eq_{GATE_ID}_cmd_70014_barrier_state"]
     caps = mapping.capabilities
     assert isinstance(caps, CoverCapabilities)
     assert caps.has_open_close and not caps.has_stop and not caps.has_position
@@ -133,7 +135,9 @@ def test_garage_with_toggle_and_numeric_state_is_a_garage_cover():
     assert mapping.reason_details["cover_device_class"] == "garage"
     assert mapping.reason_details["barrier_mode"] == "toggle_on_state"
     assert set(mapping.commands) == {"GB_TOGGLE", "GARAGE_STATE"}
-    assert not mapping.additional_mappings
+    # story/barrier-state-sensor : seul s'ajoute le capteur « État » (5 états), en lecture seule.
+    assert [m.ha_unique_id for m in mapping.additional_mappings] == [
+        f"jeedom2ha_eq_{GARAGE_ID}_cmd_70022_barrier_state"]
 
 
 def test_open_close_without_toggle_and_with_state_uses_the_direct_mode():
@@ -291,7 +295,9 @@ async def test_state_event_published_on_the_cover_state_topic(value, expected):
         "state_topic": f"jeedom2ha/{GARAGE_ID}/state",
     }]
     assert await sync.handle_state_message(GARAGE_ID, 70022, value) is True
-    assert bridge.published == [(f"jeedom2ha/{GARAGE_ID}/state", expected, 1, True)]
+    # story/barrier-state-sensor : le même état part aussi vers le capteur « État ».
+    assert bridge.published == [(f"jeedom2ha/{GARAGE_ID}/state", expected, 1, True),
+                                (f"jeedom2ha/{GARAGE_ID}/70022/barrier_state", expected, 1, True)]
 
 
 @pytest.mark.asyncio
@@ -309,8 +315,10 @@ async def test_initial_state_uses_the_barrier_table():
     decision = _decision(_map(_gate_eq(state_value="255")))
     bridge = _Bridge()
     sync = StateSynchronizer(app={"publications": {GATE_ID: decision}}, mqtt_bridge=bridge)
-    assert await sync.publish_initial_states(decision) == 1
-    assert bridge.published == [(f"jeedom2ha/{GATE_ID}/state", "open", 1, True)]
+    # story/barrier-state-sensor : le capteur « État » reçoit le même état, sur son propre topic.
+    assert await sync.publish_initial_states(decision) == 2
+    assert bridge.published == [(f"jeedom2ha/{GATE_ID}/state", "open", 1, True),
+                                (f"jeedom2ha/{GATE_ID}/70014/barrier_state", "open", 1, True)]
 
 
 def test_binary_barrier_state_is_never_a_cover_readback():

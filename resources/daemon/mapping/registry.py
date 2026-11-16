@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, Iterator, List, Optional
 
 from mapping.alarm_control_panel import AlarmControlPanelMapper
+from mapping.barrier_state_sensor import barrier_state_companion
 from mapping.binary_sensor import BinarySensorMapper
 from mapping.button import ButtonMapper
 from mapping.climate import ClimateMapper
@@ -84,6 +85,9 @@ class MapperRegistry:
         sans entité d'avant, les select suivent la règle du nom (un seul : nom de l'équipement).
         """
         before = self._map_all_base(eq, snapshot)
+        # story/barrier-state-sensor — une cover barrière (24.7) gagne son capteur compagnon « État »
+        # (5 états, lecture seule), en ajout : les entités d'avant restent identiques.
+        before = [*before, *self._barrier_state_companions(eq, snapshot, before)]
         # Une commande déjà portée par une entité (info d'un capteur, ordre d'un volet, d'une lumière,
         # d'une serrure…) ne passe jamais dans un select ; un identifiant déjà pris non plus.
         carried = set()
@@ -97,6 +101,26 @@ class MapperRegistry:
         if not before:
             return self._apply_entity_name_rule(eq, selects)
         return [*before, *selects]
+
+    @staticmethod
+    def _barrier_state_companions(
+        eq: JeedomEqLogic, snapshot: TopologySnapshot, results: List[MappingResult]
+    ) -> List[MappingResult]:
+        """Capteurs compagnons des covers barrière de ``results`` (exception documentée dans
+        ``mapping/barrier_state_sensor.py``) ; aucun pour toute autre entité."""
+        taken = {r.ha_unique_id for r in results}
+        companions: List[MappingResult] = []
+        for result in results:
+            companion = barrier_state_companion(result, snapshot)
+            if companion is None:
+                continue
+            if companion.ha_unique_id in taken:
+                _LOGGER.warning("[MAPPING] eq_id=%d: identifiant %s déjà pris → pas de capteur d'état",
+                                eq.id, companion.ha_unique_id)
+                continue
+            taken.add(companion.ha_unique_id)
+            companions.append(companion)
+        return companions
 
     def _map_all_base(self, eq: JeedomEqLogic, snapshot: TopologySnapshot) -> List[MappingResult]:
         """API additive Story 11.1 : retourne tous les mappings du premier mapper

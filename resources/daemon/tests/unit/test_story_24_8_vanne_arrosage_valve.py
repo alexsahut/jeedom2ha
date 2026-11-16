@@ -18,6 +18,7 @@ import transport.http_server as http_server
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from export import decision_export
+from mapping.barrier_state_sensor import is_barrier_state_sensor  # story/barrier-state-sensor
 from mapping.overrides import apply_type_override, save_override
 from mapping.registry import MapperRegistry, resolve_expected_ha
 from mapping.valve import ValveMapper, valve_trios
@@ -667,7 +668,9 @@ def test_decision_export_row_reads_the_valve_payload():
 ])
 def test_switch_and_cover_projection_is_unchanged(cmds):
     eq = _eq(MONO_ID, cmds)
-    assert [_shape(r) for r in _all(eq)] == [_shape(r) for r in _pre_story_projection(eq)]
+    # story/barrier-state-sensor : le capteur « État » d'une cover barrière s'ajoute, rien d'autre ne change.
+    now = [r for r in _all(eq) if not is_barrier_state_sensor(r)]
+    assert [_shape(r) for r in now] == [_shape(r) for r in _pre_story_projection(eq)]
     assert all(r.ha_entity_type != "valve" for r in _all(eq))
 
 
