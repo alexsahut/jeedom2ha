@@ -23,7 +23,7 @@ jobs:
   # Lint stage - Code quality checks
   lint:
     name: Lint (Python 3.9)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -50,7 +50,7 @@ jobs:
   # Test stage - execution with coverage
   test:
     name: Test (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     needs: lint
     strategy:
@@ -91,7 +91,7 @@ jobs:
   # (story 19.6 AC7), run explicitly here so they are exercised in CI.
   load:
     name: Load tests (Python 3.9)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: lint
 
@@ -227,7 +227,7 @@ jobs:
   # Burn-in stage - Flaky test detection
   burn-in:
     name: Burn-In (Python 3.9)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: test
     # Execute only on schedule or if PR has 'burn-in' label
