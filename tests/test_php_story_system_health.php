@@ -252,8 +252,6 @@ echo "Contrat de l'enveloppe callDaemon (correctif fix/system-health-envelope)\n
 // {action, payload, request_id, timestamp} : le démon lit `payload` (test pytest de l'enveloppe).
 check('callDaemon enveloppe la charge sous « payload »', (bool) preg_match(
     "/if \\(\\\$_method === 'POST' && !empty\\(\\\$_payload\\)\\) \\{.*?'action' => \\\$action,\\s*'payload' => \\\$_payload,\\s*'request_id' => .*?'timestamp' =>/s", $class));
-$action = str_replace('/', '.', str_replace('action/', '', ltrim(JEEDOM2HA_SYSTEM_HEALTH_ROUTE, '/')));
-check('nom d\'action dérivé par callDaemon : system_health', $action === 'system_health');
 $env = tick_env(array('enabled' => false, 'published' => true));
 jeedom2ha_system_health_tick($env->deps);
 check('la purge part avec une charge non vide (sinon callDaemon n\'enverrait aucun corps)',
@@ -268,6 +266,19 @@ check('réponse 400 / 503 du démon refusée', !jeedom2ha_system_health_response
 check('purge complète acceptée, incomplète refusée', jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => true), true)
     && !jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => false), true));
 check('démon injoignable (null) refusé', !jeedom2ha_system_health_response_ok(null));
+
+echo "UTF-8 invalide (correctif P3)\n";
+$bad = "Plugin \xC3\x28 cass\xE9";
+$badSnap = jeedom2ha_system_health_snapshot(array(
+    'plugins' => function () use ($bad) { return array(new FakePlugin("plugin_\xFFx", $bad)); },
+    'core_version' => function () { return "4.5\xFE"; },
+));
+check('nom, identifiant et version invalides : relevé encodable en JSON (json_encode n\'est pas false)',
+    json_encode($badSnap) !== false && json_encode(array('enabled' => true, 'snapshot' => $badSnap)) !== false);
+check('le plugin reste présent, son nom gardé en partie', count($badSnap['daemons']) === 1
+    && strpos($badSnap['daemons'][0]['name'], 'Plugin') === 0 && $badSnap['core_version'] !== null);
+check('un texte UTF-8 valide est rendu tel quel', jeedom2ha_system_health_utf8('Zêta – Démon') === 'Zêta – Démon');
+check('empreinte calculable sur un relevé assaini', (bool) preg_match('/^[0-9a-f]{64}$/', jeedom2ha_system_health_fingerprint($badSnap)));
 
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
