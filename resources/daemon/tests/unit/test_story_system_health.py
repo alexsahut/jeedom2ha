@@ -338,6 +338,48 @@ async def test_purge_empties_everything_even_after_a_daemon_restart():
         f"jeedom2ha/system/{k}/state" for k in result["removed"]}
 
 
+class _FailingEmptyBroker(_Broker):
+    """Broker qui refuse les vidages (charge vide) : un retrait ne peut pas aboutir."""
+
+    def publish_message(self, topic, payload, qos=1, retain=False):
+        if payload == "":
+            self.calls.append((topic, payload, retain))
+            return False
+        return super().publish_message(topic, payload, qos, retain)
+
+
+@pytest.mark.asyncio
+async def test_unreadable_broker_makes_the_publication_incomplete_so_it_is_retried():
+    """Revue P2 : broker illisible = retrait des plugins disparus non vérifié -> échec compté (le cron renverra)."""
+    broker = _Broker(collect=False)
+    result = await SystemHealthPublisher(broker).apply(SNAPSHOT)
+    assert result["failed"] == 1 and result["removed"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_removal_makes_the_publication_incomplete():
+    """Revue P2 : un plugin disparu dont la configuration ne peut pas être vidée -> échec compté, jamais « ok »."""
+    broker = _FailingEmptyBroker()
+    publisher = SystemHealthPublisher(broker)
+    assert (await publisher.apply(SNAPSHOT))["failed"] == 0
+    without_alpha = dict(SNAPSHOT, daemons=[d for d in SNAPSHOT["daemons"] if d["id"] != "plugin_alpha"])
+    result = await publisher.apply(without_alpha)
+    assert result["failed"] == 1 and result["removed"] == []
+    assert ("binary_sensor", "daemon_plugin_alpha") in publisher.published  # encore à retirer au prochain envoi
+
+
+@pytest.mark.asyncio
+async def test_route_reports_an_incomplete_removal_as_not_ok(aiohttp_client):
+    broker = _FailingEmptyBroker()
+    _app, cli = await _client(aiohttp_client, broker)
+    assert (await (await cli.post("/action/system_health", json={"enabled": True, "snapshot": SNAPSHOT},
+                                  headers=H)).json())["status"] == "ok"
+    without_alpha = dict(SNAPSHOT, daemons=[d for d in SNAPSHOT["daemons"] if d["id"] != "plugin_alpha"])
+    body = await (await cli.post("/action/system_health", json={"enabled": True, "snapshot": without_alpha},
+                                 headers=H)).json()
+    assert body["status"] == "error" and body["failed"] == 1  # le cron ne mémorise pas l'empreinte
+
+
 @pytest.mark.asyncio
 async def test_purge_is_incomplete_when_the_broker_cannot_be_read():
     broker = _Broker(collect=False)

@@ -86,7 +86,11 @@ class SystemHealthPublisher:
             self.published.add((entity.component, entity.key))
             if entity.state is not None and not self._publish(entity.state_topic, entity.state):
                 failed += 1
-        removed = await self._remove(lambda key: key not in wanted)
+        removed, remove_complete = await self._remove(lambda key: key not in wanted)
+        if not remove_complete:
+            # Broker illisible ou vidage en échec : un capteur disparu peut rester dans HA. Compté comme échec
+            # (statut non ok) : le cron ne mémorise pas l'empreinte et renvoie le relevé au passage suivant.
+            failed += 1
         _LOGGER.info(
             "[SYSTEM_HEALTH] Santé de Jeedom publiée : %d entité(s), %d retirée(s), %d échec(s)",
             len(entities), len(removed), failed,
@@ -107,11 +111,17 @@ class SystemHealthPublisher:
         removed = sorted(key for component, key in candidates if (component, key) not in failed)
         return {"removed": removed, "purge_complete": complete}
 
-    async def _remove(self, keep_out: Any) -> List[Tuple[str, str]]:
+    async def _remove(self, keep_out: Any) -> Tuple[List[Tuple[str, str]], bool]:
+        """Vide les entités hors du relevé. Complet seulement si le broker a pu être relu et chaque vidage a réussi."""
         retained = await self._retained_keys()
         candidates: Iterable[Tuple[str, str]] = set(self.published) | (retained or set())
         removed = []
+        complete = retained is not None
         for component, key in sorted(candidates):
-            if keep_out((component, key)) and self._empty(component, key):
+            if not keep_out((component, key)):
+                continue
+            if self._empty(component, key):
                 removed.append((component, key))
-        return removed
+            else:
+                complete = False
+        return removed, complete

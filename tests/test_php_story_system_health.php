@@ -182,6 +182,25 @@ $env->response = null;
 $r = jeedom2ha_system_health_tick($env->deps);
 check('démon injoignable : échec sans exception', $r['status'] === 'failed' && $env->stored === '');
 
+// Revue P2 : après A publié, un envoi de B échoué ou partiel efface l'empreinte : le retour aux valeurs A est republié.
+$env = tick_env(array('enabled' => true));
+check('A publié', jeedom2ha_system_health_tick($env->deps)['status'] === 'published' && $env->stored !== '');
+$stateA = $env->deps['snapshot'];
+$env->deps['snapshot'] = function () use ($env) {
+    $env->reads++;
+    return array('daemons' => array(array('id' => 'plugin_a', 'name' => 'Alpha', 'running' => false)),
+                 'updates' => 1, 'messages' => 0, 'core_version' => '4.4.0');
+};
+$env->response = array('status' => 'error', 'failed' => 1);
+$r = jeedom2ha_system_health_tick($env->deps);
+check('B en échec ou partiel : empreinte effacée (plus celle de A)', $r['status'] === 'failed' && $env->stored === '');
+$env->deps['snapshot'] = $stateA;
+$env->response = array('status' => 'ok', 'failed' => 0);
+$sentBefore = count($env->sent);
+$r = jeedom2ha_system_health_tick($env->deps);
+check('retour aux valeurs de A : republié (jamais « inchangé » sur un état de B resté dans HA)',
+    $r['status'] === 'published' && count($env->sent) === $sentBefore + 1);
+
 $env = tick_env(array('enabled' => true));
 $env->deps['send'] = function () { throw new Exception('réseau fictif'); };
 check('appel qui lève : échec propre', jeedom2ha_system_health_tick($env->deps)['status'] === 'failed');

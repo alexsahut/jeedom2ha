@@ -240,6 +240,9 @@ function jeedom2ha_system_health_tick(array $deps): array {
     $result = null;
   }
   if (!jeedom2ha_system_health_response_ok($result)) {
+    // Envoi échoué ou partiel : Home Assistant peut garder une partie de ce relevé. L'empreinte mémorisée est
+    // effacée pour que le relevé suivant soit TOUJOURS republié, même s'il revient aux valeurs d'avant.
+    $deps['store']('');
     $log('warning', '[SYSTEM_HEALTH] Relevé non publié, nouvel essai au prochain passage');
     return array('status' => 'failed', 'reason' => 'send_failed');
   }
