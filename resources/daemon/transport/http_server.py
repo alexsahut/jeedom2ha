@@ -5798,6 +5798,10 @@ async def _handle_action_system_health(request: web.Request) -> web.Response:
         return web.json_response({"status": "error", "message": "Champ 'enabled' (booléen) obligatoire."}, status=400)
     if body["enabled"] and not isinstance(body.get("snapshot"), dict):
         return web.json_response({"status": "error", "message": "Champ 'snapshot' (objet) obligatoire."}, status=400)
+    if not body["enabled"]:
+        # Revue P3 — la case décochée oublie le relevé AVANT tout contrôle du broker : même refusée (503), la
+        # demande empêche toute republication à la reconnexion ; la purge est retentée par le cron.
+        request.app["system_health_last"]["snapshot"] = None
     bridge = request.app.get("mqtt_bridge")
     if bridge is None or not getattr(bridge, "is_connected", False):
         return web.json_response({"status": "error", "message": "Broker MQTT indisponible."}, status=503)

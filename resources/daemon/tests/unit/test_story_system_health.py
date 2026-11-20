@@ -552,3 +552,19 @@ async def test_concurrent_collection_makes_the_send_fail_and_be_retried():
     broker = _Broker()
     broker.collect_retained_topics = AsyncMock(return_value=None)
     assert (await SystemHealthPublisher(broker).apply(SNAPSHOT))["failed"] == 1
+
+
+@pytest.mark.asyncio
+async def test_unchecking_while_the_broker_is_away_prevents_any_republication(aiohttp_client):
+    """Revue P3 : appareil publié, broker absent, case décochée (503), puis retour du broker : rien n'est republié."""
+    broker = _Broker()
+    _app, cli, reconnect_cb, birth_cb = await _connected(aiohttp_client, broker)
+    assert (await cli.post("/action/system_health", json={"enabled": True, "snapshot": SNAPSHOT}, headers=H)).status == 200
+    broker.is_connected = False
+    assert (await cli.post("/action/system_health", json={"enabled": False}, headers=H)).status == 503
+    broker.is_connected = True
+    broker.retained.clear()
+    broker.calls.clear()
+    await reconnect_cb()
+    await birth_cb()
+    assert not any("system" in t for t, _p, _r in broker.calls)
