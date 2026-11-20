@@ -5794,6 +5794,10 @@ async def _handle_action_system_health(request: web.Request) -> web.Response:
         body = await request.json()
     except Exception:
         return web.json_response({"status": "error", "message": "Corps de requête JSON invalide."}, status=400)
+    # jeedom2ha::callDaemon enveloppe tout POST dans {"action", "payload", "request_id", "timestamp"} : on travaille
+    # sur la charge utile, comme les autres routes ; un corps nu reste accepté.
+    if isinstance(body, dict) and isinstance(body.get("payload"), dict):
+        body = body["payload"]
     if not isinstance(body, dict) or not isinstance(body.get("enabled"), bool):
         return web.json_response({"status": "error", "message": "Champ 'enabled' (booléen) obligatoire."}, status=400)
     if body["enabled"] and not isinstance(body.get("snapshot"), dict):

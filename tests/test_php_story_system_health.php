@@ -247,5 +247,27 @@ foreach (token_get_all(file_get_contents($root . '/core/php/jeedom2ha_system_hea
 }
 check('fichier pur : aucun appel au cœur Jeedom (hors commentaires)', !preg_match('/\b(plugin|update|message|config|log|jeedom|DB)::/', $code));
 
+echo "Contrat de l'enveloppe callDaemon (correctif fix/system-health-envelope)\n";
+// callDaemon n'envoie un corps POST que si la charge est non vide, puis l'enveloppe dans
+// {action, payload, request_id, timestamp} : le démon lit `payload` (test pytest de l'enveloppe).
+check('callDaemon enveloppe la charge sous « payload »', (bool) preg_match(
+    "/if \\(\\\$_method === 'POST' && !empty\\(\\\$_payload\\)\\) \\{.*?'action' => \\\$action,\\s*'payload' => \\\$_payload,\\s*'request_id' => .*?'timestamp' =>/s", $class));
+$action = str_replace('/', '.', str_replace('action/', '', ltrim(JEEDOM2HA_SYSTEM_HEALTH_ROUTE, '/')));
+check('nom d\'action dérivé par callDaemon : system_health', $action === 'system_health');
+$env = tick_env(array('enabled' => false, 'published' => true));
+jeedom2ha_system_health_tick($env->deps);
+check('la purge part avec une charge non vide (sinon callDaemon n\'enverrait aucun corps)',
+    count($env->sent) === 1 && !empty($env->sent[0]) && $env->sent[0] === array('enabled' => false));
+$env = tick_env(array('enabled' => true));
+jeedom2ha_system_health_tick($env->deps);
+check('la publication part avec enabled et snapshot', !empty($env->sent[0]) && $env->sent[0]['enabled'] === true && is_array($env->sent[0]['snapshot']));
+// Réponses du démon telles que callDaemon les rend (JSON décodé, codes d'erreur lus grâce à ignore_errors).
+check('réponse 200 du démon acceptée', jeedom2ha_system_health_response_ok(array('status' => 'ok', 'entities' => 7, 'removed' => array(), 'failed' => 0)));
+check('réponse 400 / 503 du démon refusée', !jeedom2ha_system_health_response_ok(array('status' => 'error', 'message' => "Champ 'enabled' (booléen) obligatoire."))
+    && !jeedom2ha_system_health_response_ok(array('status' => 'error', 'message' => 'Broker MQTT indisponible.')));
+check('purge complète acceptée, incomplète refusée', jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => true), true)
+    && !jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => false), true));
+check('démon injoignable (null) refusé', !jeedom2ha_system_health_response_ok(null));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
