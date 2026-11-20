@@ -53,25 +53,47 @@ class SystemHealthPublisher:
         return ok
 
     async def _retained_keys(self) -> Optional[PublishedKeys]:
-        """Configurations retenues de l'appareil lues sur le broker ; None si la lecture est impossible."""
+        """Configurations retenues de l'appareil lues sur le broker ; None si la lecture est impossible.
+
+        Revue P3.1 — UNE seule collecte (filtre ``<prefix>/+/+/config``, puis tri par le motif strict) : la fenêtre
+        bornée de ``collect_retained_topics`` (1,5 s) n'est payée qu'une fois par envoi, au lieu d'une fois par
+        composant (3 s auparavant).
+
+        Revue P3.2 — une collecte déjà en cours sur le pont (purge des boutons de scénario au même moment) fait
+        renvoyer None : le retrait ou la purge est alors incomplet, l'envoi répond un échec et le cron le retente au
+        passage suivant. Accepté : rien n'est perdu, seulement différé de 5 minutes.
+        """
         collect = getattr(self._bridge, "collect_retained_topics", None)
         if collect is None:
             return None
+        try:
+            topics = await collect(f"{self._prefix}/+/+/config")
+        except Exception:
+            _LOGGER.exception("[SYSTEM_HEALTH] Lecture des configurations retenues impossible")
+            return None
+        if not isinstance(topics, list):
+            return None
         pattern = system_config_topic_pattern(self._prefix)
         found: PublishedKeys = set()
-        for component in SYSTEM_COMPONENTS:
-            try:
-                topics = await collect(f"{self._prefix}/{component}/+/config")
-            except Exception:
-                _LOGGER.exception("[SYSTEM_HEALTH] Lecture des configurations retenues impossible")
-                return None
-            if not isinstance(topics, list):
-                return None
-            for topic in topics:
-                match = pattern.fullmatch(topic) if isinstance(topic, str) else None
-                if match and match.group(1) == component:
-                    found.add((component, match.group(2)))
+        for topic in topics:
+            match = pattern.fullmatch(topic) if isinstance(topic, str) else None
+            if match and match.group(1) in SYSTEM_COMPONENTS:
+                found.add((match.group(1), match.group(2)))
         return found
+
+    def republish(self, snapshot: Any) -> int:
+        """Revue P2 — republie configurations et états retenus du dernier relevé (reconnexion au broker, retour de
+        Home Assistant), sans relecture du broker ni retrait. Renvoie le nombre d'échecs."""
+        failed = 0
+        for entity in map_system_health(snapshot):
+            payload = json.dumps(build_system_health_payload(entity), ensure_ascii=False)
+            if not self._publish(entity.config_topic(self._prefix), payload):
+                failed += 1
+                continue
+            self.published.add((entity.component, entity.key))
+            if entity.state is not None and not self._publish(entity.state_topic, entity.state):
+                failed += 1
+        return failed
 
     async def apply(self, snapshot: Any) -> Dict[str, Any]:
         """Publie le relevé (configurations puis états retenus) et retire les entités qui n'en font plus partie."""

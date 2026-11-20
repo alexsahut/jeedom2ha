@@ -1328,6 +1328,25 @@ async def _detect_lifecycle_changes(
                 )
 
 
+def _republish_system_health(app: web.Application, reason: str) -> None:
+    """story/system-health (revue P2) — republie l'appareil « Santé de Jeedom » depuis le dernier relevé en mémoire.
+
+    Appelée à chaque connexion MQTT et au retour de Home Assistant, comme l'appareil du pont, que des équipements
+    soient publiés ou non : un broker redémarré sans ses messages retenus retrouve l'appareil sans attendre un
+    changement de valeur. Aucun relevé en mémoire (case décochée, purge faite, démon tout juste démarré) : rien.
+    """
+    snapshot = (app.get("system_health_last") or {}).get("snapshot")
+    mqtt_bridge = app.get("mqtt_bridge")
+    if not isinstance(snapshot, dict) or not mqtt_bridge or not getattr(mqtt_bridge, "is_connected", False):
+        return
+    try:
+        published = app.get("system_health_published")
+        failed = SystemHealthPublisher(mqtt_bridge, published=published).republish(snapshot)
+        _LOGGER.info("[SYSTEM_HEALTH] Santé de Jeedom republiée (reason=%s, %d échec(s))", reason, failed)
+    except Exception:
+        _LOGGER.exception("[SYSTEM_HEALTH] Republication de Santé de Jeedom échouée (reason=%s)", reason)
+
+
 async def _publish_bridge_discovery(app: web.Application) -> bool:
     """Story 22.4 — publie (retenu) l'appareil du pont « Jeedom (jeedom2ha) ».
 
@@ -1859,6 +1878,7 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
         """Called when broker reconnects — republish from RAM cache if non-empty."""
         # Story 22.4 — appareil du pont d'abord, à chaque connexion (première comprise).
         await _publish_bridge_discovery(app)
+        _republish_system_health(app, "broker_reconnect")  # story/system-health (revue P2)
         # Story 24.14 (revue P2) — un parc qui ne publie que des boutons de scénario est republié aussi.
         if not app.get("publications") and _scenario_republish_entries(app):
             await _republish_all_from_cache(app, "broker_reconnect")
@@ -1876,6 +1896,7 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
         app["ha_birth_seen_at"] = datetime.now(timezone.utc).isoformat()
         # Story 22.4 — appareil du pont d'abord.
         await _publish_bridge_discovery(app)
+        _republish_system_health(app, "ha_birth")  # story/system-health (revue P2)
         await _republish_all_from_cache(app, "ha_birth")
 
     # Start the persistent bridge with new params and republication callbacks
@@ -5783,9 +5804,12 @@ async def _handle_action_system_health(request: web.Request) -> web.Response:
     published = request.app.setdefault("system_health_published", set())
     publisher = SystemHealthPublisher(bridge, published=published)
     if body["enabled"]:
+        # Revue P2 — dernier relevé gardé en mémoire : republié à la reconnexion au broker et au retour de HA.
+        request.app["system_health_last"]["snapshot"] = body["snapshot"]
         result = await publisher.apply(body["snapshot"])
         status = "ok" if result["failed"] == 0 else "error"
         return web.json_response({"status": status, **result})
+    request.app["system_health_last"]["snapshot"] = None
     result = await publisher.purge()
     return web.json_response({"status": "ok", **result})
 
@@ -5850,6 +5874,8 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_get("/system/state_listeners", _handle_system_state_listeners)
     # story/system-health — appareil « Santé de Jeedom » (désactivé par défaut, lecture seule).
     app["system_health_published"] = set()
+    # Dernier relevé appliqué (revue P2), dans un conteneur mutable : jamais de clé réassignée sur l'app démarrée.
+    app["system_health_last"] = {"snapshot": None}
     app.router.add_post("/action/system_health", _handle_action_system_health)
     return app
 

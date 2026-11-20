@@ -64,6 +64,7 @@ class _Broker:
         return True
 
     async def collect_retained_topics(self, topic_filter, window_s=1.5):
+        self.collects = getattr(self, "collects", []) + [topic_filter]
         regex = "^" + re.escape(topic_filter).replace(r"\+", "[^/]+").replace(r"\#", ".*") + "$"
         return [t for t in self.retained if re.match(regex, t)]
 
@@ -472,3 +473,82 @@ async def test_disabled_by_default_the_mqtt_trace_is_strictly_identical_to_main(
     assert entity_commands(app["mappings"]) == base["entities"]
     assert not any("jeedom2ha_system" in c["topic"] or c["topic"].startswith("jeedom2ha/system/") for c in bridge.calls)
     assert app["system_health_published"] == set()
+
+
+# --- Revue P2 : republication après redémarrage du broker / retour de HA ------------------------
+
+async def _connected(aiohttp_client, broker):
+    broker.start = AsyncMock()
+    broker.stop = AsyncMock()
+    broker.state = "connected"
+    broker.broker_info = "broker.example.invalid:18830"
+    app, cli = await _client(aiohttp_client, broker)
+    resp = await cli.post("/action/mqtt_connect", json={"payload": {"host": "broker.example.invalid", "port": 18830}},
+                          headers=H)
+    assert resp.status == 200
+    kwargs = broker.start.call_args.kwargs
+    return app, cli, kwargs["on_reconnect_cb"], kwargs["on_ha_birth_cb"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("which", ["broker_reconnect", "ha_birth"])
+async def test_device_is_republished_after_a_broker_restart_without_retained_messages(aiohttp_client, which):
+    broker = _Broker()
+    app, cli, reconnect_cb, birth_cb = await _connected(aiohttp_client, broker)
+    assert (await cli.post("/action/system_health", json={"enabled": True, "snapshot": SNAPSHOT}, headers=H)).status == 200
+    expected = {t: p for t, p in broker.retained.items() if "system" in t}
+    assert len([t for t in expected if t.endswith("/config")]) == 7
+    # Mosquitto redémarre SANS persistance : plus aucun message retenu.
+    broker.retained.clear()
+    broker.calls.clear()
+    await (reconnect_cb() if which == "broker_reconnect" else birth_cb())
+    assert {t: p for t, p in broker.retained.items() if "system" in t} == expected  # configurations ET états
+    assert app["publications"] == {}  # aucun équipement publié : l'appareil revient quand même
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_republished_when_disabled_or_purged(aiohttp_client):
+    broker = _Broker()
+    _app, cli, reconnect_cb, _birth = await _connected(aiohttp_client, broker)
+    await reconnect_cb()
+    assert not any("system" in t for t, _p, _r in broker.calls)  # jamais activée : rien
+    await cli.post("/action/system_health", json={"enabled": True, "snapshot": SNAPSHOT}, headers=H)
+    await cli.post("/action/system_health", json={"enabled": False}, headers=H)
+    broker.retained.clear()
+    broker.calls.clear()
+    await reconnect_cb()
+    assert not any("system" in t for t, _p, _r in broker.calls)  # purgée : rien ne revient
+
+
+# --- Revue P3.1 : une seule collecte par envoi --------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_one_retained_collection_per_send():
+    """Une seule fenêtre de collecte (1,5 s sur le vrai pont) par envoi, au lieu de deux (3 s) : filtre unique
+    ``<prefix>/+/+/config`` puis tri par le motif strict de l'appareil."""
+    broker = _Broker()
+    publisher = SystemHealthPublisher(broker)
+    await publisher.apply(SNAPSHOT)
+    assert broker.collects == ["homeassistant/+/+/config"]
+    await publisher.purge()
+    assert broker.collects == ["homeassistant/+/+/config"] * 2
+
+
+@pytest.mark.asyncio
+async def test_single_collection_still_sorts_out_other_entities():
+    broker = _Broker()
+    broker.publish_message("homeassistant/switch/jeedom2ha_system_daemon_x/config", "{}", retain=True)  # autre domaine
+    broker.publish_message("homeassistant/sensor/jeedom2ha_199_1626/config", "{}", retain=True)
+    broker.publish_message("homeassistant/sensor/autre_integration_system/config", "{}", retain=True)
+    await SystemHealthPublisher(broker).apply(SNAPSHOT)
+    assert "homeassistant/switch/jeedom2ha_system_daemon_x/config" in broker.retained
+    assert "homeassistant/sensor/jeedom2ha_199_1626/config" in broker.retained
+    assert "homeassistant/sensor/autre_integration_system/config" in broker.retained
+
+
+@pytest.mark.asyncio
+async def test_concurrent_collection_makes_the_send_fail_and_be_retried():
+    """Revue P3.2 : une collecte déjà en cours (purge des scénarios) fait renvoyer None : envoi compté en échec."""
+    broker = _Broker()
+    broker.collect_retained_topics = AsyncMock(return_value=None)
+    assert (await SystemHealthPublisher(broker).apply(SNAPSHOT))["failed"] == 1
