@@ -138,7 +138,8 @@ test('front v3 (Lot 3) réel — aucune case de plugin ; lien « Choisir ce qui 
     // Garde levée (front v3, Lot 6) : le texte de ⓘ est dans `data-j2ha-tip` (bulle au clic), plus dans `title` ; même assertion.
     assert.match(await page.locator('#p_j2haChoosePublished .j2ha-info').getAttribute('data-j2ha-tip'), /En cas de doute/);
     const keys = await page.evaluate(() => [...document.querySelectorAll('#div_plugin_configuration .configKey')].map((el) => el.getAttribute('data-l1key')));
-    assert.ok(keys.every((k) => /^mqtt/.test(k)), keys.join(','));
+    // story/system-health : une seule clé hors broker, la case « Publier la santé de Jeedom » (décochée par défaut).
+    assert.ok(keys.every((k) => /^mqtt/.test(k) || k === 'publishSystemHealth'), keys.join(','));
     assert.deepEqual(ctx.requests.map((r) => r.action), ['getMqttConfig']);
     assert.deepEqual(ctx.errors, []);
   });
@@ -452,4 +453,31 @@ test('Lot 4 / revue réel — réglages figés au clic : le broker testé est ce
       assert.deepEqual(ctx.errors, []);
     }, { initScript: FAKE_CORE_JS('ok'), mqttDelayMs: 400, mqttTest });
   }
+});
+
+// story/system-health — la case « Publier la santé de Jeedom » : décochée par défaut, enregistrée par « Sauvegarder » du
+// cœur (champ configKey `publishSystemHealth`), hors du bloc MQTT (jamais verrouillée par la chaîne de test du broker).
+test('story/system-health — source : case configKey publishSystemHealth, info-bulle vers « Santé de Jeedom »', () => {
+  assert.match(config, /<input type="checkbox" class="configKey" data-l1key="publishSystemHealth" id="cb_publishSystemHealth"\/>/);
+  assert.match(config, /<label class="col-md-4 control-label" for="cb_publishSystemHealth">\{\{Publier la santé de Jeedom\}\}<\/label>/);
+  assert.match(config, /data-j2ha-doc="santé-de-jeedom"/);
+  assert.doesNotMatch(config, /data-l1key="publishSystemHealth"[^>]*checked/, 'jamais cochée d\'office');
+  // Le verrou de la chaîne MQTT ne vise que les champs du broker.
+  assert.match(config, /\$\('\.configKey\[data-l1key\^=mqtt\], #in_mqttPassword, #bt_importMqttManager, #bt_mqttTestSaveRestart'\)\.prop\('disabled', locked\);/);
+});
+
+test('story/system-health réel — case présente, décochée par défaut, dans la configuration du plugin', async (t) => {
+  await withConfigurationPage(t, FIXTURE, async (page, ctx) => {
+    const box = page.locator('#div_plugin_configuration .configKey[data-l1key=publishSystemHealth]');
+    assert.equal(await box.count(), 1);
+    assert.equal(await box.getAttribute('type'), 'checkbox');
+    assert.equal(await box.isChecked(), false, 'désactivée par défaut');
+    assert.equal(await box.isDisabled(), false);
+    assert.equal((await page.locator('label[for=cb_publishSystemHealth]').innerText()).trim(), 'Publier la santé de Jeedom');
+    assert.match(await page.locator('#i_systemHealth').getAttribute('data-j2ha-tip'), /jamais leur texte/);
+    await box.check();
+    assert.equal(await box.isChecked(), true);
+    assert.deepEqual(ctx.requests.map((r) => r.action), ['getMqttConfig'], 'cocher n\'envoie rien : « Sauvegarder » du cœur enregistre');
+    assert.deepEqual(ctx.errors, []);
+  });
 });

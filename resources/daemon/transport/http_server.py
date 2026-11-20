@@ -79,6 +79,7 @@ from mapping.overrides import (
 )
 from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
+from discovery.system_health import SystemHealthPublisher  # story/system-health
 from cache.disk_cache import save_publications_cache
 from export.decision_export import (
     DecisionMemo,
@@ -5758,6 +5759,37 @@ async def _handle_action_state_update(request: web.Request) -> web.Response:
     return web.json_response({"status": "ok", "published": bool(published)})
 
 
+async def _handle_action_system_health(request: web.Request) -> web.Response:
+    """story/system-health — relevé « Santé de Jeedom » envoyé par le cron du plugin (lecture seule).
+
+    Corps : ``{"enabled": true, "snapshot": {...}}`` publie l'appareil (configurations et états retenus) et retire
+    ce qui ne fait plus partie du relevé ; ``{"enabled": false}`` le purge entièrement. Hors du circuit des
+    équipements : ni ``publications``, ni ``mappings``, ni compteurs, ni verrou d'action. Le cron n'appelle cette
+    route que si la case est cochée (ou pour la purge qui suit sa désactivation) : désactivé, rien n'est publié.
+    """
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"status": "error", "message": "Corps de requête JSON invalide."}, status=400)
+    if not isinstance(body, dict) or not isinstance(body.get("enabled"), bool):
+        return web.json_response({"status": "error", "message": "Champ 'enabled' (booléen) obligatoire."}, status=400)
+    if body["enabled"] and not isinstance(body.get("snapshot"), dict):
+        return web.json_response({"status": "error", "message": "Champ 'snapshot' (objet) obligatoire."}, status=400)
+    bridge = request.app.get("mqtt_bridge")
+    if bridge is None or not getattr(bridge, "is_connected", False):
+        return web.json_response({"status": "error", "message": "Broker MQTT indisponible."}, status=503)
+    published = request.app.setdefault("system_health_published", set())
+    publisher = SystemHealthPublisher(bridge, published=published)
+    if body["enabled"]:
+        result = await publisher.apply(body["snapshot"])
+        status = "ok" if result["failed"] == 0 else "error"
+        return web.json_response({"status": status, **result})
+    result = await publisher.purge()
+    return web.json_response({"status": "ok", **result})
+
+
 def create_app(local_secret: str) -> web.Application:
     """Create the aiohttp application with routes and auth context."""
     app = web.Application(client_max_size=SYNC_REQUEST_MAX_BYTES)
@@ -5816,6 +5848,9 @@ def create_app(local_secret: str) -> web.Application:
     # Story 12.1 — canal inbound Jeedom → daemon pour le streaming d'état (vague 1)
     app.router.add_post("/action/state_update", _handle_action_state_update)
     app.router.add_get("/system/state_listeners", _handle_system_state_listeners)
+    # story/system-health — appareil « Santé de Jeedom » (désactivé par défaut, lecture seule).
+    app["system_health_published"] = set()
+    app.router.add_post("/action/system_health", _handle_action_system_health)
     return app
 
 

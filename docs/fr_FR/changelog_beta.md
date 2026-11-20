@@ -6,6 +6,13 @@
 
 ---
 
+# 2026-11-19 — Santé de Jeedom dans Home Assistant (option)
+
+- Nouvelle case **« Publier la santé de Jeedom »** dans la configuration, **décochée par défaut** : elle publie un appareil « Santé de Jeedom », en lecture seule, avec l'état du démon de chaque plugin qui en a un, les nombres de démons en service et arrêtés (un état illisible compte comme arrêté), le nombre de mises à jour disponibles, le nombre de messages (jamais leur texte) et la version du cœur.
+- Relevé toutes les 5 minutes, envoyé seulement s'il change. Décocher la case retire l'appareil de Home Assistant. Case décochée, rien ne change dans ce qui est publié.
+
+---
+
 # 2026-11-16 — Portails et portes motorisées : capteur « État »
 
 - Un portail ou une porte motorisée publié comme **ouvrant** (types génériques de portail ou de porte motorisée, avec un état numérique) gagne un capteur **« État »** sur le même appareil : il affiche les cinq états de la convention barrière (`closed`, `closing`, `stopped`, `opening`, `open`), dont l'état **arrêté** que Home Assistant ne sait pas afficher pour un ouvrant. Une valeur hors de la table n'est pas publiée.
