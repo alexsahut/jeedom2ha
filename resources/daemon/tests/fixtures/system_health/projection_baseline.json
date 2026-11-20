@@ -1,0 +1,2125 @@
+{
+ "entities": {
+  "jeedom2ha_eq_1000": {
+   "commands": {
+    "LIGHT_OFF": 10002,
+    "LIGHT_ON": 10001,
+    "LIGHT_STATE": 10003
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_10000": {
+   "commands": {
+    "GENERIC_INFO": 100001
+   },
+   "confidence": "ambiguous",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_10001": {
+   "commands": {
+    "COLOR": 100011
+   },
+   "confidence": "ambiguous",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_10002": {
+   "commands": {
+    "VOLUME_SET": 100021
+   },
+   "confidence": "ambiguous",
+   "type": "button"
+  },
+  "jeedom2ha_eq_10003": {
+   "commands": {
+    "SET_TEXT": 100031
+   },
+   "confidence": "ambiguous",
+   "type": "button"
+  },
+  "jeedom2ha_eq_1001": {
+   "commands": {
+    "LIGHT_ON": 10011,
+    "LIGHT_STATE": 10012
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1002": {
+   "commands": {
+    "LIGHT_OFF": 10021,
+    "LIGHT_STATE": 10022
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1003": {
+   "commands": {
+    "LIGHT_SLIDER": 10031
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1004": {
+   "commands": {
+    "LIGHT_ON": 10041,
+    "LIGHT_STATE": 10042
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1005": {
+   "commands": {
+    "LIGHT_BRIGHTNESS": 10054,
+    "LIGHT_OFF": 10052,
+    "LIGHT_ON": 10051,
+    "LIGHT_SLIDER": 10055,
+    "LIGHT_STATE": 10053
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1006": {
+   "commands": {
+    "LIGHT_OFF": 10062,
+    "LIGHT_ON": 10061,
+    "LIGHT_STATE": 10063
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1007": {
+   "commands": {
+    "LIGHT_ON": 10071,
+    "LIGHT_STATE": 10072
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1008": {
+   "commands": {
+    "LIGHT_OFF": 10081,
+    "LIGHT_STATE": 10082
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_1009": {
+   "commands": {
+    "LIGHT_SLIDER": 10091,
+    "LIGHT_STATE": 10092
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_11000": {
+   "commands": {
+    "THERMOSTAT_MODE": 110004,
+    "THERMOSTAT_SETPOINT": 110003,
+    "THERMOSTAT_SET_MODE_110005": 110005,
+    "THERMOSTAT_SET_MODE_110006": 110006,
+    "THERMOSTAT_SET_MODE_OFF": 110007,
+    "THERMOSTAT_SET_SETPOINT": 110001,
+    "THERMOSTAT_STATE": 110008,
+    "THERMOSTAT_TEMPERATURE": 110002
+   },
+   "confidence": "sure",
+   "type": "climate"
+  },
+  "jeedom2ha_eq_11000_cmd_110009": {
+   "commands": {
+    "THERMOSTAT_LOCK": 110009,
+    "THERMOSTAT_SET_LOCK": 110010,
+    "THERMOSTAT_SET_UNLOCK": 110012
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_11001": {
+   "commands": {
+    "THERMOSTAT_SET_SETPOINT": 110011
+   },
+   "confidence": "sure",
+   "type": "climate"
+  },
+  "jeedom2ha_eq_11002": {
+   "commands": {
+    "THERMOSTAT_MODE": 110024,
+    "THERMOSTAT_SETPOINT": 110023,
+    "THERMOSTAT_SET_MODE_110025": 110025,
+    "THERMOSTAT_SET_SETPOINT": 110021,
+    "THERMOSTAT_STATE": 110026,
+    "THERMOSTAT_TEMPERATURE": 110022
+   },
+   "confidence": "sure",
+   "type": "climate"
+  },
+  "jeedom2ha_eq_12000": {
+   "commands": {
+    "ALARM_DISABLE": 12004,
+    "ALARM_ENABLE": 12003,
+    "ALARM_STATE": 12001
+   },
+   "confidence": "sure",
+   "type": "alarm_control_panel"
+  },
+  "jeedom2ha_eq_2000": {
+   "commands": {
+    "FLAP_DOWN": 20002,
+    "FLAP_STATE": 20003,
+    "FLAP_UP": 20001
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2001": {
+   "commands": {
+    "FLAP_DOWN": 20012,
+    "FLAP_UP": 20011
+   },
+   "confidence": "probable",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2002": {
+   "commands": {
+    "FLAP_SLIDER": 20021
+   },
+   "confidence": "probable",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2003": {
+   "commands": {
+    "FLAP_DOWN": 20032,
+    "FLAP_STATE": 20033,
+    "FLAP_STOP": 20034,
+    "FLAP_UP": 20031
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2004": {
+   "commands": {
+    "FLAP_BSO_DOWN": 20042,
+    "FLAP_BSO_UP": 20041
+   },
+   "confidence": "probable",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2005": {
+   "commands": {
+    "FLAP_BSO_DOWN": 20052,
+    "FLAP_BSO_STATE": 20053,
+    "FLAP_BSO_UP": 20051
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2006": {
+   "commands": {
+    "FLAP_DOWN": 20062,
+    "FLAP_SLIDER": 20064,
+    "FLAP_STATE": 20063,
+    "FLAP_UP": 20061
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_2007": {
+   "commands": {
+    "FLAP_DOWN": 20072,
+    "FLAP_SLIDER": 20073,
+    "FLAP_UP": 20071
+   },
+   "confidence": "probable",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_230": {
+   "commands": {
+    "ALARM_ARMED": 23003,
+    "ALARM_ENABLE_STATE": 23001,
+    "ALARM_RELEASED": 23004
+   },
+   "confidence": "sure",
+   "type": "alarm_control_panel"
+  },
+  "jeedom2ha_eq_3000": {
+   "commands": {
+    "ENERGY_OFF": 30002,
+    "ENERGY_ON": 30001,
+    "ENERGY_STATE": 30003
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_3001": {
+   "commands": {
+    "ENERGY_OFF": 30012,
+    "ENERGY_ON": 30011
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_3002": {
+   "commands": {
+    "ENERGY_ON": 30021
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_3003": {
+   "commands": {
+    "ENERGY_OFF": 30031
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_3004": {
+   "commands": {
+    "ENERGY_ON": 30041,
+    "ENERGY_STATE": 30042
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_4000": {
+   "commands": {
+    "LIGHT_ON": 40001
+   },
+   "confidence": "ambiguous",
+   "type": "light"
+  },
+  "jeedom2ha_eq_4001": {
+   "commands": {
+    "FLAP_STATE": 40011
+   },
+   "confidence": "ambiguous",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_4002": {
+   "commands": {
+    "ENERGY_OFF": 40022,
+    "ENERGY_ON": 40021,
+    "ENERGY_STATE": 40023
+   },
+   "confidence": "ambiguous",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_457": {
+   "commands": {
+    "LIGHT_OFF": 45702,
+    "LIGHT_ON": 45701,
+    "LIGHT_SLIDER": 45704,
+    "LIGHT_STATE": 45703
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_457_cmd_45705": {
+   "commands": {
+    "45705": 45705
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_457_cmd_45706": {
+   "commands": {
+    "45706": 45706
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5137": {
+   "commands": {
+    "5137": 5137
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5138": {
+   "commands": {
+    "5138": 5138
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5139": {
+   "commands": {
+    "5139": 5139
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5140": {
+   "commands": {
+    "5140": 5140
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5169": {
+   "commands": {
+    "5169": 5169
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5170": {
+   "commands": {
+    "5170": 5170
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5171": {
+   "commands": {
+    "5171": 5171
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_553_cmd_5177": {
+   "commands": {
+    "5177": 5177
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_554": {
+   "commands": {
+    "ENERGY_OFF": 5707,
+    "ENERGY_ON": 5706,
+    "ENERGY_STATE": 5708
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_554_cmd_5205": {
+   "commands": {
+    "5205": 5205
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_554_cmd_5206": {
+   "commands": {
+    "5206": 5206
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_554_cmd_5510": {
+   "commands": {
+    "5510": 5510
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_554_cmd_5530": {
+   "commands": {
+    "5530": 5530
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_554_cmd_5535": {
+   "commands": {
+    "5535": 5535
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_554_select_5489": {
+   "commands": {
+    "MODE_SET_STATE#5372": 5372,
+    "MODE_SET_STATE#5490": 5490,
+    "MODE_SET_STATE#5491": 5491,
+    "MODE_STATE": 5489
+   },
+   "confidence": "sure",
+   "type": "select"
+  },
+  "jeedom2ha_eq_583_cmd_5986": {
+   "commands": {
+    "5986": 5986
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_583_cmd_5987": {
+   "commands": {
+    "SWITCH_OFF": 5998,
+    "SWITCH_ON": 5997,
+    "SWITCH_STATE": 5987
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_583_cmd_5988": {
+   "commands": {
+    "5988": 5988
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_583_cmd_5991": {
+   "commands": {
+    "5991": 5991
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_583_cmd_5992": {
+   "commands": {
+    "5992": 5992
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_583_cmd_5993": {
+   "commands": {
+    "5993": 5993
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_583_cmd_6009": {
+   "commands": {
+    "SWITCH_OFF": 6001,
+    "SWITCH_ON": 5999,
+    "SWITCH_STATE": 6009
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_583_cmd_6010": {
+   "commands": {
+    "SWITCH_OFF": 6021,
+    "SWITCH_ON": 6000,
+    "SWITCH_STATE": 6010
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_6000": {
+   "commands": {
+    "LIGHT_STATE": 60001
+   },
+   "confidence": "probable",
+   "type": "light"
+  },
+  "jeedom2ha_eq_6001": {
+   "commands": {
+    "LIGHT_OFF": 60012,
+    "LIGHT_ON": 60011,
+    "LIGHT_STATE": 60013
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_628_cmd_5977": {
+   "commands": {
+    "SWITCH_OFF": 5979,
+    "SWITCH_ON": 5978,
+    "SWITCH_STATE": 5977
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_628_cmd_5980": {
+   "commands": {
+    "SWITCH_OFF": 5982,
+    "SWITCH_ON": 5981,
+    "SWITCH_STATE": 5980
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_628_cmd_5983": {
+   "commands": {
+    "SWITCH_OFF": 5985,
+    "SWITCH_ON": 5984,
+    "SWITCH_STATE": 5983
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_628_cmd_6004": {
+   "commands": {
+    "SWITCH_OFF": 6006,
+    "SWITCH_ON": 6005,
+    "SWITCH_STATE": 6004
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_7000": {
+   "commands": {
+    "TEMPERATURE": 70001
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_7001": {
+   "commands": {
+    "HUMIDITY": 70011
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_7002": {
+   "commands": {
+    "POWER": 70021
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_7003": {
+   "commands": {
+    "CO2": 70031
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_7004": {
+   "commands": {
+    "BRIGHTNESS": 70041
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_8000": {
+   "commands": {
+    "PRESENCE": 80001
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_8001": {
+   "commands": {
+    "OPENING": 80011
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_8002": {
+   "commands": {
+    "SMOKE": 80021
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_8003": {
+   "commands": {
+    "FLOOD": 80031
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_8004": {
+   "commands": {
+    "LOCK_STATE": 80041
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9000": {
+   "commands": {
+    "GENERIC_ACTION": 90001
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9001": {
+   "commands": {
+    "MEDIA_PAUSE": 90011
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9002": {
+   "commands": {
+    "SIREN_ON": 90021
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9700": {
+   "commands": {
+    "PRESENCE": 97001,
+    "SET_OFF": 97003,
+    "SET_ON": 97002
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9801_cmd_980101": {
+   "commands": {
+    "980101": 980101
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9801_cmd_980102": {
+   "commands": {
+    "980102": 980102
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9801_cmd_980103": {
+   "commands": {
+    "980103": 980103
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9802": {
+   "commands": {
+    "BARRIER_STATE": 980201
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9803_cmd_980301": {
+   "commands": {
+    "FAN_OFF": 980303,
+    "FAN_ON": 980302,
+    "FAN_STATE": 980301
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9810": {
+   "commands": {
+    "ENERGY_OFF#905491": 905491,
+    "ENERGY_OFF#905707": 905707,
+    "ENERGY_ON#905490": 905490,
+    "ENERGY_ON#905706": 905706,
+    "ENERGY_STATE": 905708
+   },
+   "confidence": "ambiguous",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9810_cmd_905205": {
+   "commands": {
+    "905205": 905205
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9810_cmd_905206": {
+   "commands": {
+    "905206": 905206
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9810_cmd_905510": {
+   "commands": {
+    "905510": 905510
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9810_cmd_905530": {
+   "commands": {
+    "905530": 905530
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9810_cmd_905535": {
+   "commands": {
+    "905535": 905535
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9811": {
+   "commands": {
+    "ENERGY_OFF": 981103,
+    "ENERGY_ON": 981102,
+    "ENERGY_STATE": 981101
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9812": {
+   "commands": {
+    "PRESENCE": 981201,
+    "SET_OFF": 981203,
+    "SET_ON": 981202
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9813": {
+   "commands": {
+    "ENERGY_OFF": 981304,
+    "ENERGY_ON": 981303,
+    "ENERGY_STATE": 981301
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9820": {
+   "commands": {
+    "TEMPERATURE": 982001
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9820_select_982002": {
+   "commands": {
+    "MODE_SET_STATE#982003": 982003,
+    "MODE_SET_STATE#982004": 982004,
+    "MODE_SET_STATE#982005": 982005,
+    "MODE_STATE": 982002
+   },
+   "confidence": "sure",
+   "type": "select"
+  },
+  "jeedom2ha_eq_9821": {
+   "commands": {
+    "ENERGY_OFF": 982103,
+    "ENERGY_ON": 982102,
+    "ENERGY_STATE": 982101
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9821_select_982104": {
+   "commands": {
+    "MODE_SET_STATE#982105": 982105,
+    "MODE_STATE": 982104
+   },
+   "confidence": "sure",
+   "type": "select"
+  },
+  "jeedom2ha_eq_9822": {
+   "commands": {
+    "ENERGY_OFF": 982203,
+    "ENERGY_ON": 982202,
+    "ENERGY_STATE": 982201
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9823": {
+   "commands": {
+    "ENERGY_OFF": 982303,
+    "ENERGY_ON": 982302,
+    "ENERGY_STATE": 982301
+   },
+   "confidence": "sure",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9824": {
+   "commands": {
+    "TEMPERATURE": 982401
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9830": {
+   "commands": {
+    "FLAP_DOWN": 983003,
+    "FLAP_STATE": 983001,
+    "FLAP_UP": 983002
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_9831": {
+   "commands": {
+    "LIGHT_OFF": 983104,
+    "LIGHT_ON": 983103,
+    "LIGHT_STATE": 983101
+   },
+   "confidence": "sure",
+   "type": "light"
+  },
+  "jeedom2ha_eq_9832_cmd_983201": {
+   "commands": {
+    "983201": 983201
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9832_cmd_983202": {
+   "commands": {
+    "983202": 983202
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9832_cmd_983203": {
+   "commands": {
+    "983203": 983203
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9833": {
+   "commands": {
+    "MODE_SET_STATE": 983375
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9833_select_983301": {
+   "commands": {
+    "MODE_SET_STATE#983310": 983310,
+    "MODE_SET_STATE#983311": 983311,
+    "MODE_SET_STATE#983312": 983312,
+    "MODE_SET_STATE#983313": 983313,
+    "MODE_SET_STATE#983314": 983314,
+    "MODE_SET_STATE#983315": 983315,
+    "MODE_SET_STATE#983316": 983316,
+    "MODE_STATE": 983301
+   },
+   "confidence": "sure",
+   "type": "select"
+  },
+  "jeedom2ha_eq_9834_cmd_983401": {
+   "commands": {
+    "983401": 983401
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9834_cmd_983402": {
+   "commands": {
+    "983402": 983402
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9834_cmd_983403": {
+   "commands": {
+    "SWITCH_OFF": 983405,
+    "SWITCH_ON": 983404,
+    "SWITCH_STATE": 983403
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9834_cmd_983406": {
+   "commands": {
+    "SWITCH_OFF": 983408,
+    "SWITCH_ON": 983407,
+    "SWITCH_STATE": 983406
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9834_cmd_983409": {
+   "commands": {
+    "SWITCH_OFF": 983411,
+    "SWITCH_ON": 983410,
+    "SWITCH_STATE": 983409
+   },
+   "confidence": "probable",
+   "type": "switch"
+  },
+  "jeedom2ha_eq_9835_cmd_983501": {
+   "commands": {
+    "LOCK_CLOSE": 983503,
+    "LOCK_OPEN": 983502,
+    "LOCK_STATE": 983501
+   },
+   "confidence": "sure",
+   "type": "lock"
+  },
+  "jeedom2ha_eq_9840": {
+   "commands": {
+    "GARAGE_STATE": 984026,
+    "GB_TOGGLE": 984024
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_9840_cmd_984026_barrier_state": {
+   "commands": {
+    "GARAGE_STATE": 984026
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9841": {
+   "commands": {
+    "BARRIER_STATE": 984143,
+    "GB_CLOSE": 984146,
+    "GB_OPEN": 984145,
+    "GB_TOGGLE": 984142
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_9841_cmd_984143_barrier_state": {
+   "commands": {
+    "BARRIER_STATE": 984143
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9842": {
+   "commands": {
+    "BARRIER_STATE": 984201,
+    "GB_CLOSE": 984203,
+    "GB_OPEN": 984202
+   },
+   "confidence": "sure",
+   "type": "cover"
+  },
+  "jeedom2ha_eq_9842_cmd_984201_barrier_state": {
+   "commands": {
+    "BARRIER_STATE": 984201
+   },
+   "confidence": "sure",
+   "type": "sensor"
+  },
+  "jeedom2ha_eq_9844": {
+   "commands": {
+    "GARAGE_STATE": 984401
+   },
+   "confidence": "sure",
+   "type": "binary_sensor"
+  },
+  "jeedom2ha_eq_9845": {
+   "commands": {
+    "GB_OPEN": 984502
+   },
+   "confidence": "sure",
+   "type": "button"
+  },
+  "jeedom2ha_eq_9846": {
+   "commands": {
+    "FLAP_DOWN": 984603,
+    "FLAP_STATE": 984601,
+    "FLAP_STOP": 984604,
+    "FLAP_UP": 984602
+   },
+   "confidence": "sure",
+   "type": "cover"
+  }
+ },
+ "mqtt": [
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_230\", \"object_id\": \"jeedom2ha_230\", \"state_topic\": \"jeedom2ha/230/alarm/state\", \"command_topic\": \"jeedom2ha/230/alarm/set\", \"value_template\": \"{{ 'armed_away' if value == '1' else 'disarmed' }}\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_230\"], \"name\": \"Alarme maison\", \"manufacturer\": \"Jeedom (alarm)\", \"model\": \"alarm\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_230\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/alarm_control_panel/jeedom2ha_230/config"
+  },
+  {
+   "payload": "{\"name\": \"Puissance panneaux\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5138\", \"object_id\": \"jeedom2ha_553_5138\", \"state_topic\": \"jeedom2ha/553/5138/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5138\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5138/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/553/availability"
+  },
+  {
+   "payload": "{\"name\": \"Puissance reseau\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5137\", \"object_id\": \"jeedom2ha_553_5137\", \"state_topic\": \"jeedom2ha/553/5137/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5137\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5137/config"
+  },
+  {
+   "payload": "{\"name\": \"Routage cumulus\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5139\", \"object_id\": \"jeedom2ha_553_5139\", \"state_topic\": \"jeedom2ha/553/5139/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5139\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5139/config"
+  },
+  {
+   "payload": "{\"name\": \"Routage radiateur\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5140\", \"object_id\": \"jeedom2ha_553_5140\", \"state_topic\": \"jeedom2ha/553/5140/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5140\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5140/config"
+  },
+  {
+   "payload": "{\"name\": \"Etat sortie 1 (CE %)\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5177\", \"object_id\": \"jeedom2ha_553_5177\", \"state_topic\": \"jeedom2ha/553/5177/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5177\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5177/config"
+  },
+  {
+   "payload": "{\"name\": \"Production panneaux journaliere\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5171\", \"object_id\": \"jeedom2ha_553_5171\", \"state_topic\": \"jeedom2ha/553/5171/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5171\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"Wh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5171/config"
+  },
+  {
+   "payload": "{\"name\": \"Production injectee journaliere\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5170\", \"object_id\": \"jeedom2ha_553_5170\", \"state_topic\": \"jeedom2ha/553/5170/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5170\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"Wh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5170/config"
+  },
+  {
+   "payload": "{\"name\": \"Consommation reseau journaliere\", \"unique_id\": \"jeedom2ha_eq_553_cmd_5169\", \"object_id\": \"jeedom2ha_553_5169\", \"state_topic\": \"jeedom2ha/553/5169/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_553\"], \"name\": \"MSunPV / RouteurSolaire\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_553_5169\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/553/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"Wh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_553_5169/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5987\", \"object_id\": \"jeedom2ha_583_5987\", \"command_topic\": \"jeedom2ha/583/5987/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/583/5987/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_583_5987\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_583_5987/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/583/availability"
+  },
+  {
+   "payload": "{\"name\": \"Charge solaire\", \"unique_id\": \"jeedom2ha_eq_583_cmd_6009\", \"object_id\": \"jeedom2ha_583_6009\", \"command_topic\": \"jeedom2ha/583/6009/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/583/6009/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_583_6009\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_583_6009/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge manuelle\", \"unique_id\": \"jeedom2ha_eq_583_cmd_6010\", \"object_id\": \"jeedom2ha_583_6010\", \"command_topic\": \"jeedom2ha/583/6010/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/583/6010/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_583_6010\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_583_6010/config"
+  },
+  {
+   "payload": "{\"name\": \"Puissance\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5991\", \"object_id\": \"jeedom2ha_583_5991\", \"state_topic\": \"jeedom2ha/583/5991/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_583_5991\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_583_5991/config"
+  },
+  {
+   "payload": "{\"name\": \"Energie session\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5992\", \"object_id\": \"jeedom2ha_583_5992\", \"state_topic\": \"jeedom2ha/583/5992/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_583_5992\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"Wh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_583_5992/config"
+  },
+  {
+   "payload": "{\"name\": \"Energie jour\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5993\", \"object_id\": \"jeedom2ha_583_5993\", \"state_topic\": \"jeedom2ha/583/5993/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_583_5993\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"Wh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_583_5993/config"
+  },
+  {
+   "payload": "{\"name\": \"Branche\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5986\", \"object_id\": \"jeedom2ha_583_5986\", \"state_topic\": \"jeedom2ha/583/5986/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_583_5986\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_583_5986/config"
+  },
+  {
+   "payload": "{\"name\": \"Connecte\", \"unique_id\": \"jeedom2ha_eq_583_cmd_5988\", \"object_id\": \"jeedom2ha_583_5988\", \"state_topic\": \"jeedom2ha/583/5988/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_583\"], \"name\": \"IQ EV Charger\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_583_5988\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/583/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_583_5988/config"
+  },
+  {
+   "payload": "{\"name\": \"Filtration piscine\", \"unique_id\": \"jeedom2ha_eq_628_cmd_5977\", \"object_id\": \"jeedom2ha_628_5977\", \"command_topic\": \"jeedom2ha/628/5977/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/628/5977/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_628\"], \"name\": \"Pilotage priorisation solaire\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_628_5977\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/628/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_628_5977/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/628/availability"
+  },
+  {
+   "payload": "{\"name\": \"Chauffage piscine\", \"unique_id\": \"jeedom2ha_eq_628_cmd_5980\", \"object_id\": \"jeedom2ha_628_5980\", \"command_topic\": \"jeedom2ha/628/5980/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/628/5980/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_628\"], \"name\": \"Pilotage priorisation solaire\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_628_5980\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/628/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_628_5980/config"
+  },
+  {
+   "payload": "{\"name\": \"Chauffage SPA\", \"unique_id\": \"jeedom2ha_eq_628_cmd_5983\", \"object_id\": \"jeedom2ha_628_5983\", \"command_topic\": \"jeedom2ha/628/5983/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/628/5983/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_628\"], \"name\": \"Pilotage priorisation solaire\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_628_5983\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/628/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_628_5983/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge voiture\", \"unique_id\": \"jeedom2ha_eq_628_cmd_6004\", \"object_id\": \"jeedom2ha_628_6004\", \"command_topic\": \"jeedom2ha/628/6004/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/628/6004/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_628\"], \"name\": \"Pilotage priorisation solaire\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_628_6004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/628/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_628_6004/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1000\", \"object_id\": \"jeedom2ha_1000\", \"state_topic\": \"jeedom2ha/1000/state\", \"command_topic\": \"jeedom2ha/1000/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1000\"], \"name\": \"Light reference 1000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1001\", \"object_id\": \"jeedom2ha_1001\", \"state_topic\": \"jeedom2ha/1001/state\", \"command_topic\": \"jeedom2ha/1001/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1001\"], \"name\": \"Light reference 1001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1002\", \"object_id\": \"jeedom2ha_1002\", \"state_topic\": \"jeedom2ha/1002/state\", \"command_topic\": \"jeedom2ha/1002/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1002\"], \"name\": \"Light reference 1002\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1003\", \"object_id\": \"jeedom2ha_1003\", \"state_topic\": \"jeedom2ha/1003/state\", \"command_topic\": \"jeedom2ha/1003/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1003\"], \"name\": \"Light reference 1003\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1003\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1003/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": true, \"brightness_command_topic\": \"jeedom2ha/1003/brightness/set\", \"brightness_scale\": 100, \"supported_color_modes\": [\"brightness\"], \"color_mode\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1003/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1003/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1004\", \"object_id\": \"jeedom2ha_1004\", \"state_topic\": \"jeedom2ha/1004/state\", \"command_topic\": \"jeedom2ha/1004/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1004\"], \"name\": \"Light reference 1004\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1004/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"brightness_state_topic\": \"jeedom2ha/1004/brightness\", \"brightness_command_topic\": \"jeedom2ha/1004/brightness/set\", \"brightness_scale\": 100, \"supported_color_modes\": [\"brightness\"], \"color_mode\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1004/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1004/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1005\", \"object_id\": \"jeedom2ha_1005\", \"state_topic\": \"jeedom2ha/1005/state\", \"command_topic\": \"jeedom2ha/1005/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1005\"], \"name\": \"Light reference 1005\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1005\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1005/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"brightness_state_topic\": \"jeedom2ha/1005/brightness\", \"brightness_command_topic\": \"jeedom2ha/1005/brightness/set\", \"brightness_scale\": 100, \"supported_color_modes\": [\"brightness\"], \"color_mode\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1005/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1005/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1006\", \"object_id\": \"jeedom2ha_1006\", \"state_topic\": \"jeedom2ha/1006/state\", \"command_topic\": \"jeedom2ha/1006/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1006\"], \"name\": \"Light reference 1006\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1006\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1006/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1006/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1006/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1007\", \"object_id\": \"jeedom2ha_1007\", \"state_topic\": \"jeedom2ha/1007/state\", \"command_topic\": \"jeedom2ha/1007/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1007\"], \"name\": \"Light reference 1007\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1007\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1007/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1007/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1007/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1008\", \"object_id\": \"jeedom2ha_1008\", \"state_topic\": \"jeedom2ha/1008/state\", \"command_topic\": \"jeedom2ha/1008/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1008\"], \"name\": \"Light reference 1008\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1008\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1008/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1008/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1008/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_1009\", \"object_id\": \"jeedom2ha_1009\", \"state_topic\": \"jeedom2ha/1009/state\", \"command_topic\": \"jeedom2ha/1009/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_1009\"], \"name\": \"Light reference 1009\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_1009\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/1009/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"brightness_state_topic\": \"jeedom2ha/1009/brightness\", \"brightness_command_topic\": \"jeedom2ha/1009/brightness/set\", \"brightness_scale\": 100, \"supported_color_modes\": [\"brightness\"], \"color_mode\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_1009/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/1009/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2000\", \"object_id\": \"jeedom2ha_2000\", \"command_topic\": \"jeedom2ha/2000/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2000/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2000\"], \"name\": \"Cover reference 2000\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2001\", \"object_id\": \"jeedom2ha_2001\", \"command_topic\": \"jeedom2ha/2001/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2001/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2001\"], \"name\": \"Cover reference 2001\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2002\", \"object_id\": \"jeedom2ha_2002\", \"command_topic\": \"jeedom2ha/2002/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2002/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2002\"], \"name\": \"Cover reference 2002\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": true, \"position_topic\": \"jeedom2ha/2002/position\", \"set_position_topic\": \"jeedom2ha/2002/position/set\", \"position_open\": 100, \"position_closed\": 0}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2003\", \"object_id\": \"jeedom2ha_2003\", \"command_topic\": \"jeedom2ha/2003/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2003/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2003\"], \"name\": \"Cover reference 2003\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2003\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2003/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"payload_stop\": \"STOP\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2003/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2003/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2004\", \"object_id\": \"jeedom2ha_2004\", \"command_topic\": \"jeedom2ha/2004/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2004/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"blind\", \"device\": {\"identifiers\": [\"jeedom2ha_2004\"], \"name\": \"Cover reference 2004\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2004/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2004/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2004/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2005\", \"object_id\": \"jeedom2ha_2005\", \"command_topic\": \"jeedom2ha/2005/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2005/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"blind\", \"device\": {\"identifiers\": [\"jeedom2ha_2005\"], \"name\": \"Cover reference 2005\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2005\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2005/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2005/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2005/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2006\", \"object_id\": \"jeedom2ha_2006\", \"command_topic\": \"jeedom2ha/2006/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2006/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2006\"], \"name\": \"Cover reference 2006\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2006\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2006/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"position_topic\": \"jeedom2ha/2006/position\", \"set_position_topic\": \"jeedom2ha/2006/position/set\", \"position_open\": 100, \"position_closed\": 0}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2006/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2006/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_2007\", \"object_id\": \"jeedom2ha_2007\", \"command_topic\": \"jeedom2ha/2007/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/2007/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_2007\"], \"name\": \"Cover reference 2007\", \"manufacturer\": \"Jeedom (volet)\", \"model\": \"volet\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_2007\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/2007/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": true, \"position_topic\": \"jeedom2ha/2007/position\", \"set_position_topic\": \"jeedom2ha/2007/position/set\", \"position_open\": 100, \"position_closed\": 0}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_2007/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/2007/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_3000\", \"object_id\": \"jeedom2ha_3000\", \"command_topic\": \"jeedom2ha/3000/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/3000/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_3000\"], \"name\": \"Switch reference 3000\", \"manufacturer\": \"Jeedom (prise)\", \"model\": \"prise\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_3000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/3000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"outlet\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_3000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/3000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_3001\", \"object_id\": \"jeedom2ha_3001\", \"command_topic\": \"jeedom2ha/3001/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/3001/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_3001\"], \"name\": \"Switch reference 3001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_3001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/3001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_3001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/3001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_3002\", \"object_id\": \"jeedom2ha_3002\", \"command_topic\": \"jeedom2ha/3002/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/3002/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_3002\"], \"name\": \"Switch reference 3002\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_3002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/3002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_3002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/3002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_3003\", \"object_id\": \"jeedom2ha_3003\", \"command_topic\": \"jeedom2ha/3003/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/3003/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_3003\"], \"name\": \"Switch reference 3003\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_3003\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/3003/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_3003/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/3003/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_3004\", \"object_id\": \"jeedom2ha_3004\", \"command_topic\": \"jeedom2ha/3004/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/3004/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_3004\"], \"name\": \"Switch reference 3004\", \"manufacturer\": \"Jeedom (energy_meter)\", \"model\": \"energy_meter\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_3004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/3004/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"outlet\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_3004/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/3004/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_6001\", \"object_id\": \"jeedom2ha_6001\", \"state_topic\": \"jeedom2ha/6001/state\", \"command_topic\": \"jeedom2ha/6001/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_6001\"], \"name\": \"Blocked product_scope climate 6001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_6001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/6001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_6001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/6001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_7000\", \"object_id\": \"jeedom2ha_7000\", \"state_topic\": \"jeedom2ha/7000/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_7000\"], \"name\": \"Sensor temperature salon 7000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_7000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/7000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"temperature\", \"unit_of_measurement\": \"°C\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_7000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/7000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_7001\", \"object_id\": \"jeedom2ha_7001\", \"state_topic\": \"jeedom2ha/7001/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_7001\"], \"name\": \"Sensor humidite sdb 7001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_7001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/7001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"humidity\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_7001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/7001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_7002\", \"object_id\": \"jeedom2ha_7002\", \"state_topic\": \"jeedom2ha/7002/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_7002\"], \"name\": \"Compteur puissance elec 7002\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_7002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/7002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_7002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/7002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_7003\", \"object_id\": \"jeedom2ha_7003\", \"state_topic\": \"jeedom2ha/7003/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_7003\"], \"name\": \"Sensor qualite air 7003\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_7003\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/7003/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"carbon_dioxide\", \"unit_of_measurement\": \"ppm\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_7003/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/7003/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_7004\", \"object_id\": \"jeedom2ha_7004\", \"state_topic\": \"jeedom2ha/7004/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_7004\"], \"name\": \"Sensor luminosite 7004\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_7004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/7004/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"illuminance\", \"unit_of_measurement\": \"lx\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_7004/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/7004/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_8000\", \"object_id\": \"jeedom2ha_8000\", \"state_topic\": \"jeedom2ha/8000/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_8000\"], \"name\": \"Detecteur presence salon 8000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_8000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/8000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"occupancy\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_8000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/8000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_8001\", \"object_id\": \"jeedom2ha_8001\", \"state_topic\": \"jeedom2ha/8001/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_8001\"], \"name\": \"Capteur ouverture porte entree 8001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_8001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/8001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"door\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_8001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/8001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_8002\", \"object_id\": \"jeedom2ha_8002\", \"state_topic\": \"jeedom2ha/8002/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_8002\"], \"name\": \"Detecteur fumee cuisine 8002\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_8002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/8002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"smoke\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_8002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/8002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_8003\", \"object_id\": \"jeedom2ha_8003\", \"state_topic\": \"jeedom2ha/8003/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_8003\"], \"name\": \"Capteur inondation cave 8003\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_8003\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/8003/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"moisture\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_8003/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/8003/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_8004\", \"object_id\": \"jeedom2ha_8004\", \"state_topic\": \"jeedom2ha/8004/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_8004\"], \"name\": \"Serrure connectee 8004\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_8004\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/8004/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"lock\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_8004/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/8004/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9000\", \"object_id\": \"jeedom2ha_9000\", \"command_topic\": \"jeedom2ha/9000/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9000\"], \"name\": \"Scenario alarme securite 9000\", \"manufacturer\": \"Jeedom (scenario)\", \"model\": \"scenario\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9000/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9001\", \"object_id\": \"jeedom2ha_9001\", \"command_topic\": \"jeedom2ha/9001/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9001\"], \"name\": \"Lecteur salon 9001\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9002\", \"object_id\": \"jeedom2ha_9002\", \"command_topic\": \"jeedom2ha/9002/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9002\"], \"name\": \"Sirene garage 9002\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9700\", \"object_id\": \"jeedom2ha_9700\", \"command_topic\": \"jeedom2ha/9700/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9700/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9700\"], \"name\": \"iPhone Alex 9700\", \"manufacturer\": \"Jeedom (mobile)\", \"model\": \"mobile\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9700\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9700/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9700/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9700/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_11000\", \"object_id\": \"jeedom2ha_11000\", \"temperature_command_topic\": \"jeedom2ha/11000/temperature/set\", \"modes\": [\"heat\", \"off\"], \"temp_step\": 0.5, \"precision\": 0.1, \"optimistic\": false, \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_11000\"], \"name\": \"Thermostat RDC\", \"manufacturer\": \"Jeedom (thermostat)\", \"model\": \"thermostat\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"climate.jeedom2ha_11000\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/11000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"temperature_state_topic\": \"jeedom2ha/11000/setpoint\", \"current_temperature_topic\": \"jeedom2ha/11000/current_temperature\", \"mode_state_topic\": \"jeedom2ha/11000/mode\", \"mode_command_topic\": \"jeedom2ha/11000/mode/set\", \"preset_modes\": [\"Mode A\", \"Mode B\"], \"preset_mode_state_topic\": \"jeedom2ha/11000/preset\", \"preset_mode_command_topic\": \"jeedom2ha/11000/preset/set\", \"action_topic\": \"jeedom2ha/11000/action\", \"temperature_unit\": \"C\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/climate/jeedom2ha_11000/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/11000/availability"
+  },
+  {
+   "payload": "{\"name\": \"Verrouillage\", \"unique_id\": \"jeedom2ha_eq_11000_cmd_110009\", \"object_id\": \"jeedom2ha_11000_110009\", \"command_topic\": \"jeedom2ha/11000/110009/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/11000/110009/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_11000\"], \"name\": \"Thermostat RDC\", \"manufacturer\": \"Jeedom (thermostat)\", \"model\": \"thermostat\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_11000_110009\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/11000/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"entity_category\": \"config\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_11000_110009/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_11001\", \"object_id\": \"jeedom2ha_11001\", \"temperature_command_topic\": \"jeedom2ha/11001/temperature/set\", \"modes\": [\"heat\"], \"temp_step\": 0.5, \"precision\": 0.1, \"optimistic\": false, \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_11001\"], \"name\": \"Thermostat Galerie\", \"manufacturer\": \"Jeedom (thermostat)\", \"model\": \"thermostat\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"climate.jeedom2ha_11001\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/11001/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/climate/jeedom2ha_11001/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/11001/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_11002\", \"object_id\": \"jeedom2ha_11002\", \"temperature_command_topic\": \"jeedom2ha/11002/temperature/set\", \"modes\": [\"heat\"], \"temp_step\": 0.5, \"precision\": 0.1, \"optimistic\": false, \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_11002\"], \"name\": \"Thermostat chambre Arthur\", \"manufacturer\": \"Jeedom (thermostat)\", \"model\": \"thermostat\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"climate.jeedom2ha_11002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/11002/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"temperature_state_topic\": \"jeedom2ha/11002/setpoint\", \"current_temperature_topic\": \"jeedom2ha/11002/current_temperature\", \"mode_state_topic\": \"jeedom2ha/11002/mode\", \"preset_modes\": [\"Mode A\"], \"preset_mode_state_topic\": \"jeedom2ha/11002/preset\", \"preset_mode_command_topic\": \"jeedom2ha/11002/preset/set\", \"action_topic\": \"jeedom2ha/11002/action\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/climate/jeedom2ha_11002/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/11002/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_12000\", \"object_id\": \"jeedom2ha_12000\", \"state_topic\": \"jeedom2ha/12000/alarm/state\", \"command_topic\": \"jeedom2ha/12000/alarm/set\", \"value_template\": \"{{ 'armed_away' if value == '1' else 'disarmed' }}\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_12000\"], \"name\": \"Alarme maison 12000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_12000\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/alarm_control_panel/jeedom2ha_12000/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_457\", \"object_id\": \"jeedom2ha_457\", \"state_topic\": \"jeedom2ha/457/state\", \"command_topic\": \"jeedom2ha/457/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_457\"], \"name\": \"Chambre parents\", \"manufacturer\": \"Jeedom (zwave)\", \"model\": \"zwave\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_457\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/457/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"brightness_command_topic\": \"jeedom2ha/457/brightness/set\", \"brightness_scale\": 100, \"supported_color_modes\": [\"brightness\"], \"color_mode\": true}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_457/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/457/availability"
+  },
+  {
+   "payload": "{\"name\": \"Puissance\", \"unique_id\": \"jeedom2ha_eq_457_cmd_45705\", \"object_id\": \"jeedom2ha_457_45705\", \"state_topic\": \"jeedom2ha/457/45705/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_457\"], \"name\": \"Chambre parents\", \"manufacturer\": \"Jeedom (zwave)\", \"model\": \"zwave\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_457_45705\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/457/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_457_45705/config"
+  },
+  {
+   "payload": "{\"name\": \"Consommation\", \"unique_id\": \"jeedom2ha_eq_457_cmd_45706\", \"object_id\": \"jeedom2ha_457_45706\", \"state_topic\": \"jeedom2ha/457/45706/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_457\"], \"name\": \"Chambre parents\", \"manufacturer\": \"Jeedom (zwave)\", \"model\": \"zwave\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_457_45706\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/457/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"kWh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_457_45706/config"
+  },
+  {
+   "payload": "{\"name\": \"Sortie 1\", \"unique_id\": \"jeedom2ha_eq_9801_cmd_980101\", \"object_id\": \"jeedom2ha_9801_980101\", \"state_topic\": \"jeedom2ha/9801/980101/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9801\"], \"name\": \"Multiprise bureau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9801_980101\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9801/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9801_980101/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9801/availability"
+  },
+  {
+   "payload": "{\"name\": \"Sortie 2\", \"unique_id\": \"jeedom2ha_eq_9801_cmd_980102\", \"object_id\": \"jeedom2ha_9801_980102\", \"state_topic\": \"jeedom2ha/9801/980102/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9801\"], \"name\": \"Multiprise bureau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9801_980102\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9801/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9801_980102/config"
+  },
+  {
+   "payload": "{\"name\": \"Sortie 3\", \"unique_id\": \"jeedom2ha_eq_9801_cmd_980103\", \"object_id\": \"jeedom2ha_9801_980103\", \"state_topic\": \"jeedom2ha/9801/980103/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9801\"], \"name\": \"Multiprise bureau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9801_980103\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9801/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9801_980103/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9802\", \"object_id\": \"jeedom2ha_9802\", \"state_topic\": \"jeedom2ha/9802/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9802\"], \"name\": \"Portail entree\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Garage\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9802\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9802/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"garage_door\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9802/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9802/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9803_cmd_980301\", \"object_id\": \"jeedom2ha_9803_980301\", \"command_topic\": \"jeedom2ha/9803/980301/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9803/980301/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9803\"], \"name\": \"Ventilateur chambre\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9803_980301\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9803/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9803_980301/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9803/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_554\", \"object_id\": \"jeedom2ha_554\", \"command_topic\": \"jeedom2ha/554/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/554/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_554\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_554/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/554/availability"
+  },
+  {
+   "payload": "{\"name\": \"Routage\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5205\", \"object_id\": \"jeedom2ha_554_5205\", \"state_topic\": \"jeedom2ha/554/5205/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_554_5205\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_554_5205/config"
+  },
+  {
+   "payload": "{\"name\": \"Routage réel\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5530\", \"object_id\": \"jeedom2ha_554_5530\", \"state_topic\": \"jeedom2ha/554/5530/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_554_5530\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_554_5530/config"
+  },
+  {
+   "payload": "{\"name\": \"Puissance\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5206\", \"object_id\": \"jeedom2ha_554_5206\", \"state_topic\": \"jeedom2ha/554/5206/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_554_5206\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_554_5206/config"
+  },
+  {
+   "payload": "{\"name\": \"CE Kwh chauffe complete\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5535\", \"object_id\": \"jeedom2ha_554_5535\", \"state_topic\": \"jeedom2ha/554/5535/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_554_5535\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"kWh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_554_5535/config"
+  },
+  {
+   "payload": "{\"name\": \"chauffe complète dans la journée\", \"unique_id\": \"jeedom2ha_eq_554_cmd_5510\", \"object_id\": \"jeedom2ha_554_5510\", \"state_topic\": \"jeedom2ha/554/5510/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_554_5510\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_554_5510/config"
+  },
+  {
+   "payload": "{\"name\": \"etat\", \"unique_id\": \"jeedom2ha_eq_554_select_5489\", \"object_id\": \"jeedom2ha_554_select_5489\", \"command_topic\": \"jeedom2ha/554/select_5489/set\", \"state_topic\": \"jeedom2ha/554/select_5489/state\", \"options\": [\"Absence\", \"manu\", \"auto\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_554\"], \"name\": \"Chauffe-eau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_554_select_5489\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/554/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/select/jeedom2ha_554_select_5489/config"
+  },
+  {
+   "payload": "{\"name\": \"Routage\", \"unique_id\": \"jeedom2ha_eq_9810_cmd_905205\", \"object_id\": \"jeedom2ha_9810_905205\", \"state_topic\": \"jeedom2ha/9810/905205/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9810\"], \"name\": \"Ballon buanderie\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9810_905205\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9810/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9810_905205/config"
+  },
+  {
+   "payload": "{\"name\": \"Routage réel\", \"unique_id\": \"jeedom2ha_eq_9810_cmd_905530\", \"object_id\": \"jeedom2ha_9810_905530\", \"state_topic\": \"jeedom2ha/9810/905530/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9810\"], \"name\": \"Ballon buanderie\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9810_905530\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9810/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9810_905530/config"
+  },
+  {
+   "payload": "{\"name\": \"Puissance\", \"unique_id\": \"jeedom2ha_eq_9810_cmd_905206\", \"object_id\": \"jeedom2ha_9810_905206\", \"state_topic\": \"jeedom2ha/9810/905206/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9810\"], \"name\": \"Ballon buanderie\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9810_905206\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9810/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9810_905206/config"
+  },
+  {
+   "payload": "{\"name\": \"CE Kwh chauffe complete\", \"unique_id\": \"jeedom2ha_eq_9810_cmd_905535\", \"object_id\": \"jeedom2ha_9810_905535\", \"state_topic\": \"jeedom2ha/9810/905535/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9810\"], \"name\": \"Ballon buanderie\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9810_905535\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9810/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"energy\", \"unit_of_measurement\": \"kWh\", \"state_class\": \"total_increasing\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9810_905535/config"
+  },
+  {
+   "payload": "{\"name\": \"chauffe complète dans la journée\", \"unique_id\": \"jeedom2ha_eq_9810_cmd_905510\", \"object_id\": \"jeedom2ha_9810_905510\", \"state_topic\": \"jeedom2ha/9810/905510/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9810\"], \"name\": \"Ballon buanderie\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9810_905510\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9810/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9810_905510/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9810/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9811\", \"object_id\": \"jeedom2ha_9811\", \"command_topic\": \"jeedom2ha/9811/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9811/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9811\"], \"name\": \"Prise atelier\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9811\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9811/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9811/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9811/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9813\", \"object_id\": \"jeedom2ha_9813\", \"command_topic\": \"jeedom2ha/9813/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9813/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9813\"], \"name\": \"Prise cellier\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9813\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9813/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9813/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9813/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9812\", \"object_id\": \"jeedom2ha_9812\", \"command_topic\": \"jeedom2ha/9812/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9812/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9812\"], \"name\": \"Présence maison\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Chambre\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9812\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9812/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9812/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9812/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9820\", \"object_id\": \"jeedom2ha_9820\", \"state_topic\": \"jeedom2ha/9820/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9820\"], \"name\": \"Radiateur salle de bain\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9820\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9820/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"temperature\", \"unit_of_measurement\": \"°C\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9820/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9820/availability"
+  },
+  {
+   "payload": "{\"name\": \"Mode\", \"unique_id\": \"jeedom2ha_eq_9820_select_982002\", \"object_id\": \"jeedom2ha_9820_select_982002\", \"command_topic\": \"jeedom2ha/9820/select_982002/set\", \"state_topic\": \"jeedom2ha/9820/select_982002/state\", \"options\": [\"Confort\", \"Eco\", \"Hors-gel\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9820\"], \"name\": \"Radiateur salle de bain\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_9820_select_982002\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9820/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/select/jeedom2ha_9820_select_982002/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9821\", \"object_id\": \"jeedom2ha_9821\", \"command_topic\": \"jeedom2ha/9821/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9821/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9821\"], \"name\": \"Prise climatiseur\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9821\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9821/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9821/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9821/availability"
+  },
+  {
+   "payload": "{\"name\": \"Mode clim\", \"unique_id\": \"jeedom2ha_eq_9821_select_982104\", \"object_id\": \"jeedom2ha_9821_select_982104\", \"command_topic\": \"jeedom2ha/9821/select_982104/set\", \"state_topic\": \"jeedom2ha/9821/select_982104/state\", \"options\": [\"Froid\", \"Chaud\", \"Auto\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9821\"], \"name\": \"Prise climatiseur\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_9821_select_982104\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9821/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/select/jeedom2ha_9821_select_982104/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9822\", \"object_id\": \"jeedom2ha_9822\", \"command_topic\": \"jeedom2ha/9822/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9822/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9822\"], \"name\": \"Ballon cave\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9822\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9822/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9822/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9822/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9823\", \"object_id\": \"jeedom2ha_9823\", \"command_topic\": \"jeedom2ha/9823/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9823/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9823\"], \"name\": \"Ballon atelier\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9823\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9823/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9823/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9823/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9824\", \"object_id\": \"jeedom2ha_9824\", \"state_topic\": \"jeedom2ha/9824/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9824\"], \"name\": \"Station météo\", \"manufacturer\": \"Jeedom (zwavejs)\", \"model\": \"zwavejs\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9824\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9824/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"temperature\", \"unit_of_measurement\": \"°C\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9824/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9824/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9830\", \"object_id\": \"jeedom2ha_9830\", \"command_topic\": \"jeedom2ha/9830/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9830/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_9830\"], \"name\": \"Volet bassin\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9830\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9830/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9830/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9830/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9831\", \"object_id\": \"jeedom2ha_9831\", \"state_topic\": \"jeedom2ha/9831/state\", \"command_topic\": \"jeedom2ha/9831/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9831\"], \"name\": \"Voiture\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"light.jeedom2ha_9831\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9831/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/light/jeedom2ha_9831/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9831/availability"
+  },
+  {
+   "payload": "{\"name\": \"Puissance panneaux\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983201\", \"object_id\": \"jeedom2ha_9832_983201\", \"state_topic\": \"jeedom2ha/9832/983201/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983201\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"power\", \"unit_of_measurement\": \"W\", \"state_class\": \"measurement\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983201/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9832/availability"
+  },
+  {
+   "payload": "{\"name\": \"Etat sortie 1\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983202\", \"object_id\": \"jeedom2ha_9832_983202\", \"state_topic\": \"jeedom2ha/9832/983202/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983202\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983202/config"
+  },
+  {
+   "payload": "{\"name\": \"Etat sortie 2\", \"unique_id\": \"jeedom2ha_eq_9832_cmd_983203\", \"object_id\": \"jeedom2ha_9832_983203\", \"state_topic\": \"jeedom2ha/9832/983203/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9832\"], \"name\": \"Routeur\", \"manufacturer\": \"Jeedom (msunpv)\", \"model\": \"msunpv\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9832_983203\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9832/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"unit_of_measurement\": \"%\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9832_983203/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9833\", \"object_id\": \"jeedom2ha_9833\", \"command_topic\": \"jeedom2ha/9833/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9833\"], \"name\": \"Modes\", \"manufacturer\": \"Jeedom (mode)\", \"model\": \"mode\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9833\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9833/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9833/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9833/availability"
+  },
+  {
+   "payload": "{\"name\": \"Mode\", \"unique_id\": \"jeedom2ha_eq_9833_select_983301\", \"object_id\": \"jeedom2ha_9833_select_983301\", \"command_topic\": \"jeedom2ha/9833/select_983301/set\", \"state_topic\": \"jeedom2ha/9833/select_983301/state\", \"options\": [\"Absent\", \"Normal\", \"Vacances scolaires\", \"Travail\", \"Soirée\", \"Nuit\", \"Réveil\"], \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9833\"], \"name\": \"Modes\", \"manufacturer\": \"Jeedom (mode)\", \"model\": \"mode\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"select.jeedom2ha_9833_select_983301\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9833/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/select/jeedom2ha_9833_select_983301/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983403\", \"object_id\": \"jeedom2ha_9834_983403\", \"command_topic\": \"jeedom2ha/9834/983403/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983403/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983403\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983403/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9834/availability"
+  },
+  {
+   "payload": "{\"name\": \"Charge solaire\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983406\", \"object_id\": \"jeedom2ha_9834_983406\", \"command_topic\": \"jeedom2ha/9834/983406/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983406/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983406\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983406/config"
+  },
+  {
+   "payload": "{\"name\": \"Charge manuelle\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983409\", \"object_id\": \"jeedom2ha_9834_983409\", \"command_topic\": \"jeedom2ha/9834/983409/set\", \"payload_on\": \"ON\", \"payload_off\": \"OFF\", \"state_topic\": \"jeedom2ha/9834/983409/state\", \"state_on\": \"ON\", \"state_off\": \"OFF\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"switch.jeedom2ha_9834_983409\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/switch/jeedom2ha_9834_983409/config"
+  },
+  {
+   "payload": "{\"name\": \"Branche\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983401\", \"object_id\": \"jeedom2ha_9834_983401\", \"state_topic\": \"jeedom2ha/9834/983401/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9834_983401\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9834_983401/config"
+  },
+  {
+   "payload": "{\"name\": \"Connecte\", \"unique_id\": \"jeedom2ha_eq_9834_cmd_983402\", \"object_id\": \"jeedom2ha_9834_983402\", \"state_topic\": \"jeedom2ha/9834/983402/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9834\"], \"name\": \"Borne garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9834_983402\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9834/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9834_983402/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9835_cmd_983501\", \"object_id\": \"jeedom2ha_9835_983501\", \"command_topic\": \"jeedom2ha/9835/983501/set\", \"payload_lock\": \"LOCK\", \"payload_unlock\": \"UNLOCK\", \"state_topic\": \"jeedom2ha/9835/983501/state\", \"state_locked\": \"LOCKED\", \"state_unlocked\": \"UNLOCKED\", \"state_jammed\": \"JAMMED\", \"optimistic\": false, \"device\": {\"identifiers\": [\"jeedom2ha_9835\"], \"name\": \"Serrure portillon\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"lock.jeedom2ha_9835_983501\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9835/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/lock/jeedom2ha_9835_983501/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9835/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9840\", \"object_id\": \"jeedom2ha_9840\", \"command_topic\": \"jeedom2ha/9840/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9840/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"garage\", \"device\": {\"identifiers\": [\"jeedom2ha_9840\"], \"name\": \"Garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9840\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9840/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"state_opening\": \"opening\", \"state_closing\": \"closing\", \"state_stopped\": \"stopped\", \"payload_stop\": null}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9840/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9840/availability"
+  },
+  {
+   "payload": "{\"name\": \"État\", \"unique_id\": \"jeedom2ha_eq_9840_cmd_984026_barrier_state\", \"object_id\": \"jeedom2ha_9840_984026_barrier_state\", \"state_topic\": \"jeedom2ha/9840/984026/barrier_state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9840\"], \"name\": \"Garage\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9840_984026_barrier_state\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9840/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"enum\", \"options\": [\"closed\", \"closing\", \"stopped\", \"opening\", \"open\"]}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9840_984026_barrier_state/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9841\", \"object_id\": \"jeedom2ha_9841\", \"command_topic\": \"jeedom2ha/9841/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9841/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"gate\", \"device\": {\"identifiers\": [\"jeedom2ha_9841\"], \"name\": \"Portail\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9841\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9841/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"state_opening\": \"opening\", \"state_closing\": \"closing\", \"state_stopped\": \"stopped\", \"payload_stop\": null}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9841/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9841/availability"
+  },
+  {
+   "payload": "{\"name\": \"État\", \"unique_id\": \"jeedom2ha_eq_9841_cmd_984143_barrier_state\", \"object_id\": \"jeedom2ha_9841_984143_barrier_state\", \"state_topic\": \"jeedom2ha/9841/984143/barrier_state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9841\"], \"name\": \"Portail\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9841_984143_barrier_state\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9841/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"enum\", \"options\": [\"closed\", \"closing\", \"stopped\", \"opening\", \"open\"]}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9841_984143_barrier_state/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9842\", \"object_id\": \"jeedom2ha_9842\", \"command_topic\": \"jeedom2ha/9842/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9842/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"gate\", \"device\": {\"identifiers\": [\"jeedom2ha_9842\"], \"name\": \"Portail allée\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9842\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9842/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"state_opening\": \"opening\", \"state_closing\": \"closing\", \"state_stopped\": \"stopped\", \"payload_stop\": null}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9842/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9842/availability"
+  },
+  {
+   "payload": "{\"name\": \"État\", \"unique_id\": \"jeedom2ha_eq_9842_cmd_984201_barrier_state\", \"object_id\": \"jeedom2ha_9842_984201_barrier_state\", \"state_topic\": \"jeedom2ha/9842/984201/barrier_state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9842\"], \"name\": \"Portail allée\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"sensor.jeedom2ha_9842_984201_barrier_state\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9842/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"enum\", \"options\": [\"closed\", \"closing\", \"stopped\", \"opening\", \"open\"]}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/sensor/jeedom2ha_9842_984201_barrier_state/config"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9844\", \"object_id\": \"jeedom2ha_9844\", \"state_topic\": \"jeedom2ha/9844/state\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9844\"], \"name\": \"Garage atelier\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"binary_sensor.jeedom2ha_9844\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9844/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"device_class\": \"garage_door\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/binary_sensor/jeedom2ha_9844/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9844/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9845\", \"object_id\": \"jeedom2ha_9845\", \"command_topic\": \"jeedom2ha/9845/cmd\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_9845\"], \"name\": \"Barrière parking\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"button.jeedom2ha_9845\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9845/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/button/jeedom2ha_9845/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9845/availability"
+  },
+  {
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_9846\", \"object_id\": \"jeedom2ha_9846\", \"command_topic\": \"jeedom2ha/9846/set\", \"payload_open\": \"OPEN\", \"payload_close\": \"CLOSE\", \"state_topic\": \"jeedom2ha/9846/state\", \"state_open\": \"open\", \"state_closed\": \"closed\", \"device_class\": \"shutter\", \"device\": {\"identifiers\": [\"jeedom2ha_9846\"], \"name\": \"Volet bureau\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"cover.jeedom2ha_9846\", \"availability\": [{\"topic\": \"jeedom2ha/bridge/status\"}, {\"topic\": \"jeedom2ha/9846/availability\"}], \"availability_mode\": \"all\", \"payload_available\": \"online\", \"payload_not_available\": \"offline\", \"optimistic\": false, \"payload_stop\": \"STOP\"}",
+   "qos": 1,
+   "retain": true,
+   "topic": "homeassistant/cover/jeedom2ha_9846/config"
+  },
+  {
+   "payload": "online",
+   "qos": 1,
+   "retain": true,
+   "topic": "jeedom2ha/9846/availability"
+  }
+ ]
+}

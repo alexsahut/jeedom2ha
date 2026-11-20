@@ -19,7 +19,7 @@ L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleu
    - [La pièce et la fiche](#la-pièce-et-la-fiche) · [Corriger le type](#corriger-le-type) · [Choisir ce qui est publié](#choisir-ce-qui-est-publié) ([Exclure une pièce](#exclure-une-pièce))
    - [Les scénarios](#les-scénarios) · [Configuration](#configuration) · [Vérifier l'installation](#vérifier-linstallation) · [Le guide de démarrage](#le-guide-de-démarrage)
 6. [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
-   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures) · [Modes](#modes-listes-de-choix)
+   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures) · [Modes](#modes-listes-de-choix) · [Santé de Jeedom](#santé-de-jeedom)
    - [Les causes de blocage](#les-causes-de-blocage) · [Les conseils](#les-conseils)
 7. [Les états et les compteurs](compteurs.md) — le détail des chiffres (page séparée).
 8. [Dépannage](#dépannage)
@@ -327,6 +327,7 @@ Indiquez le broker que Home Assistant utilise déjà : « Hôte MQTT » (adresse
 
 - La configuration ne règle pas ce qui est publié : le lien **« Choisir ce qui est publié »** (↗) ouvre la page du plugin sur le panneau [Choisir ce qui est publié](#choisir-ce-qui-est-publié).
 - **« Avancé »** (replié) contient « Réinitialiser le formulaire », qui vide les champs du broker sans rien enregistrer.
+- **« Santé de Jeedom »** : la case « Publier la santé de Jeedom » (décochée par défaut) publie l'appareil décrit dans [Santé de Jeedom](#santé-de-jeedom).
 - « cron5 désactivé : mises à jour manuelles » s'affiche seulement si la tâche cron5 est décochée dans le bloc « Fonctionnalités » de Jeedom : les changements d'activation et d'exclusion attendent alors un « Relire Jeedom ».
 
 ### Vérifier l'installation
@@ -507,6 +508,25 @@ Une info texte de Jeedom dont la valeur est posée par **au moins deux actions**
 - **En ajout seulement** : la liste s'ajoute aux entités de l'équipement, sans en remplacer ni en changer aucune. L'interrupteur, les capteurs ou les boutons gardent leurs identifiants et leurs topics.
 - **Voie manuelle** : quand un seul côté est reconnu, « Corriger le type » complète l'autre, et l'aperçu montre la liste avant d'enregistrer. Sur une info texte dont les actions portent déjà le type `MODE_SET_STATE`, il propose **« Mode (état) »** ; sur une action d'un équipement dont l'info porte déjà `MODE_STATE` (ou a reçu « Mode (état) »), il propose **« Mode (commande) »**, action par action (la liste gagne un choix à chaque action). Une commande sans équivalent dans Home Assistant garde ce lien dans la liste repliée des commandes ignorées (« Mode (état)… », « Mode (commande)… »). Quand ni l'info ni les actions ne sont reconnues, rien n'est proposé. Ce réglage reste dans le plugin : **les types génériques de Jeedom ne sont jamais modifiés** (ils servent aussi à Homebridge et HomeKit).
 - Identifiant de l'entité : `select.jeedom2ha_<équipement>_select_<info d'état>` (un espace de noms propre : il ne peut pas rencontrer celui d'un capteur).
+
+### Santé de Jeedom
+
+Option de la [configuration](#configuration), **désactivée par défaut** : la case **« Publier la santé de Jeedom »** publie dans Home Assistant un appareil **« Santé de Jeedom »**, en **lecture seule**, lu dans le cœur de Jeedom. Toutes ses entités sont des entités de diagnostic, sans aucun ordre possible depuis Home Assistant.
+
+| Entité | Valeur |
+|---|---|
+| un capteur binaire « en marche » (`running`) par plugin actif qui a son propre démon, au nom du plugin | en marche si Jeedom dit le démon démarré (« OK » dans la page du plugin), arrêté sinon, y compris quand son état ne peut pas être lu (plugin en erreur). Un plugin sans démon n'en produit pas. jeedom2ha lui-même n'y figure pas : c'est l'entité « État du pont ». |
+| « Démons en service » et « Démons arrêtés » | le nombre de démons en marche et arrêtés, parmi exactement les mêmes plugins que les capteurs « en marche » ci-dessus (même relevé) : leur somme est le nombre de ces capteurs, pour un résumé « démons en service X/Y ». Un plugin dont l'état ne peut pas être lu compte comme **arrêté** (son capteur « en marche » est à arrêté). Sans aucun plugin à démon actif : 0 et 0. |
+| « Mises à jour disponibles » | le nombre de mises à jour signalées par Jeedom |
+| « Messages » | le nombre de messages du centre de messages de Jeedom, **jamais leur texte** |
+| « Version du cœur » | la version de Jeedom |
+
+- **Rythme** : relevé toutes les 5 minutes par la tâche cron5, envoyé au démon **seulement si une valeur change**. Cocher ou décocher la case prend effet à l'enregistrement de la configuration.
+- **Décocher la case retire l'appareil** de Home Assistant (configurations et états effacés). Case décochée, rien n'est lu ni publié.
+- **Robuste** : un plugin absent, ancien ou en erreur ne bloque ni le relevé ni le reste du plugin ; son démon est alors indiqué arrêté. Jeedom 4.4, 4.5 et 4.6.
+- **Indisponible** quand le démon de jeedom2ha est arrêté (même disponibilité que l'entité « État du pont »).
+- Hors des équipements : l'appareil ne compte dans aucun compteur, et « Supprimer de Home Assistant » ne le vise pas ; seule la case le publie ou le retire.
+- Identifiants : `binary_sensor.jeedom2ha_system_daemon_<plugin>`, `sensor.jeedom2ha_system_daemons_running`, `sensor.jeedom2ha_system_daemons_stopped`, `sensor.jeedom2ha_system_updates`, `sensor.jeedom2ha_system_messages`, `sensor.jeedom2ha_system_core_version` (un espace de noms propre, distinct de celui des équipements et des scénarios).
 
 ### Les causes de blocage
 

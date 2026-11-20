@@ -24,6 +24,7 @@ require_once __DIR__  . '/../php/jeedom2ha_reevaluation.php';
 require_once __DIR__  . '/../php/jeedom2ha_command_bounds.php'; // correctif fix/daemon-sync-body-limit
 require_once __DIR__  . '/../php/jeedom2ha_command_links.php'; // fix/switch-appariement-etat — info reliée à une action
 require_once __DIR__  . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — publication des scénarios
+require_once __DIR__  . '/../php/jeedom2ha_system_health.php'; // story/system-health — appareil « Santé de Jeedom »
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -49,6 +50,13 @@ class jeedom2ha extends eqLogic {
    * Ne remplace le secret existant que si une nouvelle valeur non vide est fournie.
    */
   public static function postSaveConfiguration() {
+    // story/system-health — la case « Santé de Jeedom » prend effet tout de suite (publication ou purge), sans
+    // attendre le prochain passage du cron ; jamais bloquant pour l'enregistrement.
+    try {
+      self::systemHealthTick();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'debug', '[SYSTEM_HEALTH] Relevé après enregistrement non envoyé : ' . $e->getMessage());
+    }
     $password = init('mqttPassword');
     if ($password === null || $password === '') {
       return;
@@ -177,6 +185,10 @@ class jeedom2ha extends eqLogic {
 
   public static function deamon_start() {
     self::deamon_stop();
+    // story/system-health — le démon repart sans état : le prochain relevé « Santé de Jeedom » sera renvoyé.
+    jeedom2ha_system_health_invalidate(function (string $fingerprint) {
+      config::save(JEEDOM2HA_SYSTEM_HEALTH_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+    });
     log::add(__CLASS__, 'info', '[DAEMON] Starting daemon...');
 
     $daemonDir = __DIR__ . '/../../resources/daemon';
@@ -424,6 +436,66 @@ class jeedom2ha extends eqLogic {
     } catch (\Throwable $e) {
       log::add(__CLASS__, 'warning', '[REEVAL] Réévaluation périodique échouée : ' . $e->getMessage());
     }
+    // story/system-health — relevé « Santé de Jeedom » (désactivé par défaut : rien n'est lu ni envoyé).
+    try {
+      self::systemHealthTick();
+    } catch (\Throwable $e) {
+      log::add(__CLASS__, 'warning', '[SYSTEM_HEALTH] Relevé périodique échoué : ' . $e->getMessage());
+    }
+  }
+
+  /**
+   * story/system-health — un pas du relevé « Santé de Jeedom » (logique dans jeedom2ha_system_health_tick(), fonction
+   * pure testée sans le cœur). Case décochée et rien de publié : aucune lecture, aucun appel au démon.
+   */
+  public static function systemHealthTick(): array {
+    return jeedom2ha_system_health_tick(array(
+      'enabled' => function () {
+        return jeedom2ha_system_health_enabled(config::byKey(JEEDOM2HA_SYSTEM_HEALTH_ENABLED_KEY, __CLASS__, '0'));
+      },
+      'published' => function () {
+        return (string) config::byKey(JEEDOM2HA_SYSTEM_HEALTH_PUBLISHED_KEY, __CLASS__, '') === '1';
+      },
+      'set_published' => function (bool $published) {
+        config::save(JEEDOM2HA_SYSTEM_HEALTH_PUBLISHED_KEY, $published ? '1' : '', __CLASS__);
+      },
+      'stored' => function () {
+        return (string) config::byKey(JEEDOM2HA_SYSTEM_HEALTH_FINGERPRINT_KEY, __CLASS__, '');
+      },
+      'store' => function (string $fingerprint) {
+        config::save(JEEDOM2HA_SYSTEM_HEALTH_FINGERPRINT_KEY, $fingerprint, __CLASS__);
+      },
+      'snapshot' => function () {
+        return self::readSystemHealthSnapshot();
+      },
+      'send' => function (array $payload) {
+        return self::callDaemon(JEEDOM2HA_SYSTEM_HEALTH_ROUTE, $payload, 'POST', JEEDOM2HA_SYSTEM_HEALTH_TIMEOUT_S, 1);
+      },
+      'log' => function (string $level, string $message) {
+        log::add(__CLASS__, $level, $message);
+      },
+    ));
+  }
+
+  /**
+   * story/system-health — relevé : démons des plugins actifs, mises à jour, nombre de messages (jamais leur texte),
+   * version du cœur. Chaque lecture est gardée (classe et méthode présentes, exception) : Jeedom 4.4, 4.5 et 4.6.
+   */
+  public static function readSystemHealthSnapshot(): array {
+    return jeedom2ha_system_health_snapshot(array(
+      'plugins' => function () {
+        return (class_exists('plugin') && method_exists('plugin', 'listPlugin')) ? plugin::listPlugin(true) : array();
+      },
+      'updates' => function () {
+        return (class_exists('update') && method_exists('update', 'nbNeedUpdate')) ? update::nbNeedUpdate() : null;
+      },
+      'messages' => function () {
+        return (class_exists('message') && method_exists('message', 'nbMessage')) ? message::nbMessage() : null;
+      },
+      'core_version' => function () {
+        return (class_exists('jeedom') && method_exists('jeedom', 'version')) ? jeedom::version() : null;
+      },
+    ), __CLASS__);
   }
 
   /**

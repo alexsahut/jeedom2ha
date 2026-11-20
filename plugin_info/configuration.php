@@ -172,6 +172,21 @@ include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha');
   </fieldset>
 </form>
 
+<!-- story/system-health : appareil « Santé de Jeedom » (lecture seule), désactivé par défaut. Enregistré par « Sauvegarder » du cœur. -->
+<form class="form-horizontal" id="form_j2haSystemHealth">
+  <fieldset>
+    <legend><i class="fas fa-heartbeat"></i> {{Santé de Jeedom}}
+      <sup><button type="button" class="j2ha-info j2ha-v3-info" id="i_systemHealth" data-j2ha-tip="{{Publie dans Home Assistant un appareil « Santé de Jeedom », en lecture seule : l'état du démon de chaque plugin qui en a un, les nombres de démons en service et arrêtés, le nombre de mises à jour disponibles, le nombre de messages (jamais leur texte) et la version du cœur. Relevé toutes les 5 minutes par cron5. Décocher retire l'appareil de Home Assistant.}}" aria-label="{{Aide}} : {{Santé de Jeedom}}" aria-expanded="false" data-j2ha-doc="santé-de-jeedom"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
+    </legend>
+    <div class="form-group">
+      <label class="col-md-4 control-label" for="cb_publishSystemHealth">{{Publier la santé de Jeedom}}</label>
+      <div class="col-md-4">
+        <input type="checkbox" class="configKey" data-l1key="publishSystemHealth" id="cb_publishSystemHealth"/>
+      </div>
+    </div>
+  </fieldset>
+</form>
+
 <!-- Front v3 (Lot 3) : ce qui est publié se choisit dans un seul panneau, sur la page du plugin. -->
 <p id="p_j2haChoosePublished">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha#j2ha-choisir" id="lnk_j2haChoosePublished"><i class="fas fa-check-square"></i> {{Choisir ce qui est publié}} <i class="fas fa-external-link-alt"></i></a>
