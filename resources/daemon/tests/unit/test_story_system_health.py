@@ -568,3 +568,34 @@ async def test_unchecking_while_the_broker_is_away_prevents_any_republication(ai
     await reconnect_cb()
     await birth_cb()
     assert not any("system" in t for t, _p, _r in broker.calls)
+
+
+# --- Enveloppe de jeedom2ha::callDaemon (fidèle au PHP) ---------------------------------------------
+
+def _envelope(payload):
+    """Corps exact posté par callDaemon('/action/system_health', $payload, 'POST', ...)."""
+    return {"action": "system_health", "payload": payload, "request_id": "0123456789abcdef",
+            "timestamp": "2026-11-20T10:00:00+01:00"}
+
+
+@pytest.mark.asyncio
+async def test_call_daemon_envelope_publishes_then_purges(aiohttp_client):
+    broker = _Broker()
+    app, cli = await _client(aiohttp_client, broker)
+    resp = await cli.post("/action/system_health", json=_envelope({"enabled": True, "snapshot": SNAPSHOT}), headers=H)
+    assert resp.status == 200
+    assert (await resp.json()) == {"status": "ok", "entities": 7, "removed": [], "failed": 0}
+    assert len([t for t in broker.retained if t.startswith("homeassistant/")]) == 7
+    assert app["system_health_last"]["snapshot"] == SNAPSHOT
+    resp = await cli.post("/action/system_health", json=_envelope({"enabled": False}), headers=H)
+    assert resp.status == 200
+    body = await resp.json()
+    assert body["status"] == "ok" and body["purge_complete"] is True and len(body["removed"]) == 7
+    assert broker.retained == {} and app["system_health_last"]["snapshot"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [{}, {"enabled": "1"}, {"enabled": True}, {"enabled": True, "snapshot": []}])
+async def test_call_daemon_envelope_without_valid_fields_is_still_a_400(aiohttp_client, payload):
+    _app, cli = await _client(aiohttp_client, _Broker())
+    assert (await cli.post("/action/system_health", json=_envelope(payload), headers=H)).status == 400

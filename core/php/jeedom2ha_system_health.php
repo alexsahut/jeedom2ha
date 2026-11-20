@@ -58,6 +58,29 @@ function jeedom2ha_system_health_enabled($raw): bool {
 }
 
 /**
+ * Texte du relevé en UTF-8 valide : les octets invalides sont remplacés, pour que json_encode ne rende jamais false
+ * (sinon callDaemon n'enverrait aucun corps et le relevé serait retenté sans fin). Sans dépendance au cœur.
+ */
+function jeedom2ha_system_health_utf8(string $value): string {
+  if ($value === '' || preg_match('//u', $value) === 1) {
+    return $value;
+  }
+  if (function_exists('mb_convert_encoding')) {
+    $clean = @mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+    if (is_string($clean) && preg_match('//u', $clean) === 1) {
+      return $clean;
+    }
+  }
+  if (function_exists('iconv')) {
+    $clean = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+    if (is_string($clean) && preg_match('//u', $clean) === 1) {
+      return $clean;
+    }
+  }
+  return (string) preg_replace('/[\x80-\xFF]/', '?', $value);
+}
+
+/**
  * Un plugin (objet `plugin` du cœur) -> ligne du relevé, ou null s'il ne produit rien (pas un objet, sans identifiant,
  * jeedom2ha lui-même, inactif, sans démon propre). L'état du démon illisible (méthode absente, exception, réponse
  * inattendue) donne « arrêté » : le démon n'est pas vérifié en marche. Ne lève jamais.
@@ -69,7 +92,7 @@ function jeedom2ha_system_health_plugin_row($plugin, string $selfId = 'jeedom2ha
     if (!is_object($plugin) || !method_exists($plugin, 'getId')) {
       return null;
     }
-    $id = trim((string) $plugin->getId());
+    $id = trim(jeedom2ha_system_health_utf8((string) $plugin->getId()));
     if ($id === '' || $id === $selfId) {
       return null;
     }
@@ -79,7 +102,7 @@ function jeedom2ha_system_health_plugin_row($plugin, string $selfId = 'jeedom2ha
     if (!method_exists($plugin, 'getHasOwnDeamon') || intval($plugin->getHasOwnDeamon()) !== 1) {
       return null;
     }
-    $name = method_exists($plugin, 'getName') ? trim((string) $plugin->getName()) : '';
+    $name = method_exists($plugin, 'getName') ? trim(jeedom2ha_system_health_utf8((string) $plugin->getName())) : '';
   } catch (\Throwable $e) {
     return null;
   }
@@ -121,7 +144,7 @@ function jeedom2ha_system_health_version(callable $reader): ?string {
   } catch (\Throwable $e) {
     return null;
   }
-  $value = is_scalar($value) ? trim((string) $value) : '';
+  $value = is_scalar($value) ? trim(jeedom2ha_system_health_utf8((string) $value)) : '';
   return ($value === '' || strlen($value) > 64) ? null : $value;
 }
 

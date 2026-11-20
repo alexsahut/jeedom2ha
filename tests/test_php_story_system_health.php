@@ -247,5 +247,38 @@ foreach (token_get_all(file_get_contents($root . '/core/php/jeedom2ha_system_hea
 }
 check('fichier pur : aucun appel au cœur Jeedom (hors commentaires)', !preg_match('/\b(plugin|update|message|config|log|jeedom|DB)::/', $code));
 
+echo "Contrat de l'enveloppe callDaemon (correctif fix/system-health-envelope)\n";
+// callDaemon n'envoie un corps POST que si la charge est non vide, puis l'enveloppe dans
+// {action, payload, request_id, timestamp} : le démon lit `payload` (test pytest de l'enveloppe).
+check('callDaemon enveloppe la charge sous « payload »', (bool) preg_match(
+    "/if \\(\\\$_method === 'POST' && !empty\\(\\\$_payload\\)\\) \\{.*?'action' => \\\$action,\\s*'payload' => \\\$_payload,\\s*'request_id' => .*?'timestamp' =>/s", $class));
+$env = tick_env(array('enabled' => false, 'published' => true));
+jeedom2ha_system_health_tick($env->deps);
+check('la purge part avec une charge non vide (sinon callDaemon n\'enverrait aucun corps)',
+    count($env->sent) === 1 && !empty($env->sent[0]) && $env->sent[0] === array('enabled' => false));
+$env = tick_env(array('enabled' => true));
+jeedom2ha_system_health_tick($env->deps);
+check('la publication part avec enabled et snapshot', !empty($env->sent[0]) && $env->sent[0]['enabled'] === true && is_array($env->sent[0]['snapshot']));
+// Réponses du démon telles que callDaemon les rend (JSON décodé, codes d'erreur lus grâce à ignore_errors).
+check('réponse 200 du démon acceptée', jeedom2ha_system_health_response_ok(array('status' => 'ok', 'entities' => 7, 'removed' => array(), 'failed' => 0)));
+check('réponse 400 / 503 du démon refusée', !jeedom2ha_system_health_response_ok(array('status' => 'error', 'message' => "Champ 'enabled' (booléen) obligatoire."))
+    && !jeedom2ha_system_health_response_ok(array('status' => 'error', 'message' => 'Broker MQTT indisponible.')));
+check('purge complète acceptée, incomplète refusée', jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => true), true)
+    && !jeedom2ha_system_health_response_ok(array('status' => 'ok', 'removed' => array(), 'purge_complete' => false), true));
+check('démon injoignable (null) refusé', !jeedom2ha_system_health_response_ok(null));
+
+echo "UTF-8 invalide (correctif P3)\n";
+$bad = "Plugin \xC3\x28 cass\xE9";
+$badSnap = jeedom2ha_system_health_snapshot(array(
+    'plugins' => function () use ($bad) { return array(new FakePlugin("plugin_\xFFx", $bad)); },
+    'core_version' => function () { return "4.5\xFE"; },
+));
+check('nom, identifiant et version invalides : relevé encodable en JSON (json_encode n\'est pas false)',
+    json_encode($badSnap) !== false && json_encode(array('enabled' => true, 'snapshot' => $badSnap)) !== false);
+check('le plugin reste présent, son nom gardé en partie', count($badSnap['daemons']) === 1
+    && strpos($badSnap['daemons'][0]['name'], 'Plugin') === 0 && $badSnap['core_version'] !== null);
+check('un texte UTF-8 valide est rendu tel quel', jeedom2ha_system_health_utf8('Zêta – Démon') === 'Zêta – Démon');
+check('empreinte calculable sur un relevé assaini', (bool) preg_match('/^[0-9a-f]{64}$/', jeedom2ha_system_health_fingerprint($badSnap)));
+
 echo "\n{$passed} passed, {$failed} failed\n";
 exit($failed === 0 ? 0 : 1);
