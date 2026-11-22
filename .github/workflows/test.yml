@@ -228,7 +228,9 @@ jobs:
   burn-in:
     name: Burn-In (Python 3.9)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 10 itérations de la suite complète : ~5 min 25 s chacune (run planifié du 22/11/2026), soit ~55 min ;
+    # 90 min laissent ~35 min de marge à la croissance de la suite.
+    timeout-minutes: 90
     needs: test
     # Execute only on schedule or if PR has 'burn-in' label
     if: |
