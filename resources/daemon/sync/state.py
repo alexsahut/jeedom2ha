@@ -110,6 +110,11 @@ _ALARM_ACTIONABLE = ("alarm_control_panel",)
 # (homeassistant/components/mqtt/alarm_control_panel.py, ``_state_message_received``); an empty
 # payload is ignored, so it cannot be used.
 ALARM_UNKNOWN_PAYLOAD = "None"
+# Story 12.5 (écart 2) — fenêtre fixe (secondes, depuis le premier événement) pendant laquelle les
+# changements des infos d'une alarme sont regroupés avant UNE publication de l'état calculé : à
+# l'armement, Actif passe à 1 ~40 ms avant que Mode change, et HA montrait l'ancien mode. 0 = publication
+# immédiate (comportement de 12.4). Les autres types ne sont jamais retardés.
+ALARM_STATE_COALESCE_S = 0.25
 _ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _ALARM_ACTIONABLE
 _STREAMED_TYPES = _STREAMED_TYPES + _ALARM_ACTIONABLE
 # Payload that resets a Home Assistant MQTT select to « unknown » (never an invented option).
@@ -213,6 +218,10 @@ class StateSynchronizer:
         # Nothing removes an entry: a newer read replaces it (the sync topology included, for
         # entries older than its read time). Alarm only: the other types keep their behaviour.
         self._alarm_reads: Dict[Tuple[int, int], Tuple[float, Any]] = {}
+        # Story 12.5 (écart 2) — publications d'état d'alarme en attente, par topic :
+        # (minuteur, eq_id, cmd_id du dernier événement).
+        self.alarm_coalesce_s: float = ALARM_STATE_COALESCE_S
+        self._alarm_pending: Dict[str, Tuple[asyncio.TimerHandle, int, int]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -275,6 +284,10 @@ class StateSynchronizer:
         published = 0
         failed = 0
         for mapping, binding in resolved:
+            if self._schedule_alarm_publication(mapping, binding, eq_id_int, cmd_id_int):
+                # Story 12.5 — publiée à la fin de la fenêtre, depuis le magasin de l'alarme.
+                published += 1
+                continue
             payload = self._translate_value(mapping, value, binding.channel, binding.cmd)
             if payload is None and self._alarm_needs_unknown(mapping, binding.topic):
                 # Revue Codex de 12.4 — unknown now, a state was published before (or nothing is
@@ -301,6 +314,87 @@ class StateSynchronizer:
                       reason_code="state_published", action="publish_state",
                       state_topic=binding.topic, ha_type=mapping.ha_entity_type)
         return published > 0 and failed == 0
+
+    def _schedule_alarm_publication(self, mapping: Any, binding: "_Binding", eq_id: int, cmd_id: int) -> bool:
+        """Story 12.5 (écart 2) — programme la publication regroupée d'un topic d'alarme.
+
+        Vrai quand le topic est un topic d'alarme et qu'une fenêtre > 0 s'applique : la valeur de
+        l'événement est déjà dans le magasin de l'alarme ; une seule publication par fenêtre fixe
+        (un événement pendant la fenêtre ne la reporte pas). Faux sinon (publication immédiate).
+        """
+        if getattr(mapping, "ha_entity_type", None) not in _ALARM_ACTIONABLE:
+            return False
+        delay = float(self.alarm_coalesce_s or 0)
+        if delay <= 0:
+            return False
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return False
+        topic = binding.topic
+        pending = self._alarm_pending.get(topic)
+        if pending is not None:
+            self._alarm_pending[topic] = (pending[0], eq_id, cmd_id)
+            return True
+        handle = loop.call_later(delay, self._flush_alarm_publication, topic)
+        self._alarm_pending[topic] = (handle, eq_id, cmd_id)
+        return True
+
+    def _flush_alarm_publication(self, topic: str) -> None:
+        """Story 12.5 — publie l'état calculé d'un topic d'alarme (fin de fenêtre ou arrêt).
+
+        Mêmes règles que la publication immédiate : cible relue dans le registre (équipement
+        dépublié entre-temps : rien), broker indisponible : INFO ``mqtt_unavailable``, échec :
+        WARNING ``mqtt_publish_failed``, retour à ``unknown`` comme en 12.4. Les quatre infos sont
+        lues dans le magasin de l'alarme (dernières valeurs connues).
+        """
+        pending = self._alarm_pending.pop(topic, None)
+        if pending is None:
+            return
+        handle, eq_id, cmd_id = pending
+        handle.cancel()
+        try:
+            self._publish_coalesced_alarm(topic, eq_id, cmd_id)
+        except Exception:
+            # Revue de 12.5 — appelé par la boucle (minuteur) : un échec n'est jamais silencieux.
+            self._log(logging.WARNING, eq_id=eq_id, cmd_id=cmd_id,
+                      reason_code="mqtt_publish_failed", action="publish_state", state_topic=topic)
+
+    def _publish_coalesced_alarm(self, topic: str, eq_id: int, cmd_id: int) -> None:
+        if not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
+            self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
+                      reason_code="mqtt_unavailable", action="reject_state")
+            return
+        targets = [
+            (mapping, binding) for mapping, binding in self._resolve_state_targets(eq_id, cmd_id)
+            if binding.topic == topic and getattr(mapping, "ha_entity_type", None) in _ALARM_ACTIONABLE
+        ]
+        if not targets:
+            self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
+                      reason_code="state_target_not_found", action="reject_state")
+            return
+        mapping, binding = targets[0]
+        payload = self._translate_alarm_value(mapping, None, None, None)
+        if payload is None and self._alarm_needs_unknown(mapping, topic):
+            payload = ALARM_UNKNOWN_PAYLOAD
+        if payload is None:
+            self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
+                      reason_code="empty_state_value", action="skip_state", state_topic=topic)
+            return
+        if not self._mqtt_bridge.publish_message(topic, payload, qos=1, retain=True):
+            self._log(logging.WARNING, eq_id=eq_id, cmd_id=cmd_id,
+                      reason_code="mqtt_publish_failed", action="publish_state", state_topic=topic)
+            return
+        self._remember_retained(topic)
+        self._remember_alarm_payload(mapping, topic, payload)
+        self._log(logging.INFO, eq_id=eq_id, cmd_id=cmd_id,
+                  reason_code="state_published", action="publish_state",
+                  state_topic=topic, ha_type=mapping.ha_entity_type)
+
+    def flush_pending_states(self) -> None:
+        """Story 12.5 — publie tout de suite les états en attente de regroupement (arrêt du démon ; alarme seulement)."""
+        for topic in list(self._alarm_pending):
+            self._flush_alarm_publication(topic)
 
     def _alarm_needs_unknown(self, mapping: Any, topic: str) -> bool:
         """Revue Codex de 12.4 — an alarm whose state became unknown must reset HA to ``unknown``.

@@ -431,6 +431,11 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     "resources/daemon/tests/fixtures/system_health/projection_baseline.json::\"payload\": \"{\\\"name\\\": null, \\\"unique_id\\\": \\\"jeedom2ha_eq_230\\\", \\\"object_id\\\": \\\"jeedom2ha_230\\\", \\\"state_topic\\\": \\\"jeedom2ha/230/alarm/state\\\", \\\"command_topic\\\": \\\"jeedom2ha/230/alarm/set\\\", \\\"value_template\\\": \\\"{{ 'armed_away' if value == '1' else 'disarmed' }}\\\", \\\"payload_disarm\\\": \\\"DISARM\\\", \\\"payload_arm_home\\\": \\\"ARM_HOME\\\", \\\"payload_arm_away\\\": \\\"ARM_AWAY\\\", \\\"platform\\\": \\\"mqtt\\\", \\\"device\\\": {\\\"identifiers\\\": [\\\"jeedom2ha_230\\\"], \\\"name\\\": \\\"Alarme maison\\\", \\\"manufacturer\\\": \\\"Jeedom (alarm)\\\", \\\"model\\\": \\\"alarm\\\", \\\"via_device\\\": \\\"jeedom2ha_bridge\\\", \\\"suggested_area\\\": \\\"Salon\\\"}, \\\"origin\\\": {\\\"name\\\": \\\"jeedom2ha\\\", \\\"sw_version\\\": \\\"0.2.0\\\"}, \\\"default_entity_id\\\": \\\"alarm_control_panel.jeedom2ha_230\\\", \\\"availability_topic\\\": \\\"jeedom2ha/bridge/status\\\"}\",",
     "resources/daemon/tests/fixtures/system_health/projection_baseline.json::\"payload\": \"{\\\"name\\\": null, \\\"unique_id\\\": \\\"jeedom2ha_eq_12000\\\", \\\"object_id\\\": \\\"jeedom2ha_12000\\\", \\\"state_topic\\\": \\\"jeedom2ha/12000/alarm/state\\\", \\\"command_topic\\\": \\\"jeedom2ha/12000/alarm/set\\\", \\\"value_template\\\": \\\"{{ 'armed_away' if value == '1' else 'disarmed' }}\\\", \\\"payload_disarm\\\": \\\"DISARM\\\", \\\"payload_arm_home\\\": \\\"ARM_HOME\\\", \\\"payload_arm_away\\\": \\\"ARM_AWAY\\\", \\\"platform\\\": \\\"mqtt\\\", \\\"device\\\": {\\\"identifiers\\\": [\\\"jeedom2ha_12000\\\"], \\\"name\\\": \\\"Alarme maison 12000\\\", \\\"manufacturer\\\": \\\"Jeedom (virtual)\\\", \\\"model\\\": \\\"virtual\\\", \\\"via_device\\\": \\\"jeedom2ha_bridge\\\", \\\"suggested_area\\\": \\\"Salon\\\"}, \\\"origin\\\": {\\\"name\\\": \\\"jeedom2ha\\\", \\\"sw_version\\\": \\\"0.2.0\\\"}, \\\"default_entity_id\\\": \\\"alarm_control_panel.jeedom2ha_12000\\\", \\\"availability_topic\\\": \\\"jeedom2ha/bridge/status\\\"}\",",
   ];
+  // Story 12.5 (correctif FR49) — un armement dont la cible est une commande de mode porte l'état visé
+  // (alarm_target_state) pour la relecture fraîche du mode courant. Admis dans son fichier seulement.
+  const REPLACED_BY_12_5 = [
+    "resources/daemon/sync/command.py::return CommandTranslation(cmd_id=cmd_id, options={}, command_family=family), None",
+  ];
 
   it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
     const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
@@ -462,7 +467,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
         && !REPLACED_BY_FIX_SWITCH_APPARIEMENT.includes(`${f}::${line}`)
         && !REPLACED_BY_SELECT_MODE.includes(`${f}::${line}`)
         && !REPLACED_BY_BARRIER_STATE_SENSOR.includes(`${f}::${line}`)
-        && !REPLACED_BY_12_4.includes(`${f}::${line}`))
+        && !REPLACED_BY_12_4.includes(`${f}::${line}`)
+        && !REPLACED_BY_12_5.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

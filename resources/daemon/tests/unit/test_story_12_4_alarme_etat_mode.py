@@ -49,6 +49,12 @@ CODE = "8213-sentinelle"
 
 
 @pytest.fixture(autouse=True)
+def _immediate_alarm_state(monkeypatch):
+    """Story 12.5 — ces tests vérifient le calcul de l'état, pas le regroupement : fenêtre à 0."""
+    monkeypatch.setattr("sync.state.ALARM_STATE_COALESCE_S", 0)
+
+
+@pytest.fixture(autouse=True)
 def _no_code():
     """Le code vit dans le démon (objet global) : chaque test part sans code et le rend sans code."""
     ALARM_CODE.clear()
@@ -426,6 +432,8 @@ def _cmd_sync(mapping, state_sync=None):
                                jeedom_api_endpoint="http://127.0.0.1/core/api/jeeApi.php",
                                jeedom_core_apikey="core-apikey")
     sync._execute_exec_cmd = AsyncMock(return_value=True)
+    # Story 12.5 — lecture fraîche du mode avant un armement : en échec ici, comportement de 12.4.
+    sync._read_info_value = AsyncMock(return_value=(False, None))
     return sync, bridge
 
 

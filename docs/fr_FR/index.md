@@ -527,10 +527,12 @@ Un équipement Jeedom qui porte l'état d'une alarme (`ALARM_ENABLE_STATE` ou `A
 - Le libellé du mode est comparé sans tenir compte des majuscules ni des espaces en trop.
 - Tant que « Actif » n'a jamais été lu, ou s'il devient illisible, l'état est **inconnu** (`unknown`) : rien n'est inventé, et un état affiché auparavant est effacé. De même pour un virtuel qui n'a que « Statut » : déclenchée quand il vaut 1, inconnue sinon. Le délai de sortie n'a pas de signal dans Jeedom : l'état « armement en cours » n'est jamais affiché.
 - L'état est publié à la relecture de Jeedom, à chaque changement de l'une de ces quatre informations, au retour de Home Assistant et à la reconnexion au broker.
+- Les changements de ces informations qui arrivent ensemble (à l'armement, « Actif » change juste avant « Mode ») sont regroupés pendant un quart de seconde : Home Assistant reçoit directement l'état final, sans afficher un instant l'ancien mode.
 
 **Armer et désarmer.** Les modes proposés sont ceux que vous avez associés à HomeKit dans le plugin Homebridge (clés « Présent », « Absent » et « Nuit » de l'équipement d'alarme, au format « numéro de commande | libellé »). Le plugin les lit sans jamais les modifier.
 
 - « Armer (présent) », « Armer (absent) » et « Armer (nuit) » lancent la commande de mode associée (dans le plugin « Alarme », lancer un mode arme l'alarme). Une commande n'est retenue que si elle appartient à l'équipement et porte le type « Mode alarme » (`ALARM_SET_MODE`) ; Home Assistant ne propose que les armements retenus.
+- Si le mode demandé est **déjà le mode courant** de l'alarme désarmée, Jeedom ignore la commande de mode (son information « Mode » est déjà dans l'état visé) : le plugin relit alors « Mode » et « Actif » dans Jeedom au moment de l'ordre et envoie l'ordre d'activation de l'équipement (`ALARM_ARMED`, ou `ALARM_ENABLE` pour un virtuel), qui arme dans ce mode. Déjà armée dans ce mode : rien n'est envoyé. Si la relecture échoue, la commande de mode est envoyée comme d'habitude.
 - Sans aucun mode associé, « Armer (absent) » envoie l'ordre d'armement de l'équipement (`ALARM_ARMED`, ou `ALARM_ENABLE` pour un virtuel).
 - « Désarmer » envoie `ALARM_RELEASED` (plugin « Alarme ») ou `ALARM_DISABLE` (virtuel).
 - Pas d'état supposé : Home Assistant attend l'état relu dans Jeedom.

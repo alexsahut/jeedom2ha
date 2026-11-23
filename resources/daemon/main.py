@@ -284,6 +284,8 @@ class Jeedom2haDaemon(BaseDaemon):
                 self._command_synchronizer = None
             state_sync = self._app.get("state_synchronizer")
             if state_sync is not None:
+                # Story 12.5 — les états en attente de regroupement partent avant l'arrêt du broker.
+                state_sync.flush_pending_states()
                 state_sync.flush_retained_channels()
             mqtt_bridge = self._app.get("mqtt_bridge")
             if mqtt_bridge is not None:

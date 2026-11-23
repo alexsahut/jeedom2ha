@@ -25,7 +25,11 @@ from mapping.alarm_control_panel import (  # FR49 (CC-64)
     PAYLOAD_DISARM as ALARM_PAYLOAD_DISARM,
     alarm_arm_targets,
     alarm_disarm_command,
+    alarm_enable_command,  # Story 12.5
+    alarm_mode_labels,  # Story 12.5
+    is_mode_command,  # Story 12.5
 )
+from sync.readback import _alarm_flag, normalize_alarm_mode_label  # Story 12.5
 from sync import alarm_code as _alarm_code  # FR49 (CC-64) — limite d'essais (ALARM_LOCKOUT)
 from sync.alarm_code import alarm_code_configured, alarm_code_matches, alarm_code_unreadable  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
@@ -198,6 +202,9 @@ class CommandTranslation:
     options: Dict[str, str]
     command_family: str
     optimistic_state_payload: Optional[str] = None
+    # Story 12.5 — état HA visé par un armement dont la cible est une commande de mode
+    # (``SetModePresent`` / ``SetModeAbsent`` / ``SetModeNuit``) ; None pour tout autre ordre.
+    alarm_target_state: Optional[str] = None
 
 
 class CommandSynchronizer:
@@ -298,6 +305,12 @@ class CommandSynchronizer:
                     action="reject_command",
                 )
                 return False
+
+        if translation.alarm_target_state is not None:
+            # Story 12.5 — armement dans le mode déjà courant : lecture fraîche juste avant l'envoi.
+            translation = await self._resolve_alarm_same_mode(mapping, parsed.eq_id, topic, translation)
+            if translation is None:
+                return True
 
         executed = await self._execute_exec_cmd(translation.cmd_id, translation.options)
         if not executed:
@@ -869,6 +882,7 @@ class CommandSynchronizer:
         if action is None:
             return None, "invalid_command_payload"
         commands = mapping.commands or {}
+        target_state: Optional[str] = None
         if action == ALARM_PAYLOAD_DISARM:
             if alarm_code_configured():
                 # Revue de 12.4 : un code enregistré mais illisible refuse tout désarmement ;
@@ -890,6 +904,9 @@ class CommandSynchronizer:
         elif action in ALARM_ARM_PAYLOADS:
             cmd = alarm_arm_targets(commands).get(ALARM_ARM_PAYLOADS[action])
             family = "alarm_arm"
+            if is_mode_command(cmd):
+                # Story 12.5 — cible de mode : la lecture fraîche décidera (``_resolve_alarm_same_mode``).
+                target_state = ALARM_ARM_PAYLOADS[action]
         else:
             return None, "invalid_command_payload"
         if cmd is None:
@@ -906,7 +923,86 @@ class CommandSynchronizer:
             return None, "missing_action_command"
         if cmd_id not in own_ids:
             return None, "missing_action_command"
-        return CommandTranslation(cmd_id=cmd_id, options={}, command_family=family), None
+        return CommandTranslation(
+            cmd_id=cmd_id, options={}, command_family=family, alarm_target_state=target_state,
+        ), None
+
+    async def _resolve_alarm_same_mode(
+        self,
+        mapping: MappingResult,
+        eq_id: int,
+        topic: str,
+        translation: CommandTranslation,
+    ) -> Optional[CommandTranslation]:
+        """Story 12.5 — armement dont le mode visé est peut-être déjà le mode courant.
+
+        Le cœur Jeedom ignore une action dont l'info liée est déjà dans l'état visé
+        (``alreadyInState``) : la commande de mode, liée à l'info Mode, ne fait rien quand ce mode
+        est déjà le mode courant, et l'alarme désarmée le reste. Lecture fraîche (``cmd::execCmd``
+        sur l'info, sans effet) de Mode, puis d'Actif seulement si le mode correspond :
+
+        - Mode = mode visé et Actif = 0 : commande d'activation (ALARM_ARMED / ALARM_ENABLE),
+          qui arme dans le mode courant ; sans elle, commande de mode + WARNING ;
+        - Mode = mode visé et Actif = 1 : déjà armée dans ce mode, rien n'est envoyé (None) ;
+        - tout autre cas (autre mode, valeur illisible, null, vide, lecture en échec, libellé
+          absent) : la traduction est rendue telle quelle (comportement de 12.4).
+
+        Jamais de décision sur une valeur mémorisée : une valeur ancienne pourrait activer l'alarme
+        dans un autre mode que celui demandé. Aucun libellé ni valeur lue n'est journalisé.
+        """
+        commands = mapping.commands or {}
+        wanted = normalize_alarm_mode_label(alarm_mode_labels(mapping).get(translation.alarm_target_state))
+        mode_cmd_id = self._coerce_int(getattr(commands.get("ALARM_MODE"), "id", None))
+        enable_cmd_id = self._coerce_int(getattr(commands.get("ALARM_ENABLE_STATE"), "id", None))
+        if wanted is None or mode_cmd_id is None or enable_cmd_id is None:
+            return translation
+
+        async def _fresh(cmd_id: int) -> Tuple[bool, Any]:
+            try:
+                return await self._read_info_value(cmd_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                return False, None
+
+        ok, mode_value = await _fresh(mode_cmd_id)
+        if not ok or normalize_alarm_mode_label(mode_value) != wanted:
+            return translation
+        ok, enable_value = await _fresh(enable_cmd_id)
+        active = _alarm_flag(enable_value) if ok else None
+        if active is True:
+            self._log_cmd(
+                logging.INFO,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_already_armed_in_mode",
+                action="skip_command",
+            )
+            return None
+        if active is not False:
+            return translation
+        enable_cmd = alarm_enable_command(commands)
+        own_ids = {self._coerce_int(getattr(own, "id", None)) for own in commands.values()}
+        enable_id = self._coerce_int(getattr(enable_cmd, "id", None))
+        if enable_id is None or enable_id not in own_ids:
+            self._log_cmd(
+                logging.WARNING,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_same_mode_without_enable_command",
+                action="execute_command",
+                detail="mode_deja_courant_ordre_peut_etre_ignore_par_jeedom",
+            )
+            return translation
+        self._log_cmd(
+            logging.INFO,
+            eq_id=eq_id,
+            topic=topic,
+            reason_code="alarm_same_mode_enable",
+            action="translate_command",
+            cmd_id=enable_id,
+        )
+        return replace(translation, cmd_id=enable_id, alarm_target_state=None)
 
     @staticmethod
     def _translate_lock_command(
