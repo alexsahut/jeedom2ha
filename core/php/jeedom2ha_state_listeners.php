@@ -18,6 +18,8 @@
 
 /*
  * Story 19.5 (AC11) — fonctions PURES du réalignement des listeners d'état.
+ * Story 12.6 (CC-45) — recalage par différence (jeedom2ha_state_listener_plan), testé par
+ * tests/test_php_story_12_6_state_listeners_diff.php.
  *
  * Aucune dépendance au cœur Jeedom (pas de core.inc.php) : ce fichier est chargé
  * par core/class/jeedom2ha.class.php et core/ajax/jeedom2ha.ajax.php, et directement
@@ -55,7 +57,109 @@ function jeedom2ha_normalize_state_listener_targets($response): ?array {
 }
 
 /**
- * Réaligne les listeners d'état dans l'ordre récupérer -> valider -> créer -> purger.
+ * Story 12.6 (CC-45) — identifiant numérique strictement positif, ou null.
+ * Accepte un entier ou une chaîne de chiffres (options relues depuis le JSON du cœur).
+ */
+function jeedom2ha_state_listener_positive_int($value): ?int {
+  if (is_int($value)) {
+    return $value > 0 ? $value : null;
+  }
+  if (is_string($value) && preg_match('/^[1-9][0-9]{0,18}$/', trim($value))) {
+    return intval(trim($value));
+  }
+  return null;
+}
+
+/**
+ * Story 12.6 (CC-45) — description d'un listener existant -> ['eq_id' => int, 'cmd_id' => int], ou null s'il est mal
+ * formé. Bien formé = options `eq_id` et `cmd_id` entières positives ET un seul événement, `#<cmd_id>#` (tableau ou
+ * chaîne JSON selon la version du cœur). Tout ce qui n'est pas compris est mal formé : un listener douteux est
+ * remplacé, jamais conservé.
+ */
+function jeedom2ha_state_listener_describe_normalize($description): ?array {
+  if (!is_array($description)) {
+    return null;
+  }
+  // eq_id 0 est une cible valide du contrat (jeedom2ha_normalize_state_listener_targets) : accepté ici aussi, sinon
+  // un tel listener serait remplacé à chaque réalignement (revue 12.6).
+  $rawEqId = $description['eq_id'] ?? null;
+  $eqId = ($rawEqId === 0 || $rawEqId === '0') ? 0 : jeedom2ha_state_listener_positive_int($rawEqId);
+  $cmdId = jeedom2ha_state_listener_positive_int($description['cmd_id'] ?? null);
+  if ($eqId === null || $cmdId === null) {
+    return null;
+  }
+  $events = $description['events'] ?? null;
+  if (is_string($events)) {
+    $events = json_decode($events, true);
+  }
+  if (!is_array($events) || count($events) !== 1) {
+    return null;
+  }
+  $event = reset($events);
+  if (is_int($event)) {
+    $event = (string) $event;
+  }
+  if (!is_string($event) || trim($event, '#') !== (string) $cmdId) {
+    return null;
+  }
+  return array('eq_id' => $eqId, 'cmd_id' => $cmdId);
+}
+
+/**
+ * Story 12.6 (CC-45) — différence PURE entre les cibles voulues et les listeners existants.
+ *
+ * @param array $targets  cibles normalisées [['eq_id' => int, 'cmd_id' => int], ...]
+ *                        (jeedom2ha_normalize_state_listener_targets)
+ * @param array $existing descriptions des listeners existants, dans l'ordre de relevé :
+ *                        [['eq_id' => mixed, 'cmd_id' => mixed, 'events' => mixed, ...autres clés libres], ...]
+ * @return array ['keep' => entrées conservées, 'create' => cibles à créer, 'remove' => entrées à supprimer]
+ *
+ * Règles : un listener bien formé d'une cible voulue est conservé (le premier relevé, le plus ancien) ; ses doublons,
+ * les listeners qui ne sont plus voulus et les listeners mal formés sont supprimés ; une cible sans listener conservé
+ * est créée une seule fois. Les entrées qui ne sont pas des tableaux sont ignorées (rien à désigner). Parc inchangé :
+ * rien à créer ni à supprimer.
+ */
+function jeedom2ha_state_listener_plan(array $targets, array $existing): array {
+  $wanted = array();
+  foreach ($targets as $target) {
+    $key = intval($target['eq_id']) . ':' . intval($target['cmd_id']);
+    if (!isset($wanted[$key])) {
+      $wanted[$key] = array('eq_id' => intval($target['eq_id']), 'cmd_id' => intval($target['cmd_id']));
+    }
+  }
+
+  $keep = array();
+  $remove = array();
+  $covered = array();
+  foreach ($existing as $entry) {
+    if (!is_array($entry)) {
+      continue;
+    }
+    $normalized = jeedom2ha_state_listener_describe_normalize($entry);
+    if ($normalized === null) {
+      $remove[] = $entry;
+      continue;
+    }
+    $key = $normalized['eq_id'] . ':' . $normalized['cmd_id'];
+    if (!isset($wanted[$key]) || isset($covered[$key])) {
+      $remove[] = $entry; // plus voulu, ou doublon d'un listener déjà conservé
+      continue;
+    }
+    $covered[$key] = true;
+    $keep[] = $entry;
+  }
+
+  $create = array();
+  foreach ($wanted as $key => $target) {
+    if (!isset($covered[$key])) {
+      $create[] = $target;
+    }
+  }
+  return array('keep' => $keep, 'create' => $create, 'remove' => $remove);
+}
+
+/**
+ * Réaligne les listeners d'état dans l'ordre récupérer -> valider -> relever -> créer -> purger.
  * Sur échec de la récupération (exception) ou réponse invalide, RIEN n'est touché : les
  * listeners existants sont conservés et un avertissement est journalisé.
  * Les nouveaux listeners sont créés AVANT de supprimer les anciens (revue Codex P2,
@@ -64,20 +168,32 @@ function jeedom2ha_normalize_state_listener_targets($response): ?array {
  * effet : même valeur publiée), résorbés au réalignement suivant. Aucune commande ne se
  * retrouve sans écouteur.
  *
- * @param callable $fetchTargets  function(): mixed — réponse brute du démon
- * @param callable $listExisting  function(): iterable — listeners d'état existants
- * @param callable $removeListener function($listener): void
- * @param callable $createListener function(int $eqId, int $cmdId): void
- * @param callable $warn          function(string $message): void
- * @return int|null nombre de listeners créés, ou null si l'ensemble n'a pas été remplacé
+ * Story 12.6 (CC-45) — avec `$describeListener`, le réalignement se fait PAR DIFFÉRENCE
+ * (jeedom2ha_state_listener_plan) : les listeners encore voulus et bien formés sont conservés
+ * tels quels (même identifiant, aucune écriture), seuls les manquants sont créés et seuls les
+ * indésirables (plus voulus, doublons, mal formés) supprimés. Parc inchangé : rien n'est touché,
+ * donc plus de « Listener non trouvé » pour un évènement arrivé pendant une resynchronisation.
+ * Sans `$describeListener` (appel historique), tous les existants sont remplacés.
+ *
+ * @param callable      $fetchTargets     function(): mixed — réponse brute du démon
+ * @param callable      $listExisting     function(): iterable — listeners d'état existants
+ * @param callable      $removeListener   function($listener): void
+ * @param callable      $createListener   function(int $eqId, int $cmdId): void
+ * @param callable      $warn             function(string $message): void
+ * @param callable|null $describeListener function($listener): array ['eq_id', 'cmd_id', 'events'] (peut lever)
+ * @param array|null    $stats            rempli avec ['kept' => int, 'created' => int, 'removed' => int]
+ * @return int|null nombre de listeners en place pour le parc (conservés + créés), ou null si rien n'a été appliqué
  */
 function jeedom2ha_realign_state_listeners(
   callable $fetchTargets,
   callable $listExisting,
   callable $removeListener,
   callable $createListener,
-  callable $warn
+  callable $warn,
+  ?callable $describeListener = null,
+  ?array &$stats = null
 ): ?int {
+  $stats = array('kept' => 0, 'created' => 0, 'removed' => 0);
   try {
     $response = $fetchTargets();
   } catch (\Throwable $e) {
@@ -93,34 +209,55 @@ function jeedom2ha_realign_state_listeners(
 
   try {
     // Relevé AVANT la création, pour ne jamais supprimer les listeners qu'on vient de créer.
-    $existing = [];
+    $listeners = array();
     foreach ($listExisting() as $listener) {
-      $existing[] = $listener;
+      $listeners[] = $listener;
     }
   } catch (\Throwable $e) {
     $warn('[STATE-LISTENER] Listeners existants illisibles, rien modifié : ' . $e->getMessage());
     return null;
   }
 
-  $count = 0;
+  $entries = array();
+  foreach ($listeners as $index => $listener) {
+    $description = array();
+    if ($describeListener !== null) {
+      try {
+        $described = $describeListener($listener);
+        $description = is_array($described) ? $described : array();
+      } catch (\Throwable $e) {
+        $description = array(); // illisible = mal formé : remplacé
+      }
+    }
+    $description['_jeedom2ha_index'] = $index;
+    $entries[] = $description;
+  }
+  $plan = jeedom2ha_state_listener_plan($targets, $entries);
+
+  $created = 0;
   try {
-    foreach ($targets as $target) {
+    foreach ($plan['create'] as $target) {
       $createListener($target['eq_id'], $target['cmd_id']);
-      $count++;
+      $created++;
     }
   } catch (\Throwable $e) {
-    $warn('[STATE-LISTENER] Création interrompue après ' . $count . ' listener(s), anciens listeners conservés : ' . $e->getMessage());
+    $warn('[STATE-LISTENER] Création interrompue après ' . $created . ' listener(s), anciens listeners conservés : ' . $e->getMessage());
+    $stats['kept'] = count($plan['keep']);
+    $stats['created'] = $created;
     return null;
   }
 
+  $removed = 0;
   try {
-    foreach ($existing as $listener) {
-      $removeListener($listener);
+    foreach ($plan['remove'] as $entry) {
+      $removeListener($listeners[$entry['_jeedom2ha_index']]);
+      $removed++;
     }
   } catch (\Throwable $e) {
     $warn('[STATE-LISTENER] Purge interrompue, doublons temporaires jusqu\'au prochain réalignement : ' . $e->getMessage());
   }
-  return $count;
+  $stats = array('kept' => count($plan['keep']), 'created' => $created, 'removed' => $removed);
+  return count($plan['keep']) + $created;
 }
 
 /**
