@@ -222,6 +222,9 @@ class StateSynchronizer:
         # (minuteur, eq_id, cmd_id du dernier événement).
         self.alarm_coalesce_s: float = ALARM_STATE_COALESCE_S
         self._alarm_pending: Dict[str, Tuple[asyncio.TimerHandle, int, int]] = {}
+        # Revue de 12.5 (M2) — posé par ``flush_pending_states`` (arrêt du démon) : ensuite, un état
+        # d'alarme part tout de suite, aucun minuteur n'est plus programmé.
+        self._stopping = False
 
     @property
     def is_active(self) -> bool:
@@ -251,6 +254,11 @@ class StateSynchronizer:
         False otherwise (unknown/unpublished entity, out-of-scope type, no usable
         value, or MQTT unavailable). Never reconstructs a topic by hand and never
         publishes for an entity that was not published in discovery (AC#5).
+
+        Story 12.5 (revue M3) : pour une alarme dont l'événement est regroupé (fenêtre
+        ``ALARM_STATE_COALESCE_S``), True est rendu par anticipation : la publication part à la
+        fin de la fenêtre, où un échec est journalisé en WARNING (``mqtt_publish_failed``). Le
+        relais PHP ne lit pas cette réponse.
         """
         try:
             eq_id_int = int(eq_id)
@@ -325,7 +333,7 @@ class StateSynchronizer:
         if getattr(mapping, "ha_entity_type", None) not in _ALARM_ACTIONABLE:
             return False
         delay = float(self.alarm_coalesce_s or 0)
-        if delay <= 0:
+        if delay <= 0 or self._stopping:
             return False
         try:
             loop = asyncio.get_running_loop()
@@ -392,9 +400,28 @@ class StateSynchronizer:
                   state_topic=topic, ha_type=mapping.ha_entity_type)
 
     def flush_pending_states(self) -> None:
-        """Story 12.5 — publie tout de suite les états en attente de regroupement (arrêt du démon ; alarme seulement)."""
+        """Story 12.5 — publie tout de suite les états en attente de regroupement (arrêt du démon ; alarme seulement).
+
+        Pose aussi le drapeau d'arrêt (revue M2) : les événements qui arrivent encore publient sans attendre.
+        """
+        self._stopping = True
         for topic in list(self._alarm_pending):
             self._flush_alarm_publication(topic)
+
+    def republish_last_alarm_state(self, topic: str) -> bool:
+        """Story 12.5 — republie (retained) le dernier état publié sur ce topic d'alarme pendant ce run.
+
+        Après un armement refusé : HA garde ou retrouve l'état réel déjà publié, rien n'est recalculé
+        ni inventé. Rien de publié pendant ce run : rien n'est fait (faux). Un échec : WARNING.
+        """
+        payload = self._alarm_published.get(topic)
+        if payload is None or not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
+            return False
+        if not self._mqtt_bridge.publish_message(topic, payload, qos=1, retain=True):
+            self._log(logging.WARNING, eq_id="-", cmd_id="-", reason_code="mqtt_publish_failed",
+                      action="republish_state", state_topic=topic)
+            return False
+        return True
 
     def _alarm_needs_unknown(self, mapping: Any, topic: str) -> bool:
         """Revue Codex de 12.4 — an alarm whose state became unknown must reset HA to ``unknown``.

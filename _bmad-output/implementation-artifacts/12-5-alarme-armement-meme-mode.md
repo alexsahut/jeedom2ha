@@ -42,15 +42,17 @@ Rattachement : **pe-epic-12** (FR49), suite directe de la story 12.4 (`12-4-alar
 
 ## Critères d'acceptation
 
-1. **AC1 — Même mode, alarme désarmée** : pour un armement dont la cible est une commande de mode, le démon relit à l'instant de l'ordre (lecture fraîche, F3) les infos Mode et Actif. Si le Mode lu est le libellé du mode demandé (normalisé) et qu'Actif vaut 0, il exécute la **commande d'activation** de l'équipement (`ALARM_ARMED`, sinon `ALARM_ENABLE` ; action de ce generic type, commande de l'équipement) au lieu de la commande de mode.
+1. **AC1 — Même mode, alarme désarmée** : pour un armement dont la cible est une commande de mode, le démon relit à l'instant de l'ordre (lecture fraîche, F3) les infos Mode et Actif. Si le Mode lu, le libellé de la clé SetMode* et le nom de la commande de mode visée sont égaux une fois normalisés (revue I1) et qu'Actif vaut 0, il exécute la **commande d'activation** de l'équipement (`ALARM_ARMED`, sinon `ALARM_ENABLE` ; action de ce generic type, commande de l'équipement) au lieu de la commande de mode.
 2. **AC2 — Même mode, déjà armée** : Mode = mode demandé et Actif = 1 → aucune commande Jeedom, ordre accepté, INFO `alarm_already_armed_in_mode` ; HA garde l'état déjà publié.
-3. **AC3 — Autres cas, comportement inchangé** (la commande de mode est envoyée comme en 12.4) : autre mode courant ; Mode illisible, null, vide ou inconnu ; Actif illisible ou null ; lecture fraîche en échec ; mode demandé sans libellé ; armement sans configuration de mode (la cible est déjà la commande d'activation) ; désarmement.
+3. **AC3 — Autres cas, comportement inchangé** (la commande de mode est envoyée comme en 12.4) : autre mode courant ; configuration Homebridge incohérente (libellé de la clé différent du nom de la commande de mode visée, revue I1) ; Mode illisible, null, vide ou inconnu ; Actif illisible ou null ; lecture fraîche en échec ; mode demandé sans libellé ; armement sans configuration de mode (la cible est déjà la commande d'activation) ; désarmement.
 4. **AC4 — Alarme sans commande d'activation** : même mode et alarme désarmée mais aucune commande d'activation valable → la commande de mode est envoyée (inchangé, au cas où le cœur ne l'ignore pas) avec un WARNING `alarm_same_mode_without_enable_command` qui dit que l'ordre peut être ignoré par Jeedom.
 5. **AC5 — Lecture fiable** : jamais de décision sur une valeur mémorisée (magasin, topologie) : une valeur ancienne pourrait faire activer l'alarme dans un autre mode que celui demandé. Aucun libellé de mode ni valeur lue n'est journalisé.
 6. **AC6 — Regroupement des changements de l'alarme (écart 2)** : un événement d'une info d'alarme ne publie plus immédiatement ; il alimente le magasin et programme, si aucune n'est en attente pour ce topic, une publication unique après une courte fenêtre fixe (`ALARM_STATE_COALESCE_S`, 0,25 s) ; la publication calcule l'état depuis le magasin (dernières valeurs des quatre infos) et le publie en retained. Délai borné (fenêtre fixe depuis le premier événement, pas de report glissant).
-7. **AC7 — Non-régression du regroupement** : seuls les topics d'alarme sont regroupés, les autres types publient immédiatement comme avant ; un échec de publication reste un WARNING `mqtt_publish_failed` ; broker indisponible au moment de la publication → INFO `mqtt_unavailable` ; l'équipement dépublié entre-temps → rien publié ; le retour à `unknown` (payload `None`) suit la même règle qu'en 12.4 ; arrêt du démon : les publications en attente sont annulées proprement ; fenêtre à 0 = comportement immédiat d'avant.
+7. **AC7 — Non-régression du regroupement** : seuls les topics d'alarme sont regroupés, les autres types publient immédiatement comme avant ; un échec de publication reste un WARNING `mqtt_publish_failed` ; broker indisponible au moment de la publication → INFO `mqtt_unavailable` ; l'équipement dépublié entre-temps → rien publié ; le retour à `unknown` (payload `None`) suit la même règle qu'en 12.4 ; arrêt du démon : les publications en attente sont **publiées tout de suite** (vidage, `flush_pending_states`, avant l'arrêt du broker), puis un drapeau d'arrêt fait partir tout nouvel état d'alarme sans minuteur (revue M1, M2) ; `published: true` est rendu par anticipation pour un événement regroupé (docstring, revue M3) ; fenêtre à 0 = comportement immédiat d'avant.
 8. **AC8 — Tests** rouges puis verts : même mode désarmé, même mode armé, autre mode, mode inconnu / null, Actif illisible, lecture en échec, sans commande d'activation, sans configuration de mode ; regroupement (deux événements → une seule publication, état final ; autres types immédiats ; échec de publication journalisé). Suites pytest, flake8, PHP, Node (garde 25.4, lignes remplacées déclarées si besoin) vertes.
 9. **AC9 — Preuve terrain (hors session cloud, ClaudeBox / porteur du projet)** : sur la démo, alarme désarmée sur le mode X, armer X depuis HA → armée en X ; armer X une seconde fois → rien ; HA n'affiche plus l'ancien mode à l'armement.
+10. **AC10 — Pas d'armement d'une alarme déclenchée ou en délai d'entrée (décision du porteur du projet, 2026-11-23)** : avant tout armement (`ARM_HOME` / `ARM_AWAY` / `ARM_NIGHT`, par mode ou générique, plugin alarm ou virtuel), le démon relit Statut (`ALARM_STATE`) puis Immédiat (`immediatState`) par lecture fraîche. Statut = 1 → refus `alarm_arm_refused_triggered` ; Immédiat = 1 → refus `alarm_arm_refused_pending` ; lecture en échec, null ou illisible → refus `alarm_arm_refused_state_unreadable`. Refus = WARNING avec le code de raison, sans valeur ni libellé ; aucune commande envoyée ; le dernier état publié pendant le run est republié (retained) pour que HA garde ou retrouve l'état réel (rien de recalculé ni d'inventé ; rien publié pendant le run → rien). Une info absente de l'équipement (virtuel sans Statut, alarme sans Immédiat) n'est pas lue : ce n'est pas un échec. Le désarmement n'est pas concerné.
+    - **Pourquoi refuser quand la lecture échoue** : le plugin alarm remet le déclenchement à zéro à un changement de mode ; armer une alarme dont on ne sait pas si elle est déclenchée pourrait donc annuler un déclenchement sans code. Le refus ne coûte qu'un nouvel essai ; l'erreur inverse coûte la sécurité.
 
 ## UI Impact
 
@@ -72,7 +74,11 @@ Rattachement : **pe-epic-12** (FR49), suite directe de la story 12.4 (`12-4-alar
 - [x] Task 3 — Écart 2 (AC6, AC7) : `StateSynchronizer` — regroupement par topic d'alarme, publication différée, annulation à l'arrêt
 - [x] Task 4 — Tests verts, flake8, PHP, Node (garde 25.4)
 - [x] Task 5 — Documentation (`docs/fr_FR/index.md`, paragraphe alarme), sprint-status
+- [x] Task 7 — Corrections de la relecture indépendante de #420 et décision AC10 (voir « Review Findings »)
 - [ ] Task 6 — Preuve terrain AC9 (hors session cloud)
+  - [ ] relever la version de PHP de la box, la casse exacte du nom des commandes de mode et du libellé des clés Homebridge, et la valeur de `cmd::allowCheckState` (option `alreadyInState`) pour les commandes de mode (revue M4)
+  - [ ] armer X dans le mode X désarmé, réarmer X, vérifier l'absence d'ancien mode à l'armement
+  - [ ] AC10 : alarme déclenchée ou en délai d'entrée sur la démo, « Armer » depuis HA → refusé, HA garde l'état ; désarmer avec le code
 
 ## Dev Notes
 
@@ -130,8 +136,10 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, 2026-11-23).
   4. **Réponse à `/action/state_update`** : un événement d'alarme regroupé compte comme publié (`published: true`) ; le PHP ne lit pas cette réponse ; l'échec éventuel est journalisé en WARNING à la publication, comme avant.
   5. **Nom générique** `flush_pending_states` dans `main.py` : le test 12.4 « le code n'est jamais en ligne de commande » interdit le mot « alarm » dans `main.py`.
   6. **Tests 12.4** : fixture `_immediate_alarm_state` (fenêtre à 0) et lecture fraîche simulée en échec dans `_cmd_sync` (pas d'appel réseau) ; aucun test 12.4 retiré ni changé de sens.
+- Suites après la passe de relecture : pytest 3795 passés, 37 ignorés, 1 échec intermittent sans lien (`tests/unit/test_deploy_safety_rollback.py`, vert 3 fois sur 3 isolé, script de déploiement non touché) ; flake8 vert ; PHP 23 verts, `php -l` vert ; Node 1649 / 1652, les 3 échecs `25.4 AC8` préexistants (garde-fou périmé, PR séparée).
+- **Passe de relecture (#420) et AC10** : I1 (concordance libellé de clé / nom de la commande de mode visée), AC10 (refus d'armer une alarme déclenchée, en délai d'entrée ou illisible ; dernier état republié), M1 à M5. Les tests de 12.4 simulent maintenant Statut et Immédiat relus à 0 (sinon tout armement serait refusé, AC10) ; 29 tests de 12.5 rouges sur le commit précédent, 64 verts.
 - Latence ajoutée : armement par mode = une à deux lectures JSON-RPC (délai de requête du démon, 2 s par défaut, au pire) ; état d'alarme publié au plus 0,25 s après le premier changement.
-- Suites : pytest 3767 passés, 37 ignorés ; `flake8 resources/daemon tests` vert ; PHP : `php -l` vert sur tous les fichiers, 23 tests autonomes verts (3 exigent un vrai cœur Jeedom, ignorés comme en CI) ; Node 1652 tests, 1649 passés, 3 échecs préexistants (`test_story_25_4_ecritures_deplacees.node.test.js`, AC8 : rouge aussi sur `main` non modifié) ; garde 25.4 (AC31) : une ligne remplacée déclarée (`REPLACED_BY_12_5`).
+- Suites (premier passage) : pytest 3767 passés, 37 ignorés ; `flake8 resources/daemon tests` vert ; PHP : `php -l` vert sur tous les fichiers, 23 tests autonomes verts (3 exigent un vrai cœur Jeedom, ignorés comme en CI) ; Node 1652 tests, 1649 passés, 3 échecs préexistants (`test_story_25_4_ecritures_deplacees.node.test.js`, AC8 : rouge aussi sur `main` non modifié) ; garde 25.4 (AC31) : une ligne remplacée déclarée (`REPLACED_BY_12_5`).
 
 ### File List
 
@@ -150,7 +158,7 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, 2026-11-23).
 
 Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développement : pas de contexte neuf, écart à la recommandation du workflow), sur le diff `main...fix/alarm-arm-same-mode`.
 
-- AC1 à AC8 : implémentés, preuves dans `test_story_12_5_alarme_armement_meme_mode.py` (35 tests). AC9 terrain : hors session cloud.
+- AC1 à AC8 : implémentés, preuves dans `test_story_12_5_alarme_armement_meme_mode.py` (35 tests à cette revue ; 64 après la passe de relecture et AC10). AC9 terrain : hors session cloud.
 - File List conforme au diff git.
 
 ### Constats retenus (corrigés)
@@ -164,6 +172,18 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
 - [Low] Une republication (naissance HA, sync, « Publier ») pendant la fenêtre publie depuis le même magasin, puis la publication regroupée republie la même valeur : doublon sans effet.
 - [Low] Le cœur Jeedom pourrait aussi ignorer « Activer » si Actif valait déjà 1 : ce cas est exclu (Actif relu à 0 juste avant).
 
+## Review Findings (relecture indépendante de #420, 2026-11-23, verdict OK)
+
+- [x] [Review][Important] **I1** `sync/command.py` — la substitution par « Activer » ne vérifiait que le libellé de la clé SetMode* : une configuration Homebridge incohérente (clé Présent pointant vers la commande d'un autre mode) aurait armé dans le mauvais mode. Corrigé : la valeur relue de Mode, le libellé de la clé et le nom de la commande de mode visée doivent concorder (normalisés), sinon comportement de 12.4 ; incohérence détectée avant toute lecture du mode. Test `test_inconsistent_homebridge_configuration_keeps_the_12_4_behaviour`.
+- [x] [Review][Décision] **AC10** (porteur du projet) — refus de tout armement d'une alarme déclenchée ou en délai d'entrée, et quand Statut / Immédiat ne se relisent pas (choix sûr) ; WARNING sans valeur ; dernier état publié republié. `_alarm_arm_refusal`, `StateSynchronizer.republish_last_alarm_state`, 25 tests, `docs/fr_FR/index.md`.
+- [x] [Review][Minor] **M1** — texte d'AC7 aligné sur le code (vidage à l'arrêt, pas annulation).
+- [x] [Review][Minor] **M2** — drapeau d'arrêt posé par `flush_pending_states` : ensuite, publication immédiate (test).
+- [x] [Review][Minor] **M3** — docstring de `handle_state_message` : `published: true` anticipé pour un événement regroupé.
+- [x] [Review][Minor] **M4** — Task 6 (preuve terrain) : relever la version de PHP, la casse des noms de mode et `cmd::allowCheckState`.
+- [x] [Review][Minor] **M5** — marges des tests de fenêtre élargies (fenêtre de test 0,2 s ; test de fenêtre fixe à 0,3 s avec 75 ms de marge de chaque côté).
+- Hors périmètre (consigne du coordinateur) : les 3 échecs Node `25.4 AC8`, garde-fou périmé sur `main`, traités dans une PR séparée.
+
 ## Change Log
 
 - 2026-11-23 : création (create-story), développement (dev-story), revue (code-review) — session cloud déléguée.
+- 2026-11-23 : corrections de la relecture indépendante de #420 (I1, M1 à M5) et AC10 (décision du porteur du projet : pas d'armement d'une alarme déclenchée ou en délai d'entrée).

@@ -432,8 +432,11 @@ def _cmd_sync(mapping, state_sync=None):
                                jeedom_api_endpoint="http://127.0.0.1/core/api/jeeApi.php",
                                jeedom_core_apikey="core-apikey")
     sync._execute_exec_cmd = AsyncMock(return_value=True)
-    # Story 12.5 — lecture fraîche du mode avant un armement : en échec ici, comportement de 12.4.
-    sync._read_info_value = AsyncMock(return_value=(False, None))
+    # Story 12.5 — lectures fraîches avant un armement : Statut et Immédiat relus à 0 (armement
+    # permis) ; Mode et Actif en échec, donc comportement de 12.4 pour la commande envoyée.
+    sync._read_info_value = AsyncMock(
+        side_effect=lambda cmd_id: (True, "0") if cmd_id in (STATUS, IMMEDIATE, 72001) else (False, None)
+    )
     return sync, bridge
 
 

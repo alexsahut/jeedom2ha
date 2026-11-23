@@ -2,7 +2,10 @@
 
 Écart 1 : un armement dont le mode visé est déjà le mode courant de l'alarme désarmée exécute la
 commande d'activation (le cœur Jeedom ignore une commande de mode dont l'info liée est déjà dans
-l'état visé) ; déjà armée dans ce mode : rien ; autres cas : inchangé.
+l'état visé) ; déjà armée dans ce mode : rien ; autres cas : inchangé. Revue I1 : seulement si le
+libellé de la clé SetMode* est aussi le nom de la commande de mode visée.
+Décision du porteur du projet : aucun armement d'une alarme déclenchée ou en délai d'entrée (Statut
+ou Immédiat relus à 1), ni quand cette relecture échoue.
 Écart 2 : les changements des infos d'une alarme sont regroupés sur une courte fenêtre avant
 publication (une seule publication, état final).
 
@@ -21,14 +24,26 @@ from models.mapping import MappingResult, PublicationDecision, SensorCapabilitie
 from models.topology import JeedomCmd
 from sync import state as state_module
 from .test_story_12_4_alarme_etat_mode import (
-    ARMED, ENABLE, EQ, MODE, MODE_A, MODE_B, MODE_C, VIRTUAL,
+    ARMED, ENABLE, EQ, IMMEDIATE, MODE, MODE_A, MODE_B, MODE_C, STATUS, VIRTUAL,
     _Bridge, _alarm_eq, _cmd_sync, _map, _state_sync, _virtual_eq,
 )
 
 TOPIC = f"jeedom2ha/{EQ}/alarm/set"
 STATE_TOPIC = f"jeedom2ha/{EQ}/alarm/state"
 # Libellés de la story 12.4 : Présent « Mode Jour » (MODE_C), Absent « mode   total » (MODE_A),
-# Nuit « mode nuit » (MODE_B).
+# Nuit « mode nuit » (MODE_B). Comme dans le plugin alarm, chaque commande de mode porte le nom
+# de son mode (casse différente exprès : la comparaison est normalisée).
+MODE_NAMES = {MODE_C: "Mode Jour", MODE_A: "Mode Total", MODE_B: "Mode Nuit"}
+# Statut et Immédiat relus à 0 : armement permis (sauf valeur donnée par le test).
+SAFE = {STATUS: "0", IMMEDIATE: "0"}
+
+
+def _named_eq(names=None, **kwargs):
+    eq = _alarm_eq(**kwargs)
+    for cmd in eq.cmds:
+        if cmd.id in (names if names is not None else MODE_NAMES):
+            cmd.name = (names if names is not None else MODE_NAMES)[cmd.id]
+    return eq
 
 
 def _reader(values):
@@ -45,10 +60,15 @@ def _reader(values):
     return read
 
 
-def _sync_with_reads(values, eq=None):
-    sync, bridge = _cmd_sync(_map(eq if eq is not None else _alarm_eq()))
-    sync._read_info_value = _reader(values)
+def _sync_with_reads(values, eq=None, safe=True):
+    sync, bridge = _cmd_sync(_map(eq if eq is not None else _named_eq()))
+    sync._read_info_value = _reader({**SAFE, **values} if safe else dict(values))
     return sync, bridge
+
+
+def _mode_calls(sync):
+    """Lectures faites après le contrôle Statut / Immédiat."""
+    return [c for c in sync._read_info_value.calls if c not in (STATUS, IMMEDIATE)]
 
 
 # --- Écart 1 -----------------------------------------------------------------------------------
@@ -83,7 +103,7 @@ async def test_other_mode_sends_the_mode_command_unchanged(enable):
     sync, _bridge = _sync_with_reads({MODE: "mode nuit", ENABLE: enable})
     assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True
     sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
-    assert sync._read_info_value.calls == [MODE]  # Actif inutile quand le mode diffère
+    assert _mode_calls(sync) == [MODE]  # Actif inutile quand le mode diffère
 
 
 @pytest.mark.asyncio
@@ -114,9 +134,15 @@ async def test_unreadable_enable_sends_the_mode_command_unchanged(values):
 
 
 @pytest.mark.asyncio
-async def test_read_exception_sends_the_mode_command_unchanged():
-    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
-    sync._read_info_value = AsyncMock(side_effect=RuntimeError("boom"))
+async def test_mode_read_exception_sends_the_mode_command_unchanged():
+    sync, _bridge = _cmd_sync(_map(_named_eq()))
+
+    async def read(cmd_id):
+        if cmd_id in SAFE:
+            return True, SAFE[cmd_id]
+        raise RuntimeError("boom")
+
+    sync._read_info_value = read
     assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True
     sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
 
@@ -124,14 +150,14 @@ async def test_read_exception_sends_the_mode_command_unchanged():
 @pytest.mark.asyncio
 async def test_never_decides_on_a_stored_value():
     """Lecture fraîche en échec : la valeur de topologie (même mode, désarmée) n'est pas utilisée."""
-    sync, _bridge = _sync_with_reads({}, eq=_alarm_eq(enable="0", mode="Mode Jour"))
+    sync, _bridge = _sync_with_reads({}, eq=_named_eq(enable="0", mode="Mode Jour"))
     assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True
     sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
 
 
 @pytest.mark.asyncio
 async def test_same_mode_disarmed_without_enable_command_sends_the_mode_command_with_a_warning(caplog):
-    eq = _alarm_eq()
+    eq = _named_eq()
     eq.cmds = [c for c in eq.cmds if c.id != ARMED]
     sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "0"}, eq=eq)
     with caplog.at_level(logging.INFO):
@@ -142,26 +168,39 @@ async def test_same_mode_disarmed_without_enable_command_sends_the_mode_command_
 
 
 @pytest.mark.asyncio
-async def test_without_mode_configuration_nothing_is_read():
-    sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "0"}, eq=_alarm_eq(config={}))
-    assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is True
-    sync._execute_exec_cmd.assert_awaited_once_with(ARMED, {})
-    assert sync._read_info_value.calls == []
+@pytest.mark.parametrize("names,why", [
+    ({MODE_C: "Mode Total", MODE_A: "Mode Jour", MODE_B: "Mode Nuit"}, "clé Présent sur la commande d'un autre mode"),
+    ({MODE_C: "Cmd sans rapport", MODE_A: "Mode Total", MODE_B: "Mode Nuit"}, "nom de commande sans rapport"),
+])
+async def test_inconsistent_homebridge_configuration_keeps_the_12_4_behaviour(names, why):
+    """Revue I1 — le libellé de SetModePresent (« Mode Jour ») n'est pas le nom de la commande visée."""
+    sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "0"}, eq=_named_eq(names=names))
+    assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True, why
+    sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
+    assert _mode_calls(sync) == []  # incohérence vue avant toute lecture du mode
 
 
 @pytest.mark.asyncio
-async def test_without_mode_info_nothing_is_read():
-    eq = _alarm_eq()
+async def test_without_mode_configuration_reads_no_mode():
+    sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "0"}, eq=_named_eq(config={}))
+    assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(ARMED, {})
+    assert _mode_calls(sync) == []
+
+
+@pytest.mark.asyncio
+async def test_without_mode_info_reads_no_mode():
+    eq = _named_eq()
     eq.cmds = [c for c in eq.cmds if c.id != MODE]
     sync, _bridge = _sync_with_reads({ENABLE: "0"}, eq=eq)
     assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True
     sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
-    assert sync._read_info_value.calls == []
+    assert _mode_calls(sync) == []
 
 
 @pytest.mark.asyncio
 async def test_disarm_is_unchanged_and_reads_nothing():
-    sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "1"})
+    sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "1", STATUS: "1"})
     assert await sync.handle_command_message(TOPIC, "DISARM") is True
     assert sync._read_info_value.calls == []
 
@@ -177,10 +216,10 @@ async def test_same_mode_enable_failure_is_reported():
 @pytest.mark.asyncio
 async def test_generic_virtual_is_unchanged():
     sync, _bridge = _cmd_sync(_map(_virtual_eq()))
-    sync._read_info_value = _reader({})
+    sync._read_info_value = _reader({72001: "0"})
     assert await sync.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_AWAY") is True
     sync._execute_exec_cmd.assert_awaited_once_with(72003, {})
-    assert sync._read_info_value.calls == []
+    assert sync._read_info_value.calls == [72001]  # Statut seulement : le virtuel n'a pas d'Immédiat
 
 
 def test_alarm_enable_command_helper():
@@ -192,9 +231,86 @@ def test_alarm_enable_command_helper():
     assert alarm_enable_command({"ALARM_ARMED": info}) is None
 
 
+# --- Décision du porteur du projet : pas d'armement d'une alarme déclenchée ou en délai d'entrée ---
+
+def _refusal_sync(values, eq=None, published="triggered"):
+    """Commande + état : un état d'alarme déjà publié dans ce run, à republier après un refus."""
+    mapping = _map(eq if eq is not None else _named_eq())
+    state_sync, state_bridge, _decision = _state_sync(mapping)
+    if published is not None:
+        state_sync._alarm_published[STATE_TOPIC] = published
+    sync, bridge = _cmd_sync(mapping, state_sync=state_sync)
+    sync._read_info_value = _reader(values)
+    return sync, state_bridge
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", ["ARM_HOME", "ARM_AWAY", "ARM_NIGHT"])
+@pytest.mark.parametrize("values,reason,published", [
+    ({STATUS: "1", IMMEDIATE: "0"}, "alarm_arm_refused_triggered", "triggered"),
+    ({STATUS: "1"}, "alarm_arm_refused_triggered", "triggered"),          # Immédiat inutile
+    ({STATUS: "0", IMMEDIATE: "1"}, "alarm_arm_refused_pending", "pending"),
+    ({STATUS: "0"}, "alarm_arm_refused_state_unreadable", "pending"),     # Immédiat : lecture en échec
+    ({IMMEDIATE: "0"}, "alarm_arm_refused_state_unreadable", "triggered"),  # Statut : lecture en échec
+    ({STATUS: None, IMMEDIATE: "0"}, "alarm_arm_refused_state_unreadable", "triggered"),
+    ({STATUS: "0", IMMEDIATE: "abc"}, "alarm_arm_refused_state_unreadable", "pending"),
+])
+async def test_arming_a_triggered_or_pending_alarm_is_refused(payload, values, reason, published, caplog):
+    sync, state_bridge = _refusal_sync({**values, MODE: "Mode Jour", ENABLE: "0"}, published=published)
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert _mode_calls(sync) == []  # rien d'autre n'est lu
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1 and reason in warnings[0]
+    # ni valeur ni libellé dans le journal
+    assert "Jour" not in caplog.text and "abc" not in caplog.text
+    # HA retrouve l'état réel déjà publié (retained), rien d'inventé
+    assert [(t, p, r) for t, p, _q, r in state_bridge.published] == [(STATE_TOPIC, published, True)]
+
+
+@pytest.mark.asyncio
+async def test_refusal_with_no_published_state_publishes_nothing():
+    sync, state_bridge = _refusal_sync({STATUS: "1"}, published=None)
+    assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is False
+    assert state_bridge.published == []
+
+
+@pytest.mark.asyncio
+async def test_generic_arming_of_a_triggered_alarm_is_refused_too():
+    sync, _state_bridge = _refusal_sync({STATUS: "1"}, eq=_named_eq(config={}))
+    assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_virtual_triggered_is_refused_and_without_immediate_info_nothing_else_is_read(caplog):
+    sync, _bridge = _cmd_sync(_map(_virtual_eq()))
+    sync._read_info_value = _reader({72001: "1"})
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert "alarm_arm_refused_triggered" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_status_read_exception_refuses():
+    sync, _bridge = _cmd_sync(_map(_named_eq()))
+    sync._read_info_value = AsyncMock(side_effect=RuntimeError("boom"))
+    assert await sync.handle_command_message(TOPIC, "ARM_HOME") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_disarming_a_triggered_alarm_is_still_possible():
+    sync, _bridge = _refusal_sync({STATUS: "1"})
+    assert await sync.handle_command_message(TOPIC, "DISARM") is True
+    sync._execute_exec_cmd.assert_awaited_once()
+
+
 # --- Écart 2 : regroupement -------------------------------------------------------------------
 
-def _coalescing_sync(window=0.05, eq=None):
+def _coalescing_sync(window=0.2, eq=None):
     mapping = _map(eq if eq is not None else _alarm_eq(enable="0", mode="mode total"))
     sync, bridge, decision = _state_sync(mapping)
     sync.alarm_coalesce_s = window
@@ -212,20 +328,22 @@ async def test_arming_publishes_only_the_final_state():
     await asyncio.sleep(0.01)
     assert await sync.handle_state_message(EQ, MODE, "Mode Jour") is True
     assert bridge.published == []  # rien avant la fin de la fenêtre
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.35)
     assert [(t, p, r) for t, p, _q, r in bridge.published] == [(STATE_TOPIC, "armed_home", True)]
 
 
 @pytest.mark.asyncio
 async def test_window_is_fixed_from_the_first_event():
-    sync, bridge, _decision = _coalescing_sync(window=0.06)
+    sync, bridge, _decision = _coalescing_sync(window=0.3)
     await sync.handle_state_message(EQ, ENABLE, "1")
-    await asyncio.sleep(0.04)
+    await asyncio.sleep(0.15)
     await sync.handle_state_message(EQ, MODE, "Mode Jour")
-    await asyncio.sleep(0.04)  # 0,08 s après le premier événement : publié, pas reporté
+    # 0,38 s après le premier événement : publié (fenêtre fixe à 0,3 s) ; une fenêtre glissante
+    # n'aurait publié qu'à 0,45 s.
+    await asyncio.sleep(0.23)
     assert [p[1] for p in bridge.published] == ["armed_home"]
     await sync.handle_state_message(EQ, ENABLE, "0")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
     assert [p[1] for p in bridge.published] == ["armed_home", "disarmed"]
 
 
@@ -259,7 +377,7 @@ async def test_failed_publication_is_still_a_warning(caplog):
     sync._mqtt_bridge = _Failing()
     with caplog.at_level(logging.INFO):
         await sync.handle_state_message(EQ, ENABLE, "1")
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.35)
     failures = [r for r in caplog.records if r.levelno == logging.WARNING
                 and "mqtt_publish_failed" in r.getMessage()]
     assert len(failures) == 1 and STATE_TOPIC in failures[0].getMessage()
@@ -275,7 +393,7 @@ async def test_an_exception_at_flush_is_a_warning(caplog):
     sync._mqtt_bridge = _Raising()
     with caplog.at_level(logging.INFO):
         await sync.handle_state_message(EQ, ENABLE, "1")
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.35)
     assert any(r.levelno == logging.WARNING and "mqtt_publish_failed" in r.getMessage() for r in caplog.records)
 
 
@@ -285,7 +403,7 @@ async def test_broker_down_at_flush_publishes_nothing(caplog):
     await sync.handle_state_message(EQ, ENABLE, "1")
     bridge.is_connected = False
     with caplog.at_level(logging.INFO):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.35)
     assert bridge.published == []
     assert "mqtt_unavailable" in caplog.text
 
@@ -295,7 +413,7 @@ async def test_unpublished_meanwhile_publishes_nothing():
     sync, bridge, _decision = _coalescing_sync()
     await sync.handle_state_message(EQ, ENABLE, "1")
     sync._app["publications"].clear()
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.35)
     assert bridge.published == []
 
 
@@ -303,11 +421,11 @@ async def test_unpublished_meanwhile_publishes_nothing():
 async def test_unknown_is_still_published_once():
     sync, bridge, _decision = _coalescing_sync()
     await sync.handle_state_message(EQ, ENABLE, "1")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.35)
     await sync.handle_state_message(EQ, ENABLE, None)
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.35)
     await sync.handle_state_message(EQ, MODE, "mode nuit")
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.35)
     assert [p[1] for p in bridge.published] == ["armed_away", "None"]
 
 
@@ -321,6 +439,16 @@ async def test_shutdown_flushes_the_pending_state_now():
     await asyncio.sleep(0.01)
     sync.flush_pending_states()  # plus rien en attente
     assert [p[1] for p in bridge.published] == ["armed_night"]
+
+
+@pytest.mark.asyncio
+async def test_after_the_shutdown_flush_alarm_states_are_published_at_once():
+    """Revue M2 — après le vidage de l'arrêt, plus aucun minuteur : publication immédiate."""
+    sync, bridge, _decision = _coalescing_sync(window=5.0)
+    sync.flush_pending_states()
+    await sync.handle_state_message(EQ, ENABLE, "1")
+    assert [p[1] for p in bridge.published] == ["armed_away"]
+    assert sync._alarm_pending == {}
 
 
 @pytest.mark.asyncio
