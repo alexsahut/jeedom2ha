@@ -267,6 +267,35 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
 
 **Issue :** aucun constat High ; Medium corrigés. Statut laissé à `review` et non `ready-for-UX-validation` / `done` : AC8 (preuve terrain) n'est pas faite, et la définition de `done` du `sprint-status.yaml` exige la preuve terrain pour un changement de publication HA ; l'UI touchée (bloc « Alarme ») passera ensuite par `ready-for-UX-validation`.
 
+## Review Findings
+
+### Revue Codex et relecture indépendante (2026-11-23) — aucun P1, tous corrigés (AC9, Task 10)
+
+- [x] [Codex][P2] Virtuel à `ALARM_STATE` seul : 1 → 0 donnait `None`, rien publié, HA restait sur `triggered` (retenu). Règle générale : état devenu inconnu après un état publié (ou encore inconnu après un redémarrage) → payload `None` retenu [sync/state.py]
+- [x] [Relecture] Code stocké mais illisible : le démon partait sans code (désarmable sans code). Indicateur `alarm_disarm_code_unreadable`, refus de tout DISARM, discovery qui exige le code, warning PHP sans valeur [core/php/jeedom2ha_alarm.php, core/class/jeedom2ha.class.php, sync/alarm_code.py, sync/command.py, transport/http_server.py]
+- [x] [Relecture] Aucune limite d'essais : verrou de 5 minutes après 5 codes faux, par équipement, horloge injectable [sync/alarm_code.py, sync/command.py]
+- [x] [Relecture] Code libre : 4 à 8 chiffres, PHP et JS, `REMOTE_CODE` gardé [core/php/jeedom2ha_alarm.php, plugin_info/configuration.php]
+- [x] [Relecture] Doc inexacte (« n'apparaît ni dans les messages MQTT ») : HA envoie le code en clair, sans retain, sur le topic de commande ; ACL et TLS recommandés [docs/fr_FR/index.md]
+- [x] [Relecture] Redémarrage du démon requis non signalé dans la page : avis à trois cas [plugin_info/configuration.php]
+- [x] [Relecture] Deux clés Homebridge au même libellé : WARNING au mapping, comportement inchangé [mapping/alarm_control_panel.py]
+
+### `bmad-code-review` de la passe de corrections (diff `623e0bf..892433e`, 2026-11-23)
+
+Même session que les corrections (pas de contexte neuf ni d'autre modèle : écart à la recommandation du workflow, comme à la première revue). File List conforme au diff ; Tasks 10.x vérifiées dans le code et les tests ; AC9 implémenté. Aucun constat High.
+
+Retenus (corrigés dans cette passe) :
+
+- [x] [AI-Review][Medium] Après « Sauvegarder » du cœur (et non le parcours guidé), le code saisi restait en clair dans le champ (classe `configKey` comprise) et l'avis de redémarrage dépendait du champ. Le cœur appelle `window.jeedom2ha_postSaveConfiguration` après un enregistrement réussi (`desktop/js/plugin.js`, `savePluginConfig`, cœur `32ce257`) : le code quitte la page, le statut est mis à jour, et l'avis « redémarrage requis » reste affiché jusqu'au parcours guidé (qui redémarre le démon) [plugin_info/configuration.php]
+- [x] [AI-Review][Medium] `trim()` de JavaScript retire plus de blancs que `trim()` de PHP (espace insécable, espaces Unicode) : un code « 1234 » suivi d'une espace insécable passait le contrôle JS puis faisait échouer l'enregistrement côté PHP (et l'arrêtait en cours de boucle `addKey`). Le JS retire maintenant exactement les mêmes caractères que PHP [plugin_info/configuration.php]
+
+Écartés (avec raison) :
+
+- [Low] Le WARNING de doublon de libellé revient à chaque synchronisation : c'est le moment où le mapping est recalculé, comme les autres constats de mapping ; une seule ligne par alarme concernée, rien à mémoriser entre synchros.
+- [Low] La publication de `None` compte dans le nombre d'états publiés (sync, « Publier ») : c'est bien une publication sur le topic d'état, et le compteur sert au diagnostic, pas à une promesse d'état connu.
+- [Low] Le verrou d'essais est par équipement, sans plafond global : une installation a une ou deux alarmes ; quelqu'un qui peut publier sur le topic de commande peut aussi y lire le code (d'où la recommandation ACL/TLS), le verrou freine seulement l'essai à l'aveugle depuis HA.
+- [Low] Verrou et compteur en mémoire, perdus au redémarrage du démon : le démon relit alors le code ; un redémarrage demande l'accès à Jeedom, hors de portée d'un essai depuis HA.
+- [Info] Code illisible sans broker configuré : le démon ne reçoit rien (limite déjà notée : sans broker, rien n'est publié ni commandé).
+
 ## Change Log
 
 - 2026-11-23 — Story créée (`bmad-create-story`, session cloud déléguée) à partir des règles 1 à 7 du porteur du projet (23/11) ; `ready-for-dev`. Ultimate context engine analysis completed - comprehensive developer guide created.
@@ -274,3 +303,4 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
 - 2026-11-23 — Story renumérotée 24.18 → 12.4 et rangée sous `pe-epic-12` (epic qui porte FR49), sur consigne du coordinateur.
 - 2026-11-23 — Code review (`bmad-code-review`) : 4 constats corrigés, 5 écartés (voir ci-dessus) ; statut `review` en attente de la preuve terrain.
 - 2026-11-23 — Corrections de revue (Codex P2 + relecture indépendante, AC9) : fusion de `origin/main`, retour à `unknown` (payload `None`), code illisible refusé, limite d'essais, code de 4 à 8 chiffres, doc (code en clair sur le topic de commande, ACL, TLS), avis de redémarrage, WARNING de doublon de libellé ; statut `review`.
+- 2026-11-23 — `bmad-code-review` de la passe de corrections : 2 constats Medium corrigés (code laissé dans la page après « Sauvegarder » du cœur, `trim` JS ≠ PHP), 5 écartés ; statut `review` (AC8 terrain toujours à faire).

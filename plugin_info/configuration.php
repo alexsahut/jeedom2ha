@@ -327,7 +327,8 @@ function j2haNormalizeMqttConfiguration(configuration) {
 // n'est pas coché : une saisie vide garde le code actuel, comme le mot de passe MQTT. Le code n'est jamais affiché, ni écrit
 // dans la console. Revue de 12.4 : 4 à 8 chiffres, espaces de début et de fin retirés (même règle que le PHP).
 function j2haAlarmCodeText(value) {
-  return String(value === undefined || value === null ? '' : value).trim();
+  // Mêmes caractères retirés que trim() de PHP (espace, \t, \n, \r, \0, \x0B) : un code accepté ici l'est aussi côté serveur.
+  return String(value === undefined || value === null ? '' : value).replace(/^[ \t\n\r\0\x0B]+|[ \t\n\r\0\x0B]+$/g, '');
 }
 function j2haAlarmCodeIsValid(value) {
   return /^[0-9]{4,8}$/.test(j2haAlarmCodeText(value));
@@ -662,6 +663,8 @@ $(function() {
 
   // ---- FR49 (CC-64) : code de désarmement de l'alarme ----
   var j2haAlarmCodeAlreadySet = <?php echo $j2haAlarmCodeSet ? 'true' : 'false'; ?>;
+  // Avis gardé après un « Sauvegarder » du cœur : enregistré, mais le démon n'a pas redémarré.
+  var j2haAlarmCodePendingRestart = '';
   function j2haSyncAlarmCodeField() {
     var clear = $('#cb_alarmDisarmCodeClear').is(':checked');
     var $code = $('#in_alarmDisarmCode');
@@ -671,15 +674,18 @@ $(function() {
     $code.prop('disabled', clear).toggleClass('configKey', j2haAlarmCodeIsSaved($code.val(), clear));
     $('#span_alarmDisarmCodeInvalid').toggle(j2haAlarmCodeIsRejected($code.val(), clear));
     // Revue de 12.4 : le démon ne lit le code qu'à son démarrage ; l'avis dit quoi faire et ce qui vaut d'ici là.
-    var notice = j2haAlarmCodeRestartNotice($code.val(), clear, j2haAlarmCodeAlreadySet);
+    var notice = j2haAlarmCodeRestartNotice($code.val(), clear, j2haAlarmCodeAlreadySet) || j2haAlarmCodePendingRestart;
     $('[data-j2ha-alarm-restart]').each(function() {
       $(this).toggle($(this).attr('data-j2ha-alarm-restart') === notice);
     });
     $('#div_alarmDisarmCodeRestart').toggle(notice !== '');
   }
-  // Après « Tester, enregistrer et redémarrer le démon » : le code enregistré quitte le formulaire, le retrait est acquis.
-  window.j2haAlarmCodeAfterSave = function() {
+  // Enregistrement acquis : le code enregistré quitte le formulaire, le retrait est acquis. `restarted` : le démon redémarre
+  // juste après (parcours guidé) ; sinon (« Sauvegarder » du cœur) l'avis de redémarrage reste affiché.
+  function j2haAlarmCodeSaved(restarted) {
     var $code = $('#in_alarmDisarmCode');
+    var pending = j2haAlarmCodeRestartNotice($code.val(), $('#cb_alarmDisarmCodeClear').is(':checked'), j2haAlarmCodeAlreadySet);
+    j2haAlarmCodePendingRestart = restarted ? '' : (pending || j2haAlarmCodePendingRestart);
     if ($code.hasClass('configKey')) {
       $code.val('').removeClass('configKey');
       j2haAlarmCodeAlreadySet = true;
@@ -690,7 +696,12 @@ $(function() {
       $('#span_alarmDisarmCodeStatus, #div_alarmDisarmCodeClear').hide();
     }
     j2haSyncAlarmCodeField();
-  };
+  }
+  // Après « Tester, enregistrer et redémarrer le démon ».
+  window.j2haAlarmCodeAfterSave = function() { j2haAlarmCodeSaved(true); };
+  // Après « Sauvegarder » du cœur (desktop/js/plugin.js appelle window[<plugin>_postSaveConfiguration]) : le code ne reste
+  // pas dans la page, et l'avis « redémarrage requis » reste affiché tant que le démon n'a pas redémarré.
+  window.jeedom2ha_postSaveConfiguration = function() { j2haAlarmCodeSaved(false); };
   $('#in_alarmDisarmCode').on('input keyup change', j2haSyncAlarmCodeField);
   $('#cb_alarmDisarmCodeClear').on('change', j2haSyncAlarmCodeField);
 

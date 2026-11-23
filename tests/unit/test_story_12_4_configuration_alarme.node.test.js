@@ -52,6 +52,10 @@ test('12.4 revue — j2haAlarmCodeIsValid / IsRejected : 4 à 8 chiffres, messag
   assert.equal(ctx.j2haAlarmCodeIsRejected('12a4', false), true);
   assert.equal(ctx.j2haAlarmCodeIsRejected('12a4', true), false, '« Retirer le code » coché : le champ est ignoré');
   assert.equal(ctx.j2haAlarmCodeIsRejected('1234', false), false);
+  // Revue (2e passe) : mêmes blancs retirés que trim() de PHP ; une espace insécable n'en fait pas partie.
+  assert.equal(ctx.j2haAlarmCodeIsValid('\t1234\r\n\u000B'), true);
+  assert.equal(ctx.j2haAlarmCodeIsValid('1234\u00a0'), false);
+  assert.equal(ctx.j2haAlarmCodeIsValid('\u20031234'), false);
 });
 
 test('12.4 revue — j2haAlarmCodeRestartNotice : avis de redémarrage pour chaque changement en attente', () => {
@@ -229,5 +233,29 @@ test('12.4 revue réel — après « enregistrer et redémarrer », le code quit
     await page.evaluate(() => window.j2haAlarmCodeAfterSave());
     assert.equal(await page.locator('#in_alarmDisarmCode').inputValue(), '13a7');
     assert.equal(await page.locator('#span_alarmDisarmCodeInvalid').isVisible(), true);
+  });
+});
+
+test('12.4 revue réel — après « Sauvegarder » du cœur : le code quitte la page, l\'avis de redémarrage reste', async (t) => {
+  await withPage(t, { config: {} }, async (page) => {
+    await page.locator('#in_alarmDisarmCode').fill('2468');
+    await page.evaluate(() => window.jeedom2ha_postSaveConfiguration());
+    assert.equal(await page.locator('#in_alarmDisarmCode').inputValue(), '');
+    assert.equal(await page.locator('.configKey[data-l1key=alarmDisarmCode]').count(), 0);
+    assert.equal(await page.locator('#span_alarmDisarmCodeStatus').isVisible(), true);
+    assert.equal(await page.locator('[data-j2ha-alarm-restart]:visible').getAttribute('data-j2ha-alarm-restart'), 'first');
+    // Puis « Tester, enregistrer et redémarrer » : le démon redémarre, l'avis disparaît.
+    await page.evaluate(() => window.j2haAlarmCodeAfterSave());
+    assert.equal(await page.locator('#div_alarmDisarmCodeRestart').isVisible(), false);
+  });
+});
+
+test('12.4 revue réel — retrait enregistré par « Sauvegarder » : la case se décoche, l\'avis de retrait reste', async (t) => {
+  await withPage(t, { config: { alarmDisarmCode: SENTINEL } }, async (page) => {
+    await page.locator('#cb_alarmDisarmCodeClear').check();
+    await page.evaluate(() => window.jeedom2ha_postSaveConfiguration());
+    assert.equal(await page.locator('#cb_alarmDisarmCodeClear').isChecked(), false);
+    assert.equal(await page.locator('#span_alarmDisarmCodeStatus').isVisible(), false);
+    assert.equal(await page.locator('[data-j2ha-alarm-restart]:visible').getAttribute('data-j2ha-alarm-restart'), 'clear');
   });
 });
