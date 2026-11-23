@@ -19,7 +19,7 @@ L'écran du plugin ne porte pas de phrase d'aide : un état s'y lit à sa couleu
    - [La pièce et la fiche](#la-pièce-et-la-fiche) · [Corriger le type](#corriger-le-type) · [Choisir ce qui est publié](#choisir-ce-qui-est-publié) ([Exclure une pièce](#exclure-une-pièce))
    - [Les scénarios](#les-scénarios) · [Configuration](#configuration) · [Vérifier l'installation](#vérifier-linstallation) · [Le guide de démarrage](#le-guide-de-démarrage)
 6. [Ce que le plugin publie, ce qu'il ne publie pas, et pourquoi](#ce-que-le-plugin-publie-ce-quil-ne-publie-pas-et-pourquoi)
-   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures) · [Modes](#modes-listes-de-choix) · [Santé de Jeedom](#santé-de-jeedom)
+   - [Ce que le plugin sait publier](#ce-que-le-plugin-sait-publier) · [Limites](#limites--état-réel-des-lumières-et-des-volets) · [Portails](#portails-et-portes-de-garage) · [Vannes](#vannes-darrosage) · [Thermostats](#thermostats) · [Serrures](#serrures) · [Alarmes](#alarmes) · [Modes](#modes-listes-de-choix) · [Santé de Jeedom](#santé-de-jeedom)
    - [Les causes de blocage](#les-causes-de-blocage) · [Les conseils](#les-conseils)
 7. [Les états et les compteurs](compteurs.md) — le détail des chiffres (page séparée).
 8. [Dépannage](#dépannage)
@@ -328,6 +328,7 @@ Indiquez le broker que Home Assistant utilise déjà : « Hôte MQTT » (adresse
 - La configuration ne règle pas ce qui est publié : le lien **« Choisir ce qui est publié »** (↗) ouvre la page du plugin sur le panneau [Choisir ce qui est publié](#choisir-ce-qui-est-publié).
 - **« Avancé »** (replié) contient « Réinitialiser le formulaire », qui vide les champs du broker sans rien enregistrer.
 - **« Santé de Jeedom »** : la case « Publier la santé de Jeedom » (décochée par défaut) publie l'appareil décrit dans [Santé de Jeedom](#santé-de-jeedom).
+- **« Alarme »** : le champ « Code de désarmement » (facultatif) décrit dans [Alarmes](#alarmes).
 - « cron5 désactivé : mises à jour manuelles » s'affiche seulement si la tâche cron5 est décochée dans le bloc « Fonctionnalités » de Jeedom : les changements d'activation et d'exclusion attendent alors un « Relire Jeedom ».
 
 ### Vérifier l'installation
@@ -377,7 +378,7 @@ Le plugin publie dix types d'entités Home Assistant. Le type est choisi à part
 | Capteur binaire (`binary_sensor`) | Informations binaires (ouvert/fermé, présence, fumée…). |
 | Bouton (`button`) | Actions ponctuelles sans valeur, et **scénarios Jeedom** (un bouton par scénario, grisé quand le scénario est désactivé). |
 | Thermostat (`climate`) | Thermostats : température, consigne, mode, presets et chauffe en cours ; consigne, arrêt et presets pilotables (voir [Thermostats](#thermostats)). |
-| Alarme (`alarm_control_panel`) | Alarmes : état armé/désarmé et commandes pour armer et désarmer. |
+| Alarme (`alarm_control_panel`) | Alarmes : état réel (désarmée, armée selon le mode, délai d'entrée, déclenchée), armement par mode et désarmement, code de désarmement facultatif (voir [Alarmes](#alarmes)). |
 | Vanne (`valve`) | Vannes d'arrosage et robinets : ouvrir, fermer et état réel, une vanne par zone (voir [Vannes d'arrosage](#vannes-darrosage)). |
 | Serrure (`lock`) | Serrures : verrouiller, déverrouiller et état réel (voir [Serrures](#serrures)). |
 
@@ -508,6 +509,44 @@ Une info texte de Jeedom dont la valeur est posée par **au moins deux actions**
 - **En ajout seulement** : la liste s'ajoute aux entités de l'équipement, sans en remplacer ni en changer aucune. L'interrupteur, les capteurs ou les boutons gardent leurs identifiants et leurs topics.
 - **Voie manuelle** : quand un seul côté est reconnu, « Corriger le type » complète l'autre, et l'aperçu montre la liste avant d'enregistrer. Sur une info texte dont les actions portent déjà le type `MODE_SET_STATE`, il propose **« Mode (état) »** ; sur une action d'un équipement dont l'info porte déjà `MODE_STATE` (ou a reçu « Mode (état) »), il propose **« Mode (commande) »**, action par action (la liste gagne un choix à chaque action). Une commande sans équivalent dans Home Assistant garde ce lien dans la liste repliée des commandes ignorées (« Mode (état)… », « Mode (commande)… »). Quand ni l'info ni les actions ne sont reconnues, rien n'est proposé. Ce réglage reste dans le plugin : **les types génériques de Jeedom ne sont jamais modifiés** (ils servent aussi à Homebridge et HomeKit).
 - Identifiant de l'entité : `select.jeedom2ha_<équipement>_select_<info d'état>` (un espace de noms propre : il ne peut pas rencontrer celui d'un capteur).
+
+### Alarmes
+
+Un équipement Jeedom qui porte l'état d'une alarme (`ALARM_ENABLE_STATE` ou `ALARM_STATE`, en binaire) est publié comme une **alarme** (`alarm_control_panel`). Le plugin « Alarme » de Jeedom et un virtuel générique (`ALARM_ENABLE` / `ALARM_DISABLE`) sont pris en charge.
+
+**État affiché dans Home Assistant**, calculé dans cet ordre, comme le plugin Homebridge (parité avec HomeKit) :
+
+| Condition | État |
+|---|---|
+| « Statut » (`ALARM_STATE`) vaut 1 | **déclenchée** (`triggered`) |
+| « Actif » (`ALARM_ENABLE_STATE`) vaut 0 | **désarmée** (`disarmed`) |
+| « Immédiat » du plugin « Alarme » vaut 1 (délai d'entrée en cours) | **en attente** (`pending`) |
+| le libellé du « Mode » (`ALARM_MODE`) est celui de la clé HomeKit « Présent » / « Absent » / « Nuit » | **armée (présent)** `armed_home` / **armée (absent)** `armed_away` / **armée (nuit)** `armed_night` |
+| tout autre mode, ou aucune clé HomeKit | **armée (absent)** `armed_away`, comme HomeKit |
+
+- Le libellé du mode est comparé sans tenir compte des majuscules ni des espaces en trop.
+- Tant que « Actif » n'a jamais été lu, ou s'il devient illisible, l'état est **inconnu** (`unknown`) : rien n'est inventé, et un état affiché auparavant est effacé. De même pour un virtuel qui n'a que « Statut » : déclenchée quand il vaut 1, inconnue sinon. Le délai de sortie n'a pas de signal dans Jeedom : l'état « armement en cours » n'est jamais affiché.
+- L'état est publié à la relecture de Jeedom, à chaque changement de l'une de ces quatre informations, au retour de Home Assistant et à la reconnexion au broker.
+
+**Armer et désarmer.** Les modes proposés sont ceux que vous avez associés à HomeKit dans le plugin Homebridge (clés « Présent », « Absent » et « Nuit » de l'équipement d'alarme, au format « numéro de commande | libellé »). Le plugin les lit sans jamais les modifier.
+
+- « Armer (présent) », « Armer (absent) » et « Armer (nuit) » lancent la commande de mode associée (dans le plugin « Alarme », lancer un mode arme l'alarme). Une commande n'est retenue que si elle appartient à l'équipement et porte le type « Mode alarme » (`ALARM_SET_MODE`) ; Home Assistant ne propose que les armements retenus.
+- Sans aucun mode associé, « Armer (absent) » envoie l'ordre d'armement de l'équipement (`ALARM_ARMED`, ou `ALARM_ENABLE` pour un virtuel).
+- « Désarmer » envoie `ALARM_RELEASED` (plugin « Alarme ») ou `ALARM_DISABLE` (virtuel).
+- Pas d'état supposé : Home Assistant attend l'état relu dans Jeedom.
+
+**Code de désarmement (facultatif).** Dans la [configuration](#configuration), bloc « Alarme », le champ **« Code de désarmement »** :
+
+- le code compte **4 à 8 chiffres** (pavé numérique dans Home Assistant) ; les espaces au début et à la fin sont retirés. Tout autre code est refusé avec un message, et le code déjà enregistré ne change pas ;
+- avec un code, Home Assistant le demande pour **désarmer** ; l'armement reste libre. Un code faux ou absent est refusé, et le journal du démon le dit, sans jamais écrire le code ;
+- **5 codes faux** de suite pour une même alarme bloquent son désarmement depuis Home Assistant pendant **5 minutes** (même avec le bon code) ; le compteur repart de zéro au premier bon code ou à la fin du blocage ;
+- le code est enregistré chiffré et n'est jamais réaffiché (« Code déjà configuré » le dit). Il n'apparaît ni dans les journaux, ni dans la configuration publiée vers Home Assistant (la discovery ne dit que « un code est demandé »), ni dans l'état retenu de l'alarme. **En revanche, au moment du désarmement, Home Assistant envoie le code saisi en clair, sans retain, sur le topic de commande** `jeedom2ha/<équipement>/alarm/set` : un client qui écoute ce topic sur le broker peut le lire ;
+- protégez donc le broker : **des ACL** pour que seul Home Assistant puisse publier sur `jeedom2ha/+/alarm/set` (et que les autres clients ne puissent pas s'y abonner), et **TLS** pour chiffrer les échanges avec le broker ;
+- si le code enregistré ne peut plus être déchiffré, le démon refuse tout désarmement depuis Home Assistant (Home Assistant continue de demander un code) et le journal du plugin le signale : ressaisissez le code ;
+- champ vide à l'enregistrement : le code actuel est conservé ; **« Retirer le code »** l'efface ;
+- le démon ne lit le code **qu'à son démarrage** : **redémarrez-le** après avoir enregistré ou retiré le code (la page de configuration le rappelle). Tant qu'il n'a pas redémarré, l'ancien réglage s'applique : après un premier code, l'alarme reste désarmable sans code.
+
+- Identifiant de l'entité : `alarm_control_panel.jeedom2ha_<équipement>` (inchangé).
 
 ### Santé de Jeedom
 

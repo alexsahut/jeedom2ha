@@ -81,6 +81,7 @@ from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from discovery.system_health import SystemHealthPublisher  # story/system-health
 from cache.disk_cache import save_publications_cache
+from sync.alarm_code import alarm_code_configured, set_alarm_code  # FR49 (CC-64)
 from export.decision_export import (
     DecisionMemo,
     build_decision_export,
@@ -1496,7 +1497,35 @@ async def _republish_all_from_cache_body(app: web.Application, reason: str) -> N
                 )
             await asyncio.sleep(delay)
 
+        # FR49 / CC-08 — l'état d'une alarme est republié après sa discovery (birth HA,
+        # reconnexion au broker) : un broker sans persistance l'aurait perdu.
+        await _republish_alarm_state(app, decision, eq_id, reason)
+
     await _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason)
+
+
+async def _republish_alarm_state(app, decision, eq_id: int, reason: str) -> None:
+    """FR49 / CC-08 — republie l'état des alarmes publiées de cet équipement (aucun autre type)."""
+    mapping = getattr(decision, "mapping_result", None)
+    candidates = [mapping, *(getattr(mapping, "additional_mappings", None) or [])] if mapping is not None else []
+    if not any(getattr(c, "ha_entity_type", None) == "alarm_control_panel" for c in candidates):
+        return
+    state_sync = app.get("state_synchronizer")
+    republish = getattr(state_sync, "republish_alarm_states_counted", None)
+    if not callable(republish):
+        return
+    try:
+        count, failed = await republish(decision)
+        if failed:
+            # Revue Codex de 12.4 — comme un échec de discovery republiée : ERROR, jamais avalé.
+            _LOGGER.error(
+                "[SYNC-STATE] eq_id=%d : republication de l'état d'alarme échouée (reason=%s, %d échec(s))",
+                eq_id, reason, failed,
+            )
+            return
+        _LOGGER.info("[SYNC-STATE] eq_id=%d : état d'alarme republié (reason=%s, %d)", eq_id, reason, count)
+    except Exception as exc:
+        _LOGGER.error("[SYNC-STATE] eq_id=%d : republication de l'état d'alarme échouée — %s", eq_id, exc)
 
 
 def _scenario_republish_entries(app) -> list:
@@ -1859,6 +1888,18 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     data = await request.json()
     # Envelope format: params may be under "payload" key (callDaemon wrapping)
     params = data.get("payload", data)
+    # FR49 (CC-64) — le code de désarmement de l'alarme voyage dans ce corps local (protégé par
+    # le secret local), jamais en ligne de commande. Il est retiré des réglages du broker, gardé
+    # en mémoire seulement (sync.alarm_code), jamais journalisé. Absent ou vide : pas de code.
+    params = dict(params)
+    # Revue de 12.4 : « code configuré mais illisible » (déchiffrement en échec côté PHP) ->
+    # la discovery exige toujours le code et tout DISARM venant de HA est refusé.
+    code_unreadable = params.pop("alarm_disarm_code_unreadable", False) is True
+    set_alarm_code(params.pop("alarm_disarm_code", None), unreadable=code_unreadable)
+    if code_unreadable:
+        _LOGGER.warning("[ALARM] Code de désarmement configuré mais illisible : tout désarmement depuis HA sera refusé")
+    else:
+        _LOGGER.info("[ALARM] Code de désarmement %s", "configuré" if alarm_code_configured() else "non configuré")
     host = params.get("host", "")
     if not host:
         return web.json_response({
@@ -5060,6 +5101,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 continue
         if coerced:
             fresh_values = coerced
+    # FR49 (12.4, revue Codex) — infos d'alarme LUES à null au clic (le relais PHP omet les null de
+    # `current_values`) : sans cette liste, « lu à null » et « non lu » se confondent.
+    alarm_read_null = _parse_click_null_reads(body.get("current_values_null"))
 
     # Validation — intention
     if intention not in _INTENTIONS_VALIDES:
@@ -5555,6 +5599,17 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 # inconditionnellement (I11, un secondaire peut être publié sous un principal
                 # refusé) dès qu'il y a une valeur fraîche à publier.
                 click_publish_failed = False
+                # FR49 (12.4, revue Codex) — la lecture au clic des infos d'alarme alimente leur
+                # magasin, broker connecté ou non ; si seules des infos d'alarme ont été lues (à
+                # null), l'état de l'alarme est republié depuis ce magasin.
+                alarm_state_sync = request.app.get("state_synchronizer")
+                if alarm_state_sync is not None and callable(getattr(alarm_state_sync, "record_alarm_click_reads", None)) \
+                        and (fresh_values is not None or alarm_read_null):
+                    alarm_state_sync.record_alarm_click_reads(decision, fresh_since, fresh_values, alarm_read_null)
+                    if fresh_values is None and mqtt_bridge and mqtt_bridge.is_connected:
+                        # Revue Codex de 12.4 — échecs comptés comme sur le chemin des valeurs lues.
+                        _alarm_published, alarm_failed_count = await alarm_state_sync.publish_alarm_click_states(decision)
+                        click_publish_failed = alarm_failed_count > 0
                 if fresh_values is not None:
                     state_sync = request.app.get("state_synchronizer")
                     if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
@@ -5739,6 +5794,21 @@ def _normalize_state_update_body(body: Any) -> Dict[str, Any]:
     if isinstance(wrapped, dict) and ("eq_id" in wrapped or "cmd_id" in wrapped):
         return wrapped
     return body
+
+
+def _parse_click_null_reads(raw: Any) -> frozenset:
+    """FR49 (12.4) — ids de `current_values_null` (liste d'entiers) ; tout autre contenu est ignoré."""
+    if not isinstance(raw, list):
+        return frozenset()
+    ids = set()
+    for item in raw:
+        if isinstance(item, bool):
+            continue
+        try:
+            ids.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return frozenset(ids)
 
 
 async def _handle_action_state_update(request: web.Request) -> web.Response:

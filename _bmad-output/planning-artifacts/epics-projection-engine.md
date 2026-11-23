@@ -1895,6 +1895,9 @@ Story de maintenance documentaire ajoutée par `sprint-change-proposal-2026-06-2
 - Les rétrospectives `pe-epic-11-retro-2026-06-22.md` et `pe-epic-12-retro-2026-06-22.md` existent et citent les preuves terrain/Git principales.
 - `sprint-status.yaml` suit la story 12.3 jusqu'à `done`, puis `pe-epic-12` revient à `done`.
 
+### Story 12.4 — Alarme : diffuser l'état vers HA et armer par mode (vague `alarm_control_panel`, FR49, CC-64)
+Ajoutée le 2026-11-23 (epic rouvert), règles validées par le porteur du projet le 23/11. État HA `disarmed` / `armed_home` / `armed_away` / `armed_night` / `pending` / `triggered` recalculé depuis Statut (`ALARM_STATE`), Actif (`ALARM_ENABLE_STATE`), Immédiat (logicalId `immediatState` du plugin alarm) et Mode (`ALARM_MODE`), diffusé au sync, à « Publier », à chaque changement, à la naissance de HA et à la reconnexion au broker (CC-08) ; armement par les clés HomeKit `SetModePresent` / `SetModeAbsent` / `SetModeNuit` (lecture seule) ; code de désarmement facultatif (jamais en ligne de commande, journal, topic ni discovery). Fichier `12-4-alarme-etat-et-armement-par-mode.md`.
+
 ### Gates epic-level pe-epic-12
 - cohérence state ⊆ discovery : 0 `state_topic` publié pour une entité non publiée en discovery ;
 - event-driven, aucune source de vérité concurrente à Jeedom (NFR6/NFR13) ;

@@ -158,6 +158,7 @@
    "commands": {
     "ALARM_DISABLE": 12004,
     "ALARM_ENABLE": 12003,
+    "ALARM_ENABLE_STATE": 12002,
     "ALARM_STATE": 12001
    },
    "confidence": "sure",
@@ -237,7 +238,9 @@
    "commands": {
     "ALARM_ARMED": 23003,
     "ALARM_ENABLE_STATE": 23001,
-    "ALARM_RELEASED": 23004
+    "ALARM_MODE": 23006,
+    "ALARM_RELEASED": 23004,
+    "ALARM_STATE": 23002
    },
    "confidence": "sure",
    "type": "alarm_control_panel"
@@ -985,7 +988,7 @@
  },
  "mqtt": [
   {
-   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_230\", \"object_id\": \"jeedom2ha_230\", \"state_topic\": \"jeedom2ha/230/alarm/state\", \"command_topic\": \"jeedom2ha/230/alarm/set\", \"value_template\": \"{{ 'armed_away' if value == '1' else 'disarmed' }}\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_230\"], \"name\": \"Alarme maison\", \"manufacturer\": \"Jeedom (alarm)\", \"model\": \"alarm\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_230\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_230\", \"object_id\": \"jeedom2ha_230\", \"state_topic\": \"jeedom2ha/230/alarm/state\", \"command_topic\": \"jeedom2ha/230/alarm/set\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"payload_arm_night\": \"ARM_NIGHT\", \"supported_features\": [\"arm_away\"], \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_230\"], \"name\": \"Alarme maison\", \"manufacturer\": \"Jeedom (alarm)\", \"model\": \"alarm\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_230\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
    "qos": 1,
    "retain": true,
    "topic": "homeassistant/alarm_control_panel/jeedom2ha_230/config"
@@ -1627,7 +1630,7 @@
    "topic": "jeedom2ha/11002/availability"
   },
   {
-   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_12000\", \"object_id\": \"jeedom2ha_12000\", \"state_topic\": \"jeedom2ha/12000/alarm/state\", \"command_topic\": \"jeedom2ha/12000/alarm/set\", \"value_template\": \"{{ 'armed_away' if value == '1' else 'disarmed' }}\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_12000\"], \"name\": \"Alarme maison 12000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_12000\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
+   "payload": "{\"name\": null, \"unique_id\": \"jeedom2ha_eq_12000\", \"object_id\": \"jeedom2ha_12000\", \"state_topic\": \"jeedom2ha/12000/alarm/state\", \"command_topic\": \"jeedom2ha/12000/alarm/set\", \"payload_disarm\": \"DISARM\", \"payload_arm_home\": \"ARM_HOME\", \"payload_arm_away\": \"ARM_AWAY\", \"payload_arm_night\": \"ARM_NIGHT\", \"supported_features\": [\"arm_away\"], \"platform\": \"mqtt\", \"device\": {\"identifiers\": [\"jeedom2ha_12000\"], \"name\": \"Alarme maison 12000\", \"manufacturer\": \"Jeedom (virtual)\", \"model\": \"virtual\", \"via_device\": \"jeedom2ha_bridge\", \"suggested_area\": \"Salon\"}, \"origin\": {\"name\": \"jeedom2ha\", \"sw_version\": \"0.2.0\"}, \"default_entity_id\": \"alarm_control_panel.jeedom2ha_12000\", \"availability_topic\": \"jeedom2ha/bridge/status\"}",
    "qos": 1,
    "retain": true,
    "topic": "homeassistant/alarm_control_panel/jeedom2ha_12000/config"

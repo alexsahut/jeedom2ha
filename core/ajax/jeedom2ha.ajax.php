@@ -20,6 +20,7 @@
 require_once __DIR__ . '/../php/jeedom2ha_state_listeners.php';
 // Story 19.6 (AC1-AC5, AC8) — budget fixe du relais et orchestration pure (sans cœur Jeedom).
 require_once __DIR__ . '/../php/jeedom2ha_action_budget.php';
+require_once __DIR__ . '/../php/jeedom2ha_alarm.php'; // FR49 (12.4) — infos d'alarme lues à null au clic
 require_once __DIR__ . '/../php/jeedom2ha_reevaluation.php'; // Story 24.14 — fonctions pures, sans cœur Jeedom
 require_once __DIR__ . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — fonctions pures
 
@@ -972,7 +973,10 @@ try {
       // Story 19.5 (AC6) — pour 'publier' uniquement : étendre la portée en eq_id
       // AVANT toute lecture de valeur, puis lire les valeurs courantes (lecture
       // seule, getCache('value', null), jamais execCmd) pour transmission au démon.
-      $collectClickValues = ($params['intention'] === 'publier') ? function () use ($params) {
+      // FR49 (12.4, revue Codex) — infos d'alarme LUES à null au clic : envoyées à part
+      // (`current_values_null`), pour que le démon distingue « lu à null » de « non lu ».
+      $alarmReadNull = new ArrayObject();
+      $collectClickValues = ($params['intention'] === 'publier') ? function () use ($params, $alarmReadNull) {
         return _jeedom2ha_collect_click_values(
           (string)$params['portee'],
           $params['selection'],
@@ -998,11 +1002,12 @@ try {
             $cmds = [];
             foreach (cmd::byEqLogicId($eqId) as $cmd) {
               $cmds[] = ['cmd_id' => $cmd->getId(), 'type' => $cmd->getType(), '_cmd' => $cmd];
+              $cmds[count($cmds) - 1]['alarm_info'] = jeedom2ha_alarm_is_info_cmd($cmd->getGeneric_type(), $cmd->getLogicalId(), $cmd->getEqType_name());
             }
             return $cmds;
           },
-          function ($c) {
-            return $c['_cmd']->getCache('value', null);
+          function ($c) use ($alarmReadNull) {
+            return jeedom2ha_alarm_click_read($c, $c['_cmd']->getCache('value', null), $alarmReadNull);
           },
           function (string $message) {
             log::add('jeedom2ha', 'warning', $message);
@@ -1022,7 +1027,8 @@ try {
           return jeedom2ha::callDaemon('/system/status', null, 'GET', $timeoutS, $maxAttempts);
         },
         $collectClickValues,
-        function (array $callParams, int $timeoutS) {
+        function (array $callParams, int $timeoutS) use ($alarmReadNull) {
+          $callParams = jeedom2ha_alarm_add_click_null_reads($callParams, $alarmReadNull);
           return jeedom2ha::callDaemon('/action/execute', $callParams, 'POST', $timeoutS, 1);
         },
         function (array $daemonResult) use ($params) {

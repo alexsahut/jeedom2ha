@@ -124,6 +124,21 @@ def _normalize_scenario_mode(value: Any) -> Optional[str]:
     return value if isinstance(value, str) and value in _SCENARIO_MODES else None
 
 
+ALARM_MODE_CONFIG_KEYS = ("SetModePresent", "SetModeAbsent", "SetModeNuit")
+
+
+def _normalize_alarm_mode_config(value: Any) -> Dict[str, str]:
+    """FR49 (CC-64) — clés de mode d'une alarme : texte brut non vide, clés connues seulement."""
+    if not isinstance(value, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key in ALARM_MODE_CONFIG_KEYS:
+        raw = value.get(key)
+        if isinstance(raw, (str, int)) and not isinstance(raw, bool) and str(raw).strip():
+            out[key] = str(raw)
+    return out
+
+
 def _normalize_homekit_source(value: Any) -> Optional[str]:
     if isinstance(value, str) and value.strip():
         return value.strip()
@@ -239,6 +254,10 @@ class JeedomEqLogic:
     homekit_exposed: Optional[bool] = None
     homekit_exposed_source: Optional[str] = None
     logical_id: Optional[str] = field(default=None, repr=False)
+    # FR49 (CC-64) — clés de mode d'une alarme posées par Homebridge sur l'eqLogic
+    # (``SetModePresent`` / ``SetModeAbsent`` / ``SetModeNuit``, format « id|libellé »),
+    # lues en lecture seule ; seules les clés présentes et non vides sont gardées.
+    alarm_mode_config: Dict[str, str] = field(default_factory=dict)
 
     @property
     def homekit_exposed_effective(self) -> Optional[bool]:
@@ -380,6 +399,7 @@ class TopologySnapshot:
                     homekit_exposed=_to_tristate(eq_raw.get("homekit_exposed")),
                     homekit_exposed_source=_normalize_homekit_source(eq_raw.get("homekit_exposed_source")),
                     logical_id=_normalize_logical_id(eq_raw.get("logical_id")),
+                    alarm_mode_config=_normalize_alarm_mode_config(eq_raw.get("alarm_mode_config")),
                 )
             except (ValueError, TypeError, KeyError):
                 continue

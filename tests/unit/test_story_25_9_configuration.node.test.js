@@ -139,7 +139,8 @@ test('front v3 (Lot 3) réel — aucune case de plugin ; lien « Choisir ce qui 
     assert.match(await page.locator('#p_j2haChoosePublished .j2ha-info').getAttribute('data-j2ha-tip'), /En cas de doute/);
     const keys = await page.evaluate(() => [...document.querySelectorAll('#div_plugin_configuration .configKey')].map((el) => el.getAttribute('data-l1key')));
     // story/system-health : une seule clé hors broker, la case « Publier la santé de Jeedom » (décochée par défaut).
-    assert.ok(keys.every((k) => /^mqtt/.test(k) || k === 'publishSystemHealth'), keys.join(','));
+    // FR49 (story 12.4) : et la case « Retirer le code » de l'alarme (le champ du code n'est configKey que s'il est saisi).
+    assert.ok(keys.every((k) => /^mqtt/.test(k) || k === 'publishSystemHealth' || k === 'alarmDisarmCodeClear'), keys.join(','));
     assert.deepEqual(ctx.requests.map((r) => r.action), ['getMqttConfig']);
     assert.deepEqual(ctx.errors, []);
   });

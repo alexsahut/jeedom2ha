@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import math
 import re
@@ -19,6 +20,14 @@ from models.mapping import MappingResult, PublicationDecision
 from sync.readback import CHANNEL_STATE, has_reliable_channel
 from sync.readback import barrier_mode, barrier_state, is_barrier_state_command  # Story 24.7
 from sync.readback import climate_hvac_mode, climate_number  # Story 24.15
+from mapping.alarm_control_panel import (  # FR49 (CC-64)
+    ARM_PAYLOADS as ALARM_ARM_PAYLOADS,
+    PAYLOAD_DISARM as ALARM_PAYLOAD_DISARM,
+    alarm_arm_targets,
+    alarm_disarm_command,
+)
+from sync import alarm_code as _alarm_code  # FR49 (CC-64) — limite d'essais (ALARM_LOCKOUT)
+from sync.alarm_code import alarm_code_configured, alarm_code_matches, alarm_code_unreadable  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
     CHANNEL_MODE as CLIMATE_CHANNEL_MODE,
     CHANNEL_SETPOINT as CLIMATE_CHANNEL_SETPOINT,
@@ -49,6 +58,12 @@ _POSITION_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/position/set$")
 _CLIMATE_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/(?P<channel>temperature|mode|preset)/set$")
 # Story 24.15 — command families of a climate (confirmation by the streamed state only).
 _CLIMATE_FAMILIES = ("climate_setpoint", "climate_mode", "climate_preset")
+# FR49 (CC-64) — alarm orders: jeedom2ha/{eq_id}/alarm/set (topic declared by the discovery).
+_ALARM_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/alarm/set$")
+# FR49 (CC-64) — refusals of the disarm code: WARNING, never the code itself.
+_ALARM_CODE_REFUSALS = (
+    "alarm_code_missing", "alarm_code_invalid", "alarm_code_unreadable", "alarm_code_locked",
+)
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
 # Story 24.12 — equipment button (ButtonMapper / FallbackMapper): jeedom2ha/{eq_id}/cmd.
 _BUTTON_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/cmd$")
@@ -251,6 +266,16 @@ class CommandSynchronizer:
             return False
 
         translation, translation_reason = self._translate_command(mapping, parsed, payload)
+        if translation is None and translation_reason in _ALARM_CODE_REFUSALS:
+            # FR49 — disarm code refused: WARNING, the code itself is never logged.
+            self._log_cmd(
+                logging.WARNING,
+                eq_id=parsed.eq_id,
+                topic=topic,
+                reason_code=translation_reason,
+                action="reject_command",
+            )
+            return False
         if translation is None:
             self._log_cmd(
                 logging.INFO,
@@ -329,6 +354,11 @@ class CommandSynchronizer:
         if match:
             # story/select-mode — routé seulement si un select publié de l'équipement le déclare.
             return ParsedTopic(eq_id=int(match.group("eq_id")), channel="set"), None
+
+        match = _ALARM_SET_TOPIC_RE.match(topic)
+        if match:
+            # FR49 — routed only if a published alarm of this equipment declares it.
+            return ParsedTopic(eq_id=int(match.group("eq_id")), channel="alarm"), None
 
         match = _BRIGHTNESS_TOPIC_RE.match(topic)
         if match:
@@ -463,6 +493,12 @@ class CommandSynchronizer:
             if isinstance(command_topic, str) and command_topic:
                 topics["set"] = command_topic
 
+        if mapping.ha_entity_type == "alarm_control_panel":
+            # FR49 — the exact topic the discovery publishes (``…/alarm/set``).
+            command_topic = (mapping.reason_details or {}).get("command_topic")
+            if isinstance(command_topic, str) and command_topic:
+                topics["alarm"] = command_topic
+
         if mapping.ha_entity_type == "select":
             # story/select-mode — one command topic per select (node-scoped by its state info).
             command_topic = (mapping.reason_details or {}).get("command_topic")
@@ -512,6 +548,10 @@ class CommandSynchronizer:
         if mapping.ha_entity_type == "climate":
             # Story 24.15 — the topic was already matched against this climate's discovery.
             return self._translate_climate_command(mapping, parsed, str(raw_payload))
+
+        if mapping.ha_entity_type == "alarm_control_panel":
+            # FR49 — the topic was already matched against this alarm's discovery.
+            return self._translate_alarm_command(mapping, str(raw_payload))
 
         if parsed.channel == "set":
             if mapping.ha_entity_type == "switch" and (mapping.reason_details or {}).get("thermostat_lock"):
@@ -789,6 +829,84 @@ class CommandSynchronizer:
         select_value = entry.get("select")
         options = {"select": select_value} if isinstance(select_value, str) else {}
         return CommandTranslation(cmd_id=cmd_id, options=options, command_family="select_option"), None
+
+    @staticmethod
+    def _parse_alarm_payload(payload: str) -> Tuple[Optional[str], Optional[str]]:
+        """FR49 — ``(action, code)`` of an alarm order.
+
+        With a disarm code configured, the discovery's ``command_template`` sends
+        ``{"action": …, "code": …}``; a bare action (``ARM_AWAY``) carries no code. Nothing
+        here is ever logged: the code only feeds the constant-time comparison.
+        """
+        text = payload.strip()
+        if text.startswith("{"):
+            try:
+                data = json.loads(text)
+            except ValueError:
+                return None, None
+            if not isinstance(data, dict) or not isinstance(data.get("action"), str):
+                return None, None
+            code = data.get("code")
+            return data["action"].strip(), code if isinstance(code, str) else None
+        return text, None
+
+    @staticmethod
+    def _translate_alarm_command(
+        mapping: MappingResult,
+        payload: str,
+    ) -> Tuple[Optional[CommandTranslation], Optional[str]]:
+        """FR49 (CC-64) — ``ARM_HOME`` / ``ARM_AWAY`` / ``ARM_NIGHT`` / ``DISARM``.
+
+        - armements : la commande de mode désignée par ``SetModePresent`` / ``SetModeAbsent`` /
+          ``SetModeNuit`` (retenue par le mapper : action ALARM_SET_MODE de l'équipement) ; sans
+          aucune, ALARM_ARMED / ALARM_ENABLE arme en ``armed_away`` ; un armement non annoncé
+          dans ``supported_features`` est refusé ;
+        - ``DISARM`` : ALARM_RELEASED, ou ALARM_DISABLE pour un virtuel ; avec un code configuré,
+          le code reçu doit lui être égal (``hmac.compare_digest``), sinon refus ;
+        - jamais d'état supposé : Home Assistant attend l'état relu.
+        """
+        action, code = CommandSynchronizer._parse_alarm_payload(payload)
+        if action is None:
+            return None, "invalid_command_payload"
+        commands = mapping.commands or {}
+        if action == ALARM_PAYLOAD_DISARM:
+            if alarm_code_configured():
+                # Revue de 12.4 : un code enregistré mais illisible refuse tout désarmement ;
+                # après 5 codes faux, l'équipement est verrouillé 5 minutes.
+                if alarm_code_unreadable():
+                    return None, "alarm_code_unreadable"
+                lockout = _alarm_code.ALARM_LOCKOUT
+                eq_key = getattr(mapping, "jeedom_eq_id", None)
+                if lockout.is_locked(eq_key):
+                    return None, "alarm_code_locked"
+                if code is None or code == "":
+                    return None, "alarm_code_missing"
+                if not alarm_code_matches(code):
+                    lockout.record_failure(eq_key)
+                    return None, "alarm_code_invalid"
+                lockout.record_success(eq_key)
+            cmd = alarm_disarm_command(commands)
+            family = "alarm_disarm"
+        elif action in ALARM_ARM_PAYLOADS:
+            cmd = alarm_arm_targets(commands).get(ALARM_ARM_PAYLOADS[action])
+            family = "alarm_arm"
+        else:
+            return None, "invalid_command_payload"
+        if cmd is None:
+            return None, "missing_action_command"
+        own_ids = set()
+        for own in commands.values():
+            try:
+                own_ids.add(int(own.id))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        try:
+            cmd_id = int(cmd.id)
+        except (TypeError, ValueError):
+            return None, "missing_action_command"
+        if cmd_id not in own_ids:
+            return None, "missing_action_command"
+        return CommandTranslation(cmd_id=cmd_id, options={}, command_family=family), None
 
     @staticmethod
     def _translate_lock_command(
@@ -1163,6 +1281,12 @@ class CommandSynchronizer:
 
         if translation.command_family == "lock_lock_unlock" and mapping.ha_entity_type == "lock":
             # Story 24.9 — ``optimistic: false`` at discovery: never an invented state.
+            if self._has_reliable_state(mapping, decision):
+                return "real_state_confirmation"
+            return "stateless"
+
+        if mapping.ha_entity_type == "alarm_control_panel":
+            # FR49 — no ``optimistic`` for an alarm: HA waits for the streamed state.
             if self._has_reliable_state(mapping, decision):
                 return "real_state_confirmation"
             return "stateless"
