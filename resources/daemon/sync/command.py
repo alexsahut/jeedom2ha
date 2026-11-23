@@ -25,7 +25,15 @@ from mapping.alarm_control_panel import (  # FR49 (CC-64)
     PAYLOAD_DISARM as ALARM_PAYLOAD_DISARM,
     alarm_arm_targets,
     alarm_disarm_command,
+    alarm_enable_command,  # Story 12.5
+    alarm_mode_labels,  # Story 12.5
+    ALARM_PLUGIN,  # Story 12.5 (revue m1)
+    is_mode_command,  # Story 12.5
 )
+from sync.readback import _alarm_flag, normalize_alarm_mode_label  # Story 12.5
+
+# Story 12.5 (revue m1) — logicalId de l'info « Statut » du plugin alarm (comme ``immediatState``).
+ALARM_STATUS_LOGICAL_ID = "state"
 from sync import alarm_code as _alarm_code  # FR49 (CC-64) — limite d'essais (ALARM_LOCKOUT)
 from sync.alarm_code import alarm_code_configured, alarm_code_matches, alarm_code_unreadable  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
@@ -198,6 +206,9 @@ class CommandTranslation:
     options: Dict[str, str]
     command_family: str
     optimistic_state_payload: Optional[str] = None
+    # Story 12.5 — état HA visé par un armement dont la cible est une commande de mode
+    # (``SetModePresent`` / ``SetModeAbsent`` / ``SetModeNuit``) ; None pour tout autre ordre.
+    alarm_target_state: Optional[str] = None
 
 
 class CommandSynchronizer:
@@ -298,6 +309,28 @@ class CommandSynchronizer:
                     action="reject_command",
                 )
                 return False
+
+        if translation.command_family == "alarm_arm":
+            # Story 12.5 (décision du porteur du projet) — jamais d'armement d'une alarme
+            # déclenchée ou en délai d'entrée : le plugin alarm remet le déclenchement à zéro à
+            # un changement de mode, « Armer » l'annulerait donc sans code.
+            refusal = await self._alarm_arm_refusal(mapping)
+            if refusal is not None:
+                self._log_cmd(
+                    logging.WARNING,
+                    eq_id=parsed.eq_id,
+                    topic=topic,
+                    reason_code=refusal,
+                    action="reject_command",
+                )
+                self._republish_alarm_state(mapping)
+                return False
+
+        if translation.alarm_target_state is not None:
+            # Story 12.5 — armement dans le mode déjà courant : lecture fraîche juste avant l'envoi.
+            translation = await self._resolve_alarm_same_mode(mapping, parsed.eq_id, topic, translation)
+            if translation is None:
+                return True
 
         executed = await self._execute_exec_cmd(translation.cmd_id, translation.options)
         if not executed:
@@ -869,6 +902,7 @@ class CommandSynchronizer:
         if action is None:
             return None, "invalid_command_payload"
         commands = mapping.commands or {}
+        target_state: Optional[str] = None
         if action == ALARM_PAYLOAD_DISARM:
             if alarm_code_configured():
                 # Revue de 12.4 : un code enregistré mais illisible refuse tout désarmement ;
@@ -890,6 +924,9 @@ class CommandSynchronizer:
         elif action in ALARM_ARM_PAYLOADS:
             cmd = alarm_arm_targets(commands).get(ALARM_ARM_PAYLOADS[action])
             family = "alarm_arm"
+            if is_mode_command(cmd):
+                # Story 12.5 — cible de mode : la lecture fraîche décidera (``_resolve_alarm_same_mode``).
+                target_state = ALARM_ARM_PAYLOADS[action]
         else:
             return None, "invalid_command_payload"
         if cmd is None:
@@ -906,7 +943,196 @@ class CommandSynchronizer:
             return None, "missing_action_command"
         if cmd_id not in own_ids:
             return None, "missing_action_command"
-        return CommandTranslation(cmd_id=cmd_id, options={}, command_family=family), None
+        return CommandTranslation(
+            cmd_id=cmd_id, options={}, command_family=family, alarm_target_state=target_state,
+        ), None
+
+    async def _fresh_alarm_read(self, cmd_id: int) -> Tuple[bool, Any]:
+        """Story 12.5 — lecture fraîche d'une info d'alarme ; toute exception = lecture en échec."""
+        try:
+            return await self._read_info_value(cmd_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return False, None
+
+    async def _alarm_arm_refusal(self, mapping: MappingResult) -> Optional[str]:
+        """Story 12.5 — motif de refus d'un armement, ou None quand il peut partir.
+
+        Lecture fraîche de Statut (``ALARM_STATE``) et d'Immédiat (logicalId ``immediatState``), en
+        parallèle (revue m3 : délai maximal = un délai de requête du démon, 2 s par défaut, au lieu
+        de deux) ; résultats évalués dans l'ordre Statut puis Immédiat, donc identiques à une
+        lecture l'une après l'autre :
+        - Statut = 1 : ``alarm_arm_refused_triggered`` (prioritaire) ; Immédiat = 1 :
+          ``alarm_arm_refused_pending`` ;
+        - valeur vide (info jamais écrite, par exemple un virtuel) : ``alarm_arm_refused_state_empty``
+          (revue I-a : le refus se répète tant que l'info n'a pas de valeur) ;
+        - lecture en échec, valeur null ou illisible : ``alarm_arm_refused_state_unreadable``. Le
+          refus est le choix sûr : armer une alarme dont on ne sait pas si elle est déclenchée
+          pourrait annuler un déclenchement sans code ; l'utilisateur peut réessayer ;
+        - plugin alarm sans info Statut identifiable (ni generic type ``ALARM_STATE``, ni logicalId
+          ``state``) : ``alarm_arm_refused_no_status_info`` (revue m1 : un generic type retiré ne
+          contourne pas ce contrôle).
+        Une info absente d'une alarme hors plugin alarm (virtuel sans Statut ni Immédiat) n'est pas
+        lue : rien à vérifier, ce n'est pas une lecture en échec. Il reste une fenêtre inévitable
+        entre cette lecture et l'envoi de l'ordre (revue m2) : un déclenchement survenu entre les
+        deux n'est pas vu.
+        """
+        commands = mapping.commands or {}
+        status_id = self._coerce_int(getattr(commands.get("ALARM_STATE"), "id", None))
+        immediate_id = self._coerce_int(getattr(commands.get("ALARM_IMMEDIATE_STATE"), "id", None))
+        if self._is_alarm_plugin(mapping):
+            if status_id is None:
+                status_id = self._alarm_plugin_status_id(mapping)
+            if status_id is None:
+                return "alarm_arm_refused_no_status_info"
+        checks = [
+            (cmd_id, reason)
+            for cmd_id, reason in (
+                (status_id, "alarm_arm_refused_triggered"),
+                (immediate_id, "alarm_arm_refused_pending"),
+            )
+            if cmd_id is not None
+        ]
+        if not checks:
+            return None
+        reads = await asyncio.gather(*(self._fresh_alarm_read(cmd_id) for cmd_id, _reason in checks))
+        for (_cmd_id, reason), (ok, raw) in zip(checks, reads):
+            if ok and raw is not None and not isinstance(raw, bool) and str(raw).strip() == "":
+                return "alarm_arm_refused_state_empty"
+            flag = _alarm_flag(raw) if ok else None
+            if flag is None:
+                return "alarm_arm_refused_state_unreadable"
+            if flag is True:
+                return reason
+        return None
+
+    def _topology_eq(self, mapping: MappingResult) -> Any:
+        topology = self._app.get("topology") if hasattr(self._app, "get") else None
+        eq_logics = getattr(topology, "eq_logics", None)
+        if not isinstance(eq_logics, Mapping):
+            return None
+        return eq_logics.get(getattr(mapping, "jeedom_eq_id", None))
+
+    def _is_alarm_plugin(self, mapping: MappingResult) -> bool:
+        """Revue m1 — équipement du plugin alarm : type lu dans la topologie, ou info Immédiat retenue
+        (le mapper ne la retient que pour ce plugin)."""
+        eq = self._topology_eq(mapping)
+        if eq is not None and str(getattr(eq, "eq_type_name", "") or "") == ALARM_PLUGIN:
+            return True
+        return "ALARM_IMMEDIATE_STATE" in (mapping.commands or {})
+
+    def _alarm_plugin_status_id(self, mapping: MappingResult) -> Optional[int]:
+        """Revue m1 — Statut du plugin alarm retrouvé par son logicalId ``state`` (info binaire)."""
+        eq = self._topology_eq(mapping)
+        for cmd in getattr(eq, "cmds", None) or []:
+            if (
+                getattr(cmd, "logical_id", None) == ALARM_STATUS_LOGICAL_ID
+                and str(getattr(cmd, "type", "") or "").lower() == "info"
+                and "binary" in str(getattr(cmd, "sub_type", "") or "").lower()
+            ):
+                return self._coerce_int(getattr(cmd, "id", None))
+        return None
+
+    def _republish_alarm_state(self, mapping: MappingResult) -> None:
+        """Story 12.5 — après un armement refusé, HA relit l'état réel déjà publié (retained)."""
+        state_sync = self._app.get("state_synchronizer") if hasattr(self._app, "get") else None
+        republish = getattr(state_sync, "republish_last_alarm_state", None)
+        topic = (mapping.reason_details or {}).get("state_topic")
+        if callable(republish) and isinstance(topic, str) and topic:
+            try:
+                republish(topic)
+            except Exception:
+                _LOGGER.warning("[SYNC-CMD] eq_id=%s reason_code=alarm_state_republish_failed",
+                                getattr(mapping, "jeedom_eq_id", "-"))
+
+    async def _resolve_alarm_same_mode(
+        self,
+        mapping: MappingResult,
+        eq_id: int,
+        topic: str,
+        translation: CommandTranslation,
+    ) -> Optional[CommandTranslation]:
+        """Story 12.5 — armement dont le mode visé est peut-être déjà le mode courant.
+
+        Le cœur Jeedom ignore une action dont l'info liée est déjà dans l'état visé
+        (``alreadyInState``) : la commande de mode, liée à l'info Mode, ne fait rien quand ce mode
+        est déjà le mode courant, et l'alarme désarmée le reste. Lecture fraîche (``cmd::execCmd``
+        sur l'info, sans effet) de Mode, puis d'Actif seulement si le mode correspond. « Mode
+        correspond » = la valeur relue, le libellé de la clé SetMode* et le nom de la commande de
+        mode visée sont égaux une fois normalisés (revue I1 : sinon, comportement de 12.4) :
+
+        - Mode = mode visé et Actif = 0 : commande d'activation (ALARM_ARMED / ALARM_ENABLE),
+          qui arme dans le mode courant ; sans elle, commande de mode + WARNING ;
+        - Mode = mode visé et Actif = 1 : déjà armée dans ce mode, rien n'est envoyé (None) ;
+        - tout autre cas (autre mode, valeur illisible, null, vide, lecture en échec, libellé
+          absent) : la traduction est rendue telle quelle (comportement de 12.4).
+
+        Jamais de décision sur une valeur mémorisée : une valeur ancienne pourrait activer l'alarme
+        dans un autre mode que celui demandé. Aucun libellé ni valeur lue n'est journalisé.
+        """
+        commands = mapping.commands or {}
+        wanted = normalize_alarm_mode_label(alarm_mode_labels(mapping).get(translation.alarm_target_state))
+        # Revue de 12.5 (I1) — le libellé de la clé SetMode* doit aussi être le nom de la commande de
+        # mode visée : une configuration Homebridge incohérente garde le comportement de 12.4.
+        target_cmd = next(
+            (c for c in commands.values() if self._coerce_int(getattr(c, "id", None)) == translation.cmd_id),
+            None,
+        )
+        target_name = normalize_alarm_mode_label(getattr(target_cmd, "name", None))
+        mode_cmd_id = self._coerce_int(getattr(commands.get("ALARM_MODE"), "id", None))
+        enable_cmd_id = self._coerce_int(getattr(commands.get("ALARM_ENABLE_STATE"), "id", None))
+        if wanted is not None and target_name != wanted:
+            # Revue m4 — repli I1 : libellé de la clé et nom de la commande visée ne concordent pas.
+            self._log_cmd(
+                logging.INFO,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_same_mode_config_mismatch",
+                action="translate_command",
+            )
+            return translation
+        if wanted is None or mode_cmd_id is None or enable_cmd_id is None:
+            return translation
+
+        ok, mode_value = await self._fresh_alarm_read(mode_cmd_id)
+        if not ok or normalize_alarm_mode_label(mode_value) != wanted:
+            return translation
+        ok, enable_value = await self._fresh_alarm_read(enable_cmd_id)
+        active = _alarm_flag(enable_value) if ok else None
+        if active is True:
+            self._log_cmd(
+                logging.INFO,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_already_armed_in_mode",
+                action="skip_command",
+            )
+            return None
+        if active is not False:
+            return translation
+        enable_cmd = alarm_enable_command(commands)
+        own_ids = {self._coerce_int(getattr(own, "id", None)) for own in commands.values()}
+        enable_id = self._coerce_int(getattr(enable_cmd, "id", None))
+        if enable_id is None or enable_id not in own_ids:
+            self._log_cmd(
+                logging.WARNING,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_same_mode_without_enable_command",
+                action="execute_command",
+                detail="mode_deja_courant_ordre_peut_etre_ignore_par_jeedom",
+            )
+            return translation
+        self._log_cmd(
+            logging.INFO,
+            eq_id=eq_id,
+            topic=topic,
+            reason_code="alarm_same_mode_enable",
+            action="translate_command",
+            cmd_id=enable_id,
+        )
+        return replace(translation, cmd_id=enable_id, alarm_target_state=None)
 
     @staticmethod
     def _translate_lock_command(

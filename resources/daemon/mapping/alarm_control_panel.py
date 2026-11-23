@@ -166,6 +166,20 @@ def alarm_disarm_command(commands: Mapping[str, Any]) -> Optional[Any]:
     return None
 
 
+def alarm_enable_command(commands: Mapping[str, Any]) -> Optional[Any]:
+    """Story 12.5 — ALARM_ARMED (plugin alarm) ou ALARM_ENABLE (virtuel), action de ce generic type.
+
+    Commande d'activation, présente dans ``commands`` même quand des modes sont retenus : elle
+    arme l'alarme dans son mode courant (armement dans le mode déjà courant, story 12.5).
+    """
+    commands = commands or {}
+    for generic_type in ("ALARM_ARMED", "ALARM_ENABLE"):
+        cmd = commands.get(generic_type)
+        if cmd is not None and _is_action_cmd(cmd) and getattr(cmd, "generic_type", None) == generic_type:
+            return cmd
+    return None
+
+
 def alarm_supported_features(commands: Mapping[str, Any]) -> List[str]:
     """``supported_features`` HA : seulement les armements réellement disponibles."""
     targets = alarm_arm_targets(commands)
