@@ -169,6 +169,62 @@ async def test_light_and_full_sync_give_the_same_messages_for_the_scenario(aioht
         assert app_light["topology"].scenarios[sc_id].is_active == _app_full["topology"].scenarios[sc_id].is_active
 
 
+def _strip_export(doc):
+    doc = dict(doc)
+    for key in ("generated_at", "sync_at", "sync_origin", "scenario_activation_at"):
+        doc.pop(key, None)
+    return doc
+
+
+async def test_light_equals_full_sync_on_export_and_status_rows(aiohttp_client, tmp_path):
+    """Revue 24.18 (M5) — équivalence stricte avec la synchro complète : messages MQTT, export (hors horodatages et
+    origine) et lignes de statut des scénarios, publiés et non publiés compris."""
+    from transport.http_server import _scenario_status_rows
+
+    start = {1: True, 2: False, 3: True}
+    end = {1: False, 2: True, 3: False}
+    unpublished = (3,)
+
+    bridge_full = _bridge()
+    app_full, cli_full = await _client(aiohttp_client, bridge_full, tmp_path / "full")
+    await _sync(cli_full, _body(start, unpublished))
+    bridge_full.published.clear()
+    await _sync(cli_full, _body(end, unpublished))
+    full_scenario_msgs = {m for m in bridge_full.published if "scenario_" in m[0] and m[0].endswith("/availability")}
+
+    bridge_light = _bridge()
+    app_light, cli_light = await _client(aiohttp_client, bridge_light, tmp_path / "light")
+    await _sync(cli_light, _body(start, unpublished))
+    bridge_light.published.clear()
+    data = await _post_light(cli_light, end)
+
+    assert data["result"] == "applied" and data["scenario_ids"] == [1, 2, 3]
+    assert set(bridge_light.published) == full_scenario_msgs
+    assert not [m for m in bridge_light.published if "scenario_3" in m[0]]
+    assert _strip_export(await _export(cli_light)) == _strip_export(await _export(cli_full))
+    assert _scenario_status_rows(app_light) == _scenario_status_rows(app_full)
+
+
+async def test_light_rewrites_export_file_and_invalidates_states_cache(aiohttp_client, tmp_path):
+    """Revue 24.18 (M1) — le fichier d'export est réécrit et le cache des états agrégés invalidé."""
+    import json
+
+    from export.decision_export import EXPORT_FILENAME
+    from transport.http_server import _EQUIPMENT_STATES_CACHE_KEY
+
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge, tmp_path)
+    await _sync(cli, _body({1: True}))
+    generation = app[_EQUIPMENT_STATES_CACHE_KEY].get("generation", 0)
+    await _post_light(cli, {1: False})
+    with open(tmp_path / EXPORT_FILENAME, encoding="utf-8") as handle:
+        document = json.load(handle)
+    row = next(r for r in document["scenarios"] if r["scenario_id"] == 1)
+    assert row["active"] is False
+    assert document["scenario_activation_at"]
+    assert app[_EQUIPMENT_STATES_CACHE_KEY].get("generation", 0) > generation
+
+
 async def test_unchanged_states_publish_nothing(aiohttp_client, tmp_path):
     bridge = _bridge()
     _app, cli = await _client(aiohttp_client, bridge, tmp_path)
@@ -250,17 +306,63 @@ async def test_refused_when_scenario_set_differs(aiohttp_client, tmp_path):
     await _assert_refused(cli, app, bridge, {1: False, 2: True, 3: True}, "scenario_set_mismatch")
 
 
-async def test_refused_for_unpublished_scenario(aiohttp_client, tmp_path):
-    """Règle 4 : un scénario non publié n'est jamais traité par le chemin léger."""
+async def test_unpublished_scenario_updates_status_without_any_mqtt(aiohttp_client, tmp_path):
+    """Revue 24.18 (I1, option A) : un scénario non publié qui bascule met à jour l'instantané (écran des scénarios,
+    export) comme la synchro complète, sans aucun message MQTT et sans synchro complète."""
+    from transport.http_server import _scenario_status_rows
+
     bridge = _bridge()
     app, cli = await _client(aiohttp_client, bridge, tmp_path)
     await _sync(cli, _body({1: True, 2: True}, unpublished=(2,)))
-    await _assert_refused(cli, app, bridge, {1: True, 2: False}, "scenario_set_mismatch")
-    # Seuls les publiés : accepté, et rien n'est publié pour le 2.
+    before = await _export(cli)
     bridge.published.clear()
-    data = await _post_light(cli, {1: False})
-    assert data["result"] == "applied"
-    assert _scenario_messages(bridge.published, 2) == []
+
+    data = await _post_light(cli, {1: True, 2: False})
+
+    assert data["status"] == "ok" and data["result"] == "applied" and data["scenario_ids"] == [2]
+    assert bridge.published == []
+    row = next(r for r in _scenario_status_rows(app) if r["id"] == 2)
+    assert row["is_active"] is False and row["published"] is False and row["in_ha"] is False
+    assert app["scenario_publications"][2].active_or_alive is False
+    after = await _export(cli)
+    assert _scenario_row(after, 2)["active"] is False
+    assert _scenario_row(after, 2)["decision"] == "not_published"
+    assert after["sync_at"] == before["sync_at"]
+
+
+async def test_unpublished_scenario_needs_no_broker(aiohttp_client, tmp_path):
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge, tmp_path)
+    await _sync(cli, _body({1: True, 2: True}, unpublished=(2,)))
+    bridge.is_connected = False
+    data = await _post_light(cli, {1: True, 2: False})
+    assert data["result"] == "applied" and app["topology"].scenarios[2].is_active is False
+
+
+async def test_refused_when_only_published_scenarios_are_sent(aiohttp_client, tmp_path):
+    """L'ensemble reçu doit être celui de tous les scénarios lisibles, publiés ou non."""
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge, tmp_path)
+    await _sync(cli, _body({1: True, 2: True}, unpublished=(2,)))
+    await _assert_refused(cli, app, bridge, {1: False}, "scenario_set_mismatch")
+
+
+async def test_refused_while_a_withdrawal_is_pending(aiohttp_client, tmp_path):
+    """Retrait d'un non publié non confirmé (`scenario_not_selected_pending`) : synchro complète."""
+    bridge = _bridge()
+    app, cli = await _client(aiohttp_client, bridge, tmp_path)
+    await _sync(cli, _body({1: True, 2: True}, unpublished=(2,)))
+    app["scenario_publications"][2].reason = "scenario_not_selected_pending"
+    await _assert_refused(cli, app, bridge, {1: True, 2: False}, "scenario_not_confirmed")
+
+
+def test_scenario_list_is_capped():
+    from transport.http_server import SCENARIO_ACTIVATION_MAX_SCENARIOS, _parse_scenario_activation_states
+
+    rows = [{"id": i, "is_active": True} for i in range(1, SCENARIO_ACTIVATION_MAX_SCENARIOS + 1)]
+    assert _parse_scenario_activation_states({"payload": {"scenarios": rows}}) is not None
+    rows.append({"id": SCENARIO_ACTIVATION_MAX_SCENARIOS + 1, "is_active": True})
+    assert _parse_scenario_activation_states({"payload": {"scenarios": rows}}) is None
 
 
 async def test_refused_after_failed_scenario_publication(aiohttp_client, tmp_path):

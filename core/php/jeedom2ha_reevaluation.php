@@ -32,6 +32,11 @@
  * drapeaux et la source d'exclusion effective, puis un condensé SHA-256.
  */
 
+if (!defined('JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS')) {
+  /** Story 24.18 (revue M4) — plafond de la liste envoyée à /action/scenario_activation (même valeur côté démon). */
+  define('JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS', 5000);
+}
+
 if (!defined('JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY')) {
   /** Clé de configuration du plugin qui garde l'empreinte de la dernière synchro réussie (pas de table DB). */
   define('JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY', 'decisionFingerprint');
@@ -179,10 +184,10 @@ function jeedom2ha_decision_fingerprint(array $eqRows, array $scenarioRows, arra
  *
  * - `structural` : tout ce que contient l'empreinte 24.14 SAUF l'activation des scénarios (équipements, identifiants de
  *   tous les scénarios, exclusions, choix de publication des scénarios) ;
- * - `activation` : `id:isActive` des seuls scénarios PUBLIÉS (même règle que le démon et l'export : `publishedScenarios`
- *   absent -> tous publiés ; sinon publié si l'identifiant y figure). L'activation d'un scénario non publié n'entre dans
- *   aucune partie : sa bascule ne déclenche rien (elle ne change rien dans HA) ;
- * - `states` : `[['id' => int, 'is_active' => bool], ...]` des scénarios publiés, triés (envoyés au démon) ;
+ * - `activation` : `id:isActive` de TOUS les scénarios (revue 24.18, I1) : un scénario non publié qui bascule ne publie
+ *   rien dans HA, mais le démon met à jour son instantané (écran des scénarios du plugin, export), comme la synchro
+ *   complète ;
+ * - `states` : `[['id' => int, 'is_active' => bool], ...]` de tous les scénarios, triés (envoyés au démon) ;
  * - `fingerprint` : valeur composite `v2:<structural>:<activation>`, la seule mémorisée (clé `decisionFingerprint`).
  *   Deux composites égales <=> les deux parties égales.
  *
@@ -221,9 +226,9 @@ function jeedom2ha_decision_fingerprint_parts(array $eqRows, array $scenarioRows
     }
     $id = (int) $raw['id'];
     $scenarioIds[$id] = $id;
-    if ($published === null || in_array($id, $published, true)) {
-      $states[$id] = (bool) ($raw['isActive'] ?? false);
-    }
+    // Revue 24.18 (I1, option A) : l'activation de TOUS les scénarios entre dans la partie activation, publiés ou non :
+    // l'écran des scénarios du plugin (statut `is_active`) et l'export (`active`) doivent suivre sans synchro complète.
+    $states[$id] = (bool) ($raw['isActive'] ?? false);
   }
   ksort($scenarioIds);
   ksort($states);
@@ -277,14 +282,14 @@ function jeedom2ha_reevaluation_light_candidate($stored, $current): bool {
 }
 
 /**
- * Story 24.18 — chemin léger d'un pas de la tâche périodique (seule l'activation de scénarios publiés a changé).
+ * Story 24.18 — chemin léger d'un pas de la tâche périodique (seule l'activation de scénarios a changé).
  *
  * Retour : un résultat du pas (`light`, `deferred`, `failed`), ou null si le démon demande une synchro complète
  * (`full_sync_required`) : l'appelant la lance alors dans le même pas.
  */
 function jeedom2ha_reevaluation_light_step(array $deps, string $stored, string $current, array $states): ?array {
   $log = $deps['log'];
-  $log('info', '[REEVAL] Seule l\'activation de scénarios publiés a changé : mise à jour légère');
+  $log('info', '[REEVAL] Seule l\'activation de scénarios a changé : mise à jour légère');
   // Invalidée avant l'envoi : une réponse perdue laisse une empreinte vide, donc une synchro complète au pas suivant.
   jeedom2ha_reevaluation_invalidate_before_sync($deps['store']);
   try {
@@ -376,7 +381,7 @@ function jeedom2ha_reevaluation_remember_after_sync(?string $fingerprint, $resul
  *
  * Dépendances injectées (toutes obligatoires) :
  * - `fingerprint` () => string|array  empreinte courante (peut lever) ; Story 24.18 : ou
- *                                     `['fingerprint' => composite, 'states' => états des scénarios publiés]`
+ *                                     `['fingerprint' => composite, 'states' => états de tous les scénarios]`
  * - `light`       (array) => ?array   facultatif (Story 24.18) : POST /action/scenario_activation ; absent = 24.14 strict
  * - `stored`      () => string        empreinte de la dernière synchro réussie ('' si aucune)
  * - `store`       (string) => void    mémorise l'empreinte
@@ -420,8 +425,9 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
     $log('debug', '[REEVAL] État Jeedom changé, démon non prêt : réévaluation reportée');
     return array('status' => 'skipped', 'reason' => 'daemon_not_ready');
   }
-  // Story 24.18 — seule l'activation de scénarios publiés a changé : synchro légère (aucune topologie, aucun listener).
-  if (isset($deps['light']) && $states !== null && jeedom2ha_reevaluation_light_candidate($stored, $current)) {
+  // Story 24.18 — seule l'activation de scénarios a changé : synchro légère (aucune topologie, aucun listener).
+  if (isset($deps['light']) && $states !== null && count($states) <= JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS
+      && jeedom2ha_reevaluation_light_candidate($stored, $current)) {
     $light = jeedom2ha_reevaluation_light_step($deps, $stored, $current, $states);
     if ($light !== null) {
       return $light;

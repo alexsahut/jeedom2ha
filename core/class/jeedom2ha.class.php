@@ -539,7 +539,7 @@ class jeedom2ha extends eqLogic {
   public static function reevaluateDecisionsIfChanged(): array {
     return jeedom2ha_reevaluation_tick(array(
       'fingerprint' => function () {
-        // Story 24.18 — composite et états des scénarios publiés, lus ensemble (une seule lecture de la base).
+        // Story 24.18 — composite et états de tous les scénarios, lus ensemble (une seule lecture de la base).
         return self::readDecisionFingerprintParts();
       },
       'stored' => function () {
@@ -558,7 +558,7 @@ class jeedom2ha extends eqLogic {
         return self::callDaemon('/action/sync', $topology, 'POST', JEEDOM2HA_REEVALUATION_SYNC_TIMEOUT_S, null,
           array('X-Jeedom2ha-Sync-Mode' => 'service'));
       },
-      // Story 24.18 — synchro légère : seule l'activation de scénarios publiés a changé (aucun listener réaligné).
+      // Story 24.18 — synchro légère : seule l'activation de scénarios a changé (aucun listener réaligné).
       'light' => function (array $states) {
         return self::callDaemon('/action/scenario_activation', array('scenarios' => $states), 'POST', 15, 1);
       },
@@ -582,8 +582,8 @@ class jeedom2ha extends eqLogic {
   }
 
   /**
-   * Story 24.18 — empreinte en deux parties (structurelle / activation des scénarios publiés) et états des scénarios
-   * publiés, depuis les mêmes deux requêtes que 24.14 (aucun nom lu).
+   * Story 24.18 — empreinte en deux parties (structurelle / activation des scénarios) et états de tous les
+   * scénarios, depuis les mêmes deux requêtes que 24.14 (aucun nom lu).
    */
   public static function readDecisionFingerprintParts(): array {
     $eqRows = DB::Prepare(

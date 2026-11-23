@@ -8,7 +8,7 @@
 
 # 2026-11-23 — Bascule d'un scénario : mise à jour légère
 
-- Quand seule l'activation d'un ou plusieurs scénarios publiés change (par exemple un scénario qui en active et désactive un autre), la tâche périodique ne relance plus une synchronisation complète : elle met seulement à jour la disponibilité des boutons concernés dans Home Assistant. Le résultat dans Home Assistant est le même. Dans tout autre cas, ou en cas de doute, la synchronisation complète a lieu comme avant.
+- Quand seule l'activation d'un ou plusieurs scénarios change (par exemple un scénario qui en active et désactive un autre), la tâche périodique ne relance plus une synchronisation complète : elle met seulement à jour la disponibilité des boutons publiés concernés dans Home Assistant, et l'état « Actif / Inactif » de l'écran des scénarios. Le résultat est le même qu'avec une synchronisation complète. Dans tout autre cas, ou en cas de doute, la synchronisation complète a lieu comme avant.
 
 # 2026-11-19 — Santé de Jeedom dans Home Assistant (option)
 

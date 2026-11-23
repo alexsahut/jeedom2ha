@@ -50,15 +50,17 @@ check('rend structural, activation, states, fingerprint',
     isset($p['structural'], $p['activation'], $p['states'], $p['fingerprint']));
 check('composite au format v2:<structurelle>:<activation>',
     $p['fingerprint'] === 'v2:' . $p['structural'] . ':' . $p['activation']);
-check('states : seulement les scénarios publiés, triés',
-    $p['states'] === array(array('id' => 10, 'is_active' => true), array('id' => 11, 'is_active' => false)));
+check('states : tous les scénarios, publiés ou non, triés (revue I1, option A)',
+    $p['states'] === array(array('id' => 10, 'is_active' => true), array('id' => 11, 'is_active' => false),
+                           array('id' => 12, 'is_active' => true)));
 
 $toggled = jeedom2ha_decision_fingerprint_parts($eqs, array(sc_row(10, false), sc_row(11, false), sc_row(12, true)), $settings);
 check('activation d\'un publié : structurelle inchangée', $toggled['structural'] === $p['structural']);
 check('activation d\'un publié : activation changée', $toggled['activation'] !== $p['activation']);
 
 $unpub = jeedom2ha_decision_fingerprint_parts($eqs, array(sc_row(10, true), sc_row(11, false), sc_row(12, false)), $settings);
-check('activation d\'un non publié : rien ne change (règle 4)', $unpub['fingerprint'] === $p['fingerprint']);
+check('activation d\'un non publié : structurelle inchangée, activation changée (revue I1, option A)',
+    $unpub['structural'] === $p['structural'] && $unpub['activation'] !== $p['activation']);
 
 $e = $eqs; $e[0]['isEnable'] = '0';
 $x = jeedom2ha_decision_fingerprint_parts($e, $scs, $settings);
@@ -85,6 +87,34 @@ $allToggled = jeedom2ha_decision_fingerprint_parts($eqs, array(sc_row(10, true),
     array('excludedPlugins' => 'zwave', 'excludedObjects' => ''));
 check('sans choix de publication : la bascule du 12 change l\'activation seule',
     $allToggled['structural'] === $all['structural'] && $allToggled['activation'] !== $all['activation']);
+
+// Revue 24.18 (M2) — équivalence avec l'empreinte 24.14 : toute variation qui change l'ancienne change la composite.
+$cases = array(
+    'isEnable' => array($e, $scs, $settings),
+    'isActive (publié)' => array($eqs, array(sc_row(10, false), sc_row(11, false), sc_row(12, true)), $settings),
+    'isActive (non publié)' => array($eqs, array(sc_row(10, true), sc_row(11, false), sc_row(12, false)), $settings),
+    'exclusion individuelle' => array(array(eq_row(1, 1, 'virtual', 3, '{"jeedom2ha_excluded":"1"}'), eq_row(2, 0), eq_row(3, 1, 'zwave', 4)), $scs, $settings),
+    'excludedPlugins' => array($eqs, $scs, array_merge($settings, array('excludedPlugins' => ''))),
+    'excludedPlugins (ajout)' => array($eqs, $scs, array_merge($settings, array('excludedPlugins' => 'zwave,virtual'))),
+    'excludedObjects' => array($eqs, $scs, array_merge($settings, array('excludedObjects' => '3'))),
+    'équipement ajouté' => array(array_merge($eqs, array(eq_row(9))), $scs, $settings),
+    'équipement changé de pièce' => array(array(eq_row(1, 1, 'virtual', 7), eq_row(2, 0), eq_row(3, 1, 'zwave', 4)), $scs,
+        array_merge($settings, array('excludedObjects' => '7'))),
+    'scénario ajouté' => array($eqs, array_merge($scs, array(sc_row(13, false))), $settings),
+    'scénario supprimé' => array($eqs, array(sc_row(10, true), sc_row(11, false)), $settings),
+    'publishedScenarios' => array($eqs, $scs, array_merge($settings, array('publishedScenarios' => array(10)))),
+    'knownScenarioIds' => array($eqs, $scs, array_merge($settings, array('knownScenarioIds' => array(10, 11)))),
+);
+$oldBase = jeedom2ha_decision_fingerprint($eqs, $scs, $settings);
+foreach ($cases as $label => $args) {
+    $oldChanged = jeedom2ha_decision_fingerprint($args[0], $args[1], $args[2]) !== $oldBase;
+    $newChanged = jeedom2ha_decision_fingerprint_parts($args[0], $args[1], $args[2])['fingerprint'] !== $p['fingerprint'];
+    check("M2 ({$label}) : l'ancienne empreinte change et la composite aussi", $oldChanged && $newChanged);
+}
+// Et inversement : ce qui ne change pas l'ancienne ne change pas la composite.
+check('M2 : ordre, noms et ligne illisible sans effet sur les deux',
+    jeedom2ha_decision_fingerprint(array_reverse($named), array_reverse($namedSc), $settings) === $oldBase
+    && jeedom2ha_decision_fingerprint_parts(array_reverse($named), array_merge(array_reverse($namedSc), array(array('id' => 'x'))), $settings)['fingerprint'] === $p['fingerprint']);
 
 // Lecture de la composite et choix du chemin.
 check('composite lisible', jeedom2ha_reevaluation_parse_fingerprint($p['fingerprint']) === array('structural' => $p['structural'], 'activation' => $p['activation']));
@@ -206,6 +236,15 @@ check('409 : pas suivant : synchro complète', jeedom2ha_reevaluation_tick($deps
 list($deps, $st) = make_deps($OLD, $NEW_LIGHT, array('fingerprint' => function () use ($NEW_LIGHT) { return $NEW_LIGHT; }));
 $r = jeedom2ha_reevaluation_tick($deps);
 check('empreinte en chaîne seule : synchro complète', $r['status'] === 'synced' && !in_array('light', $st->calls, true));
+
+// Revue 24.18 (M4) — au-delà du plafond, pas de chemin léger (le démon répondrait 400) : synchro complète.
+$many = array();
+for ($i = 1; $i <= JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS + 1; $i++) { $many[] = array('id' => $i, 'is_active' => true); }
+list($deps, $st) = make_deps($OLD, $NEW_LIGHT, array('fingerprint' => function () use ($NEW_LIGHT, $many) {
+    return array('fingerprint' => $NEW_LIGHT, 'states' => $many);
+}));
+$r = jeedom2ha_reevaluation_tick($deps);
+check('M4 : liste au-delà du plafond : synchro complète, pas d\'appel léger', $r['status'] === 'synced' && !in_array('light', $st->calls, true));
 
 // ---------------------------------------------------------------------------
 // Câblage dans la classe

@@ -46,7 +46,7 @@ Règles posées :
 1. Si autre chose a changé en même temps, ou en cas de doute : synchro complète, comme aujourd'hui.
 2. Échec du chemin léger : retour à la synchro complète au pas suivant, aucune perte d'état.
 3. Pas de réalignement des listeners sur le chemin léger (le parc ne change pas).
-4. Un scénario non publié dont l'activation change ne déclenche rien du tout, en tenant compte de l'export de décision.
+4. Un scénario non publié dont l'activation change ne déclenche rien du tout, en tenant compte de l'export de décision. **Amendée par la relecture de la PR #422 (I1, option A)** : cette règle avait été formulée par le coordinateur, pas par Alexandre, et figeait l'écran des scénarios du plugin. Un non publié qui bascule ne publie toujours rien dans HA et ne déclenche ni synchro complète ni réalignement, mais le démon met à jour son instantané (écran, export), comme la synchro complète.
 5. Les deux empreintes sont mémorisées correctement : un pas suivant sans changement ne relance rien.
 
 ## Conception
@@ -55,10 +55,10 @@ Règles posées :
 
 - `jeedom2ha_decision_fingerprint_parts($eqRows, $scenarioRows, $settings, $selfEqType)` rend :
   - `structural` : SHA-256 de tout ce que contenait l'empreinte 24.14 **sauf** l'activation des scénarios : `id:isEnable:exclusion` des équipements, **identifiants** de tous les scénarios, plugins et pièces exclus, choix de publication des scénarios (`publishedScenarios`, `knownScenarioIds`) ;
-  - `activation` : SHA-256 de `id:isActive` des seuls scénarios **publiés** (même règle que le démon et l'export : `publishedScenarios` absent → tous publiés ; sinon publié si l'id y figure) ;
-  - `states` : `[{id, is_active}]` des scénarios publiés (ce qui sera envoyé au démon) ;
+  - `activation` : SHA-256 de `id:isActive` de **tous** les scénarios, publiés ou non (revue I1, option A) ;
+  - `states` : `[{id, is_active}]` de tous les scénarios (ce qui sera envoyé au démon), au plus 5000 (`JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS`, au-delà : synchro complète) ;
   - `fingerprint` : valeur composite `v2:<structural>:<activation>`, celle qui est mémorisée.
-- L'activation d'un scénario **non publié** n'entre dans aucune partie (règle 4) : sa bascule ne change rien, aucun appel au démon. Sa ligne d'export (`active`) et son statut (`is_active`) restent ceux de la dernière synchro complète (le verdict, `not_published` / `scenario_not_selected`, ne dépend pas de l'activation) : conséquence assumée, documentée dans `docs/dev-decision-export.md`.
+- L'activation d'un scénario **non publié** entre dans la partie activation (revue I1) : sa bascule prend le chemin léger, qui ne publie rien dans HA pour lui mais met à jour l'instantané, donc l'écran des scénarios (`is_active`, puce « Inactifs », suggestion « lancés à la main ») et l'export (`active`).
 - Une seule clé de configuration (`decisionFingerprint`) garde la valeur composite : le démarrage, « Relire Jeedom », le choix de publication des scénarios et la tâche périodique la mémorisent / l'invalident **sans changer d'appelant** (`readDecisionFingerprint()` rend la composite). Deux composites égales ⇔ les deux parties égales (règle 5). Une valeur stockée à l'ancien format (24.14, sans `v2:`) n'est pas lisible en deux parties : synchro complète au premier pas, qui mémorise la composite.
 - `jeedom2ha_reevaluation_tick()` gagne une dépendance facultative `light` (absente : comportement 24.14 strict) :
   1. composite inchangée → rien (inchangé) ;
@@ -74,10 +74,10 @@ Règles posées :
 ### Démon — action minimale `POST /action/scenario_activation`
 
 - Authentifiée (`X-Local-Secret`), sérialisée par `action_lock` comme la synchro (attente 7 s, sinon 409 `action_in_progress`).
-- Corps : `payload.scenarios = [{id, is_active}]` (identifiants entiers > 0, booléens). Corps mal formé → 400.
-- **Refus « dans le doute »** (`full_sync_required`, aucune écriture) si : aucune synchro complète depuis le démarrage (`topology` ou `sync_at` absents) ; l'ensemble reçu diffère de l'ensemble des scénarios publiés par la dernière synchro (`scenario_publications` en `scenario_button` et `discovery_published`) ; un scénario reçu n'est pas publié ; une publication de scénario ou d'équipement est restée en échec (`scenario_publication_failed_ids`, `publication_result` en échec) ; une dépublication ou un nettoyage de disponibilité est différé ; un réglage en attente existe (overrides courants ≠ overrides appliqués du mémo, la règle `pending_changes` de l'export) — la synchro complète les aurait appliqués (décision du 13/11).
+- Corps : `payload.scenarios = [{id, is_active}]` (identifiants entiers > 0, booléens, sans doublon, 5000 au plus : `SCENARIO_ACTIVATION_MAX_SCENARIOS`). Corps mal formé ou trop long → 400.
+- **Refus « dans le doute »** (`full_sync_required`, aucune écriture) si : aucune synchro complète depuis le démarrage (`topology` ou `sync_at` absents) ; l'ensemble reçu diffère de l'ensemble des scénarios lisibles de l'instantané (`topology.scenarios`, revue I1) ; la décision d'un scénario n'est ni un bouton publié confirmé (`scenario_button`, `discovery_published`) ni un retrait confirmé (`scenario_not_selected`) (`scenario_not_confirmed`) ; une publication de scénario ou d'équipement est restée en échec (`scenario_publication_failed_ids`, `publication_result` en échec) ; une dépublication ou un nettoyage de disponibilité est différé ; un réglage en attente existe (overrides courants ≠ overrides appliqués du mémo, la règle `pending_changes` de l'export) — la synchro complète les aurait appliqués (décision du 13/11).
 - Broker déconnecté → `broker_unavailable` (échec, synchro complète au pas suivant).
-- Pour chaque scénario dont `is_active` diffère de l'instantané : publication de la disponibilité retenue (`_publish_scenario_availability`, mêmes topic, charge, qos et retenue que la synchro complète) ; si elle réussit, mise à jour de `topology.scenarios[id].is_active` et de `scenario_publications[id].active_or_alive`. Un échec arrête l'action : le scénario rejoint `scenario_publication_failed_ids` (statut `ha_pending`), réponse `publish_failed`, la mémoire des scénarios déjà publiés reste alignée sur HA (aucune perte d'état).
+- Pour chaque scénario dont `is_active` diffère de l'instantané : publication de la disponibilité retenue (`_publish_scenario_availability`, mêmes topic, charge, qos et retenue que la synchro complète) ; si elle réussit, mise à jour de `topology.scenarios[id].is_active` et de `scenario_publications[id].active_or_alive`. Un échec arrête l'action : le scénario rejoint `scenario_publication_failed_ids` (statut `ha_pending`), réponse `publish_failed`, la mémoire des scénarios déjà publiés reste alignée sur HA (aucune perte d'état). Scénario non publié (retrait confirmé) : aucune publication MQTT, seules l'instantané et `active_or_alive` sont mis à jour (comme `_withdraw_unselected_scenario` dans la synchro complète) ; le broker n'est requis que si un scénario publié a basculé.
 - Après au moins une mise à jour : `decision_memo.scenario_activation_at` (champ additif de l'export, remis à `null` par chaque synchro complète), export de décision réécrit, cache des états agrégés invalidé. `sync_at` et `sync_origin` ne changent pas : ils décrivent la dernière synchro complète.
 - Aucun changement : `unchanged`, rien écrit.
 
@@ -91,8 +91,8 @@ Règles posées :
 
 ## Critères d'acceptation
 
-1. **AC1 — Découpage de l'empreinte.** La partie structurelle ne change pas quand seul `isActive` d'un scénario change ; elle change pour tout ce qui changeait l'empreinte 24.14 hormis l'activation (`isEnable`, exclusions, scénario ajouté ou supprimé, choix de publication). La partie activation change quand `isActive` d'un scénario **publié** change ; ni l'une ni l'autre ne change quand `isActive` d'un scénario **non publié** change. Aucun nom n'y entre ; l'ordre de lecture est sans effet.
-2. **AC2 — Chemin léger.** Structure égale et activation différente : un seul appel `scenario_activation` avec les états des scénarios publiés, aucune lecture de topologie, aucun `POST /action/sync`, aucun réalignement des listeners ; composite mémorisée après `applied` / `unchanged`.
+1. **AC1 — Découpage de l'empreinte.** La partie structurelle ne change pas quand seul `isActive` d'un scénario change ; elle change pour tout ce qui changeait l'empreinte 24.14 hormis l'activation (`isEnable`, exclusions, scénario ajouté ou supprimé, choix de publication). La partie activation change quand `isActive` d'un scénario change, publié ou non (revue I1). Toute variation qui change l'empreinte 24.14 change la composite (revue M2). Aucun nom n'y entre ; l'ordre de lecture est sans effet.
+2. **AC2 — Chemin léger.** Structure égale et activation différente : un seul appel `scenario_activation` avec les états de tous les scénarios, aucune lecture de topologie, aucun `POST /action/sync`, aucun réalignement des listeners ; composite mémorisée après `applied` / `unchanged`.
 3. **AC3 — Synchro complète sinon.** Activation et autre chose changées ensemble, ancienne empreinte à l'ancien format, ou aucune empreinte : synchro complète 24.14, listeners réalignés.
 4. **AC4 — Doute du démon.** `full_sync_required` : synchro complète dans le même pas.
 5. **AC5 — Échec puis retour.** Échec du chemin léger (exception, aucune réponse, `publish_failed`, `broker_unavailable`) : empreinte vide, statut `failed` ; au pas suivant, synchro complète. 409 : statut `deferred`, empreinte vide, synchro complète au pas suivant.
@@ -105,7 +105,7 @@ Règles posées :
 
 ## UI Impact
 
-- **UI Impact:** Non — aucun fichier `desktop/` ni `core/ajax/` modifié ; le statut des scénarios et la disponibilité des boutons dans HA restent ceux d'aujourd'hui.
+- **UI Impact:** Non — aucun fichier `desktop/` ni `core/ajax/` modifié. L'écran des scénarios du plugin lit le statut du démon (`/system/status` → `_scenario_status_rows`), que le chemin léger met à jour exactement comme la synchro complète, publiés et non publiés compris (revue I1, test d'équivalence M5) : l'affichage est identique à celui d'aujourd'hui, aucune validation UX n'est requise.
 
 ## Tasks / Subtasks
 
@@ -128,6 +128,8 @@ Règles posées :
   - [ ] 6.3 Aucun réalignement des listeners : identifiants et nombre de listeners du plugin inchangés sur la salve (avec 12.6 fusionnée, les identifiants sont stables même après un réalignement : la preuve repose alors sur `sync_at` inchangé, aucune synchro complète n'ayant eu lieu).
   - [ ] 6.4 Bilan sur 24 h : nombre de synchros complètes (changements de `sync_at`) très inférieur aux 62 du 23/11 ; aucune bascule du 129 manquée dans HA.
   - [ ] 6.5 Contre-épreuve : un changement structurel (activer / désactiver un équipement de test, avec l'accord d'Alexandre) change `sync_at` (synchro complète).
+  - [ ] 6.6 Si `sync_at` bouge encore à chaque bascule du 129 : relever dans l'export `pending_changes` (équipements) et les échecs de publication (`entities[].discovery_published`, `ha_pending` du statut des scénarios) : ce sont les refus « dans le doute » qui ramènent la synchro complète.
+  - [ ] 6.7 Écran des scénarios : la bascule d'un scénario non publié change son état « Actif / Inactif » au pas suivant, sans changer `sync_at`.
 
 ## Dev Notes
 
@@ -142,6 +144,8 @@ Règles posées :
 ### Ce que le chemin léger ne fait pas (risque résiduel, à connaître)
 
 Une synchro complète déclenchée par une bascule appliquait au passage ce qui avait changé hors empreinte depuis la synchro précédente : renommage d'un scénario ou d'un équipement, type générique, commande ajoutée ou supprimée, exposition HomeKit. Avec le chemin léger, ces changements ne sont plus appliqués « par hasard » à la bascule suivante d'un scénario, mais, comme le documentait déjà 24.14, au prochain démarrage, « Relire Jeedom », ou à la prochaine synchro complète (tout changement structurel). Les réglages en attente (types choisis, « Toujours » / « Jamais ») restent appliqués par la tâche périodique : le démon refuse le chemin léger tant qu'il y en a.
+
+Le chemin léger ne republie pas non plus les disponibilités retenues des **autres** scénarios (ceux qui n'ont pas basculé), que la synchro complète republiait à l'identique. Une disponibilité retenue perdue (broker sans persistance redémarré) est republiée par la naissance de HA et la reconnexion du broker (`_republish_scenarios_from_cache`), comme depuis 24.14 (revue M3).
 
 ### Garde-fous
 
@@ -189,7 +193,7 @@ Claude Opus 5.5 (session Claude Code cloud déléguée).
 - Task 4 : route `POST /action/scenario_activation` (secret, `action_lock`, 400 / 409), refus `full_sync_required` (`no_previous_sync`, `scenario_set_mismatch`, `previous_publication_failed`, `deferred_operations`, `pending_overrides`), `broker_unavailable`, `publish_failed` (scénario ajouté à `scenario_publication_failed_ids`) ; mise à jour de l'instantané et de `active_or_alive` après publication seulement ; `scenario_activation_at` (mémo, export, remis à `null` par la synchro complète).
 - Task 5 : `docs/dev-decision-export.md`, `docs/fr_FR/index.md`, `docs/fr_FR/changelog_beta.md` ; garde 25.4 : `REPLACED_BY_24_18` (2 lignes de `core/class/jeedom2ha.class.php`).
 - Vérifications (2026-11-23) : `python3 -m pytest` 3828 réussis, 37 ignorés (base : 3809) ; `flake8 resources/daemon tests` propre ; `php -l` sur tous les fichiers PHP ; tests PHP autonomes 24 réussis, 3 ignorés (cœur Jeedom requis), 0 échec ; `node --test tests/unit/*.node.test.js` 1649 réussis, 3 échecs connus `25.4 AC8` (identiques à la base, hors périmètre).
-- Commandes ciblées : `php tests/test_php_story_24_18_scenario_activation_light.php` (51 vérifications) ; `python3 -m pytest resources/daemon/tests/unit/test_story_24_18_scenario_activation.py` (20 tests) ; `node --test tests/unit/test_story_25_4_non_regression.node.test.js`.
+- Commandes ciblées : `php tests/test_php_story_24_18_scenario_activation_light.php` (66 vérifications) ; `python3 -m pytest resources/daemon/tests/unit/test_story_24_18_scenario_activation.py` (26 tests) ; `node --test tests/unit/test_story_25_4_non_regression.node.test.js`.
 - Tasks 0 et 6 (terrain) : hors session cloud, à ClaudeBox / l'agent de production.
 
 ### File List
@@ -215,7 +219,26 @@ Revue adversariale du diff (hors `_bmad/` et `_bmad-output/`). File List conform
 - **[LOW] Verdict d'équipement non mémorisé** (exception rattrapée par `_memorize_decision`) avec un override : `pending_overrides` refuse alors le chemin léger à chaque bascule, soit le comportement d'avant 24.18 (sûr).
 - **[LOW] `active` d'un scénario non publié** dans l'export et `is_active` du statut : valeur de la dernière synchro complète (règle 4), documenté dans `docs/dev-decision-export.md`.
 
+### Review Findings — relecture indépendante de la PR #422 (coordinateur, 2026-11-23)
+
+Conclusion : OK pour fusion sur le fond, aucun point bloquant ; Codex : rien ; CI verte (un test de charge relancé, machine lente). Points traités en une passe sur la même branche :
+
+- [x] **[I1, important] Écran des scénarios figé pour les non publiés.** L'activation d'un non publié sortait de l'empreinte : l'écran (`desktop/js/jeedom2ha_scenarios.js`, alimenté par `_scenario_status_rows`) affichait « Actif » jusqu'à la synchro complète suivante (puce « Inactifs », suggestion « lancés à la main » fausses). Option A appliquée : PHP — l'activation de tous les scénarios entre dans la partie activation et tous sont envoyés ; démon — l'ensemble reçu doit être celui de `topology.scenarios` ; publié : inchangé ; non publié confirmé (`scenario_not_selected`) : `topology.is_active` et `active_or_alive` mis à jour sans aucun message MQTT ; autre état : `scenario_not_confirmed` (synchro complète). Toujours ni synchro complète ni réalignement. Tests : `test_unpublished_scenario_updates_status_without_any_mqtt`, `test_unpublished_scenario_needs_no_broker`, `test_refused_when_only_published_scenarios_are_sent`, `test_refused_while_a_withdrawal_is_pending` ; UI Impact et `docs/fr_FR/index.md` corrigés.
+- [x] **[M1]** Test de la réécriture du fichier `jeedom2ha_decision_export.json` (`active`, `scenario_activation_at`) et de l'invalidation du cache des états agrégés.
+- [x] **[M2]** Test d'équivalence ancienne / nouvelle empreinte : 13 variations (dont `excludedPlugins` retiré et ajouté, exclusion individuelle, changement de pièce, `knownScenarioIds`) changent l'une et l'autre ; ordre, noms et ligne illisible ne changent ni l'une ni l'autre.
+- [x] **[M3]** Dev Notes : le chemin léger ne republie pas les disponibilités retenues des autres scénarios (couvert par la naissance de HA et la reconnexion).
+- [x] **[M4]** Liste plafonnée à 5000 (`SCENARIO_ACTIVATION_MAX_SCENARIOS`, 400 au-delà ; côté PHP `JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS` : au-delà, synchro complète sans appel léger). Tests des deux côtés.
+- [x] **[M5]** Le test d'équivalence compare aussi l'export (sans `generated_at`, `sync_at`, `sync_origin`, `scenario_activation_at`) et `_scenario_status_rows`, avec un publié actif → inactif, un publié inactif → actif et un non publié.
+- Task 6 : ajout de 6.6 (si `sync_at` bouge encore, relever `pending_changes` et les échecs de publication) et 6.7 (écran des scénarios).
+
+Le constat LOW « `active` d'un scénario non publié » de l'auto-revue est levé par I1.
+
 Statut : `review` maintenu (et non `done`) : la règle du projet exige la preuve terrain (Task 6) pour tout changement de publication vers HA. UI Impact : Non (aucun fichier `desktop/` ni `core/ajax/`).
+
+## Change Log
+
+- 2026-11-23 — create-story, dev-story, auto-revue (voir Journal).
+- 2026-11-23 — corrections de la relecture de la PR #422 : I1 (option A, non publiés dans le chemin léger, mémoire seule), M1 à M5 ; story reste `review` jusqu'à la preuve terrain.
 
 ## Journal
 

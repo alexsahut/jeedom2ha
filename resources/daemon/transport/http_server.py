@@ -2877,10 +2877,13 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
 
 
 # ---------------------------------------------------------------------------
-# Story 24.18 — synchro légère : seule l'activation de scénarios publiés a changé
+# Story 24.18 — synchro légère : seule l'activation de scénarios a changé
 # ---------------------------------------------------------------------------
 
 SCENARIO_ACTIVATION_FULL_SYNC_REQUIRED = "full_sync_required"
+# Revue 24.18 (M4) — plafond de la liste reçue (même valeur que JEEDOM2HA_REEVALUATION_LIGHT_MAX_SCENARIOS côté PHP
+# et que JEEDOM2HA_SCENARIO_PUBLICATION_MAX_IDS) ; au-delà : 400.
+SCENARIO_ACTIVATION_MAX_SCENARIOS = 5000
 
 
 def _parse_scenario_activation_states(data) -> Optional[Dict[int, bool]]:
@@ -2892,7 +2895,7 @@ def _parse_scenario_activation_states(data) -> Optional[Dict[int, bool]]:
         return None
     payload = data.get("payload")
     raw = payload.get("scenarios") if isinstance(payload, dict) else None
-    if not isinstance(raw, list):
+    if not isinstance(raw, list) or len(raw) > SCENARIO_ACTIVATION_MAX_SCENARIOS:
         return None
     states: Dict[int, bool] = {}
     for item in raw:
@@ -2908,14 +2911,23 @@ def _parse_scenario_activation_states(data) -> Optional[Dict[int, bool]]:
     return states
 
 
-def _published_scenario_ids(app) -> Set[int]:
-    """Scénarios dont le bouton a été publié par la dernière synchro complète (verdict ``scenario_button``)."""
-    return {
-        sc_id for sc_id, decision in (app.get("scenario_publications") or {}).items()
-        if getattr(decision, "reason", None) == "scenario_button"
+def _scenario_activation_kind(decision) -> Optional[str]:
+    """Revue 24.18 (I1) — comment le chemin léger traite un scénario d'après sa décision de la dernière synchro.
+
+    ``published`` : bouton publié (``scenario_button``) -> disponibilité retenue republiée ; ``unselected`` : non publié,
+    retrait confirmé (``scenario_not_selected``) -> mémoire seule, aucun message MQTT, comme la synchro complète ;
+    None : tout autre état (retrait en attente, publication non confirmée) -> synchro complète.
+    """
+    reason = getattr(decision, "reason", None)
+    if (
+        reason == "scenario_button"
         and getattr(decision, "should_publish", False)
         and getattr(decision, "discovery_published", False)
-    }
+    ):
+        return "published"
+    if reason == SCENARIO_NOT_SELECTED and not getattr(decision, "should_publish", False):
+        return "unselected"
+    return None
 
 
 def _has_pending_overrides(app, data_dir: str) -> bool:
@@ -2946,14 +2958,17 @@ def _scenario_activation_refusal(app, states: Dict[int, bool], data_dir: str) ->
     """Story 24.18 — raison de refuser le chemin léger (synchro complète demandée), ou None.
 
     Dans le doute, la synchro complète : elle seule applique ce qui a changé hors activation (ensemble des scénarios
-    publiés, publication en échec, opération différée, réglage en attente — décision du 13/11).
+    lisibles, décision de scénario non confirmée, publication en échec, opération différée, réglage en attente — décision du
+    13/11).
     """
     if app.get("topology") is None or app["decision_memo"].sync_at is None:
         return "no_previous_sync"
-    if set(states) != _published_scenario_ids(app):
+    # Revue 24.18 (I1, option A) — tous les scénarios lisibles, publiés ou non, comme la synchro complète.
+    if set(states) != set(app["topology"].scenarios):
         return "scenario_set_mismatch"
-    if any(sc_id not in app["topology"].scenarios for sc_id in states):
-        return "scenario_set_mismatch"
+    decisions = app.get("scenario_publications") or {}
+    if any(_scenario_activation_kind(decisions.get(sc_id)) is None for sc_id in states):
+        return "scenario_not_confirmed"
     if app.get("scenario_publication_failed_ids") or _has_failed_equipment_publication(app):
         return "previous_publication_failed"
     if app.get("pending_discovery_unpublish") or app.get("pending_local_availability_cleanup"):
@@ -3004,8 +3019,10 @@ def _apply_scenario_activation(app, states: Dict[int, bool], data_dir: str) -> w
     if not changed:
         return web.json_response({"action": "scenario_activation", "status": "ok", "result": "unchanged",
                                   "scenario_ids": []})
+    decisions = app["scenario_publications"]
     mqtt_bridge = app.get("mqtt_bridge")
-    if mqtt_bridge is None or not mqtt_bridge.is_connected:
+    needs_mqtt = any(_scenario_activation_kind(decisions[sc_id]) == "published" for sc_id in changed)
+    if needs_mqtt and (mqtt_bridge is None or not mqtt_bridge.is_connected):
         _LOGGER.warning("[SCENARIO-ACTIVATION] Broker injoignable : synchro complète au prochain pas")
         return web.json_response({"action": "scenario_activation", "status": "error",
                                   "code": "broker_unavailable", "scenario_ids": changed})
@@ -3013,7 +3030,11 @@ def _apply_scenario_activation(app, states: Dict[int, bool], data_dir: str) -> w
     failed = []
     for sc_id in changed:
         active = states[sc_id]
-        if not _publish_scenario_availability(mqtt_bridge, sc_id, active):
+        # Non publié (retrait confirmé) : aucun message MQTT, mémoire seule (synchro complète : active_or_alive = is_active).
+        if (
+            _scenario_activation_kind(decisions[sc_id]) == "published"
+            and not _publish_scenario_availability(mqtt_bridge, sc_id, active)
+        ):
             failed.append(sc_id)
             break
         # Publié : la mémoire suit HA (appui accepté / refusé, republication à la naissance de HA, export).

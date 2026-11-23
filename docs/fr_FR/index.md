@@ -164,7 +164,7 @@ Puis **« Relu 15:58 »** : l'heure de la dernière relecture (« Relu le 12/11 
 
 « Relire Jeedom » demande une confirmation (« Le plugin relit vos équipements et met Home Assistant à jour. », puis « Rien n'est supprimé sans que vous l'ayez exclu. »). Le résultat s'affiche en une ligne : « Relecture terminée. », « Relecture terminée avec avertissements. » ou « Relecture échouée. ».
 
-Vous n'avez rien à relancer quand un scénario ou un équipement est activé ou désactivé, ou quand une exclusion change : toutes les 5 minutes, la tâche cron5 de Jeedom le vérifie et, seulement si quelque chose a changé, relit Jeedom et met Home Assistant à jour. Quand seule l'activation d'un scénario publié a changé, seule la disponibilité de son bouton est mise à jour, sans relire tout Jeedom ; le résultat dans Home Assistant est le même.
+Vous n'avez rien à relancer quand un scénario ou un équipement est activé ou désactivé, ou quand une exclusion change : toutes les 5 minutes, la tâche cron5 de Jeedom le vérifie et, seulement si quelque chose a changé, relit Jeedom et met Home Assistant à jour. Quand seule l'activation de scénarios a changé, seule la disponibilité de leurs boutons publiés est mise à jour, sans relire tout Jeedom ; le résultat dans Home Assistant, dans l'écran des scénarios du plugin et dans l'export de décision est le même.
 
 ### La page maison et les puces
 
