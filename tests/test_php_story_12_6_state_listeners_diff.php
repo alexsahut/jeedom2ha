@@ -189,6 +189,35 @@ $negEq = array(array('id' => 1, 'eq_id' => -1, 'cmd_id' => 101, 'events' => arra
 $plan = jeedom2ha_state_listener_plan(array(array('eq_id' => 0, 'cmd_id' => 101)), $negEq);
 check('revue — eq_id négatif : mal formé, remplacé', array_column($plan['remove'], 'id') === array(1));
 
+// Revue Codex P2 (PR #421) : le cœur (listener::searchEvent) cherche le motif complet `#<cmd_id>#` ; toute autre forme
+// ne se déclenche jamais et doit être remplacée.
+foreach (array(
+    'entier 101' => array(101),
+    'chaîne "101"' => array('101'),
+    'chaîne "#101"' => array('#101'),
+    'chaîne "101#"' => array('101#'),
+    'chaîne "##101##"' => array('##101##'),
+    'chaîne " #101# "' => array(' #101# '),
+    'JSON ["101"]' => '["101"]',
+    'JSON [101]' => '[101]',
+) as $label => $events) {
+    $plan = jeedom2ha_state_listener_plan(array($targets[0]),
+        array(array('id' => 1, 'eq_id' => 10, 'cmd_id' => 101, 'events' => $events)));
+    check('Codex P2 — événement ' . $label . ' : mal formé, remplacé',
+        array_column($plan['remove'], 'id') === array(1) && $plan['create'] === array($targets[0]) && !$plan['keep']);
+}
+$plan = jeedom2ha_state_listener_plan(array($targets[0]),
+    array(array('id' => 1, 'eq_id' => 10, 'cmd_id' => 101, 'events' => '["#101#"]')));
+check('Codex P2 — JSON ["#101#"] (défense) : conservé', array_column($plan['keep'], 'id') === array(1));
+
+// Revue 6 : nombre de listeners d'une cible voulue remplacés parce que mal formés.
+$plan = jeedom2ha_state_listener_plan($targets, array(
+    array('id' => 1, 'eq_id' => 10, 'cmd_id' => 101, 'events' => array('101')),
+    array('id' => 2, 'eq_id' => 11, 'cmd_id' => '111', 'events' => array('#999#')),
+    array('id' => 3, 'eq_id' => 12, 'cmd_id' => 121, 'events' => array('121')),
+));
+check('revue 6 — mal formés d\'une cible voulue comptés (pas ceux d\'une cible plus voulue)', $plan['replaced_malformed'] === 2);
+
 // ---------------------------------------------------------------------------
 echo "\nRéalignement sur une base simulée\n";
 // ---------------------------------------------------------------------------
@@ -205,7 +234,7 @@ check('cible identique : 0 suppression', count($store->removed) === 0);
 check('cible identique : identifiants inchangés', $store->ids() === $before);
 check('cible identique : nombre en place rendu', $c === 3);
 check('statistiques : 3 conservés, 0 créé, 0 supprimé',
-    $stats === array('kept' => 3, 'created' => 0, 'removed' => 0));
+    $stats === array('kept' => 3, 'created' => 0, 'removed' => 0, 'replaced_malformed' => 0));
 
 $store->reset();
 list($c, $w) = $store->realign(targets_response($parc));
@@ -234,6 +263,21 @@ $store->reset();
 list($c, $w) = $store->realign(targets_response($parc));
 check('listener mal formé d\'une cible voulue : remplacé (créer puis supprimer)',
     $store->trace === array('fetch', 'list', 'create:10/102', 'remove:' . $before[1], 'remove:' . $badId));
+
+// Revue 6 : un WARNING quand des listeners d'une cible voulue sont remplacés parce que mal formés.
+$store = new FakeListenerStore();
+$store->add(10, 101, array('101'));
+$store->add(11, 111);
+$store->reset();
+$stats = null;
+list($c, $w) = $store->realign(targets_response(array(array(10, 101), array(11, 111))), true, $stats);
+check('revue 6 — un avertissement avec le nombre de listeners mal formés remplacés',
+    count($w) === 1 && strpos($w[0], '1 ') !== false && strpos($w[0], 'mal formé') !== false);
+check('revue 6 — statistiques : 1 conservé, 1 créé, 1 supprimé, 1 mal formé remplacé',
+    $stats === array('kept' => 1, 'created' => 1, 'removed' => 1, 'replaced_malformed' => 1));
+$store->reset();
+list($c, $w) = $store->realign(targets_response(array(array(10, 101), array(11, 111))));
+check('revue 6 — parc sain ensuite : aucun avertissement', count($w) === 0 && !$store->created && !$store->removed);
 
 // Démon en échec, réponse invalide : rien supprimé.
 $store = new FakeListenerStore();
@@ -268,7 +312,8 @@ $store->failCreateAt = null;
 $store->failRemoveAt = 1;
 $store->reset();
 list($c, $w) = $store->realign(targets_response(array(array(10, 101), array(11, 111))));
-check('suppression interrompue : créations faites, un avertissement', count($store->created) === 2 && count($w) === 1 && $c === 2);
+check('suppression interrompue : créations faites, avertissements « mal formé remplacé » puis « purge interrompue »',
+    count($store->created) === 2 && count($w) === 2 && strpos($w[1], 'Purge interrompue') !== false && $c === 2);
 
 // Description qui lève : listener remplacé.
 $store = new FakeListenerStore();
@@ -298,6 +343,99 @@ check('syncStateListeners passe une description (options et événements)',
     && strpos($body, 'getEvent()') !== false && strpos($body, 'getId()') !== false);
 check('syncStateListeners récupère les statistiques', strpos($body, '$stats') !== false);
 check('plus de journal « (re)enregistré(s) » à chaque resynchronisation', strpos($body, '(re)enregistré(s)') === false);
+
+// ---------------------------------------------------------------------------
+echo "\nRevue 7 — verrou des réalignements concurrents\n";
+// ---------------------------------------------------------------------------
+if (!function_exists('jeedom2ha_state_listener_acquire_lock')) {
+    check('jeedom2ha_state_listener_acquire_lock() présente', false);
+} else {
+    $clock = 0.0;
+    $now = function () use (&$clock) { return $clock; };
+    $sleep = function (float $s) use (&$clock) { $clock += $s; };
+    $held = false;
+    $tries = 0;
+    $try = function () use (&$held, &$tries) { $tries++; if ($held) { return false; } $held = true; return true; };
+    $warnings = array();
+    $warn = function (string $m) use (&$warnings) { $warnings[] = $m; };
+
+    check('verrou libre : pris du premier coup', jeedom2ha_state_listener_acquire_lock($try, $sleep, $now, 5.0, $warn) === true
+        && $tries === 1 && $clock === 0.0 && !$warnings);
+
+    // Un second réalignement pendant le premier (verrou tenu) : il attend puis renonce.
+    $clock = 0.0; $tries = 0;
+    $got = jeedom2ha_state_listener_acquire_lock($try, $sleep, $now, 2.0, $warn);
+    check('verrou tenu : le second réalignement ne chevauche pas le premier', $got === false);
+    check('verrou tenu : attente bornée par le délai', $clock >= 2.0 && $clock < 2.5 && $tries > 1);
+    check('verrou tenu : un avertissement', count($warnings) === 1);
+
+    // Verrou rendu pendant l'attente : le second passe ensuite.
+    $held = true; $clock = 0.0; $warnings = array();
+    $sleep2 = function (float $s) use (&$clock, &$held) { $clock += $s; if ($clock >= 0.5) { $held = false; } };
+    check('verrou rendu pendant l\'attente : le second passe après le premier',
+        jeedom2ha_state_listener_acquire_lock($try, $sleep2, $now, 5.0, $warn) === true && !$warnings);
+
+    // Prise du verrou qui lève (dossier temporaire illisible) : false, rien fait.
+    $warnings = array();
+    check('prise du verrou en échec : false, un avertissement',
+        jeedom2ha_state_listener_acquire_lock(function () { throw new Exception('tmp illisible'); }, $sleep, $now, 0.5, $warn) === false
+        && count($warnings) === 1);
+
+    // Vrai flock sur un fichier temporaire : deux poignées, la seconde est refusée tant que la première tient le verrou,
+    // puis acceptée quand la première poignée est fermée (ce que fait PHP si le processus ou la fonction s'arrête).
+    $lockFile = tempnam(sys_get_temp_dir(), 'j2ha_lock_');
+    $h1 = fopen($lockFile, 'c');
+    $h2 = fopen($lockFile, 'c');
+    $realTry1 = function () use ($h1) { return flock($h1, LOCK_EX | LOCK_NB); };
+    $realTry2 = function () use ($h2) { return flock($h2, LOCK_EX | LOCK_NB); };
+    $warnings = array(); $clock = 0.0;
+    check('flock réel : première poignée prend le verrou', jeedom2ha_state_listener_acquire_lock($realTry1, $sleep, $now, 0.0, $warn) === true);
+    check('flock réel : seconde poignée refusée pendant ce temps', jeedom2ha_state_listener_acquire_lock($realTry2, $sleep, $now, 0.4, $warn) === false);
+    fclose($h1);
+    check('flock réel : poignée fermée -> verrou rendu, la seconde passe', jeedom2ha_state_listener_acquire_lock($realTry2, $sleep, $now, 0.0, $warn) === true);
+    fclose($h2);
+    @unlink($lockFile);
+}
+
+// Revue 9 — la description est bien le 6e argument et $stats le 7e.
+function split_top_level_args($src) {
+    $args = array(); $depth = 0; $cur = ''; $quote = null; $len = strlen($src);
+    for ($i = 0; $i < $len; $i++) {
+        $ch = $src[$i];
+        if ($quote !== null) {
+            $cur .= $ch;
+            if ($ch === '\\' && $i + 1 < $len) { $cur .= $src[++$i]; continue; }
+            if ($ch === $quote) { $quote = null; }
+            continue;
+        }
+        if ($ch === "'" || $ch === '"') { $quote = $ch; $cur .= $ch; continue; }
+        if ($ch === '(' || $ch === '[' || $ch === '{') { $depth++; }
+        if ($ch === ')' || $ch === ']' || $ch === '}') {
+            if ($depth === 0) { $args[] = trim($cur); return $args; }
+            $depth--;
+        }
+        if ($ch === ',' && $depth === 0) { $args[] = trim($cur); $cur = ''; continue; }
+        $cur .= $ch;
+    }
+    return null;
+}
+$callPos = strpos($body, 'jeedom2ha_realign_state_listeners(');
+$callSrc = $callPos === false ? '' : preg_replace('/^\s*\/\/.*$/m', '', substr($body, $callPos + strlen('jeedom2ha_realign_state_listeners(')));
+$args = $callPos === false ? null : split_top_level_args($callSrc);
+$args = is_array($args) ? array_values(array_filter($args, function ($a) { return $a !== ''; })) : array();
+$strip = function ($a) { return trim(preg_replace('/^\s*\/\/.*$/m', '', $a)); };
+check('revue 9 — sept arguments passés au réalignement', count($args) === 7);
+check('revue 9 — 6e argument : la fonction de description (options et événements)',
+    isset($args[5]) && strpos($strip($args[5]), 'function') === 0 && strpos($args[5], 'getEvent()') !== false
+    && strpos($args[5], "getOption('cmd_id')") !== false);
+check('revue 9 — 7e argument : $stats', isset($args[6]) && $strip($args[6]) === '$stats');
+check('revue 5 — listeners relevés triés par identifiant (le plus ancien conservé)',
+    isset($args[1]) && strpos($args[1], 'getId()') !== false && (strpos($args[1], 'usort') !== false));
+$lockPos = strpos($body, 'jeedom2ha_state_listener_acquire_lock(');
+check('revue 7 — syncStateListeners prend le verrou (flock) AVANT le réalignement',
+    $lockPos !== false && $callPos !== false && $lockPos < $callPos && strpos($body, 'flock(') !== false);
+check('revue 7 — verrou refusé : rien n\'est réaligné (retour 0 avant l\'appel)',
+    (bool) preg_match('/if \(!jeedom2ha_state_listener_acquire_lock\([\s\S]*?\)\) \{\s*return 0;/', $body));
 
 echo "\n{$passed} réussis, {$failed} échoués\n";
 exit($failed === 0 ? 0 : 1);

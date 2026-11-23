@@ -646,6 +646,36 @@ class jeedom2ha extends eqLogic {
       return self::callDaemon('/system/state_listeners', null, 'GET', $_timeout, $_maxAttempts);
     };
 
+    // Story 12.6 (revue 7) — un seul réalignement à la fois (cron5 et un clic, par exemple) : verrou `flock` sur un
+    // fichier du dossier temporaire du plugin. Il est rendu à la fermeture de la poignée : fin de cette fonction (y compris
+    // sur exception, la variable locale étant libérée) ou mort du processus : jamais de blocage permanent. Attente bornée
+    // au budget de l'appelant ; à l'échéance, rien n'est touché et le réalignement suivant recale.
+    $lockHandle = null;
+    if (!jeedom2ha_state_listener_acquire_lock(
+      function () use (&$lockHandle) {
+        if ($lockHandle === null) {
+          $handle = fopen(jeedom::getTmpFolder(__CLASS__) . '/state_listeners.lock', 'c');
+          if ($handle === false) {
+            throw new Exception('fichier de verrou impossible à ouvrir');
+          }
+          $lockHandle = $handle;
+        }
+        return flock($lockHandle, LOCK_EX | LOCK_NB);
+      },
+      function (float $seconds) {
+        usleep((int) round($seconds * 1000000));
+      },
+      function () {
+        return microtime(true);
+      },
+      (float) $_timeout,
+      function (string $message) {
+        log::add(__CLASS__, 'warning', $message);
+      }
+    )) {
+      return 0;
+    }
+
     $stats = null;
     $count = jeedom2ha_realign_state_listeners(
       $fetcher,
@@ -656,6 +686,10 @@ class jeedom2ha extends eqLogic {
             $existing[] = $listener;
           }
         }
+        // Story 12.6 (revue 5) — identifiants croissants : le plus ancien d'un groupe de doublons est celui conservé.
+        usort($existing, function ($a, $b) {
+          return intval($a->getId()) <=> intval($b->getId());
+        });
         return $existing;
       },
       function ($listener) {
@@ -685,6 +719,8 @@ class jeedom2ha extends eqLogic {
       },
       $stats
     );
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
     if ($count === null) {
       return 0; // rien appliqué : avertissement déjà journalisé, listeners existants conservés
     }
