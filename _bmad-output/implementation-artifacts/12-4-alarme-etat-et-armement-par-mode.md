@@ -279,6 +279,10 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
 - [x] [Relecture] Redémarrage du démon requis non signalé dans la page : avis à trois cas [plugin_info/configuration.php]
 - [x] [Relecture] Deux clés Homebridge au même libellé : WARNING au mapping, comportement inchangé [mapping/alarm_control_panel.py]
 
+### Revue Codex de la tête `ddceae7` (2026-11-23)
+
+- [x] [Codex][P2] `_last_known_value()` confondait « événement de valeur `None` » et « aucun événement » : après Actif=`None` (publié `None`, correct), un événement Mode reprenait l'ancienne `current_value` de la topologie (Actif=1) et publiait `armed_away` ; la republication (naissance HA, reconnexion) reprenait la même valeur périmée. Correctif : `_last_known_alarm_value()` lit `last_event()` et garde `None` quand un événement l'a porté ; seul « aucun événement » retombe sur la topologie. Utilisé pour les quatre infos de l'alarme (calcul des voisines et `republish_alarm_states`). Vérifié aussi pour Statut (jamais `triggered` ressuscité), Immédiat (jamais `pending` ressuscité) et Mode (mode inconnu → `armed_away`, règle 5, jamais l'ancien mode). Tests : séquence Actif=`None` puis Mode, republication après Actif=`None`, et les trois autres infos ; rouges sur `ddceae7`, verts après. `_last_known_value()` lui-même n'est pas modifié : il sert aussi au thermostat (Story 24.15), hors périmètre de cette story [sync/state.py]
+
 ### `bmad-code-review` de la passe de corrections (diff `623e0bf..892433e`, 2026-11-23)
 
 Même session que les corrections (pas de contexte neuf ni d'autre modèle : écart à la recommandation du workflow, comme à la première revue). File List conforme au diff ; Tasks 10.x vérifiées dans le code et les tests ; AC9 implémenté. Aucun constat High.
@@ -304,3 +308,4 @@ Retenus (corrigés dans cette passe) :
 - 2026-11-23 — Code review (`bmad-code-review`) : 4 constats corrigés, 5 écartés (voir ci-dessus) ; statut `review` en attente de la preuve terrain.
 - 2026-11-23 — Corrections de revue (Codex P2 + relecture indépendante, AC9) : fusion de `origin/main`, retour à `unknown` (payload `None`), code illisible refusé, limite d'essais, code de 4 à 8 chiffres, doc (code en clair sur le topic de commande, ACL, TLS), avis de redémarrage, WARNING de doublon de libellé ; statut `review`.
 - 2026-11-23 — `bmad-code-review` de la passe de corrections : 2 constats Medium corrigés (code laissé dans la page après « Sauvegarder » du cœur, `trim` JS ≠ PHP), 5 écartés ; statut `review` (AC8 terrain toujours à faire).
+- 2026-11-23 — Revue Codex de `ddceae7` : P2 corrigé (un événement de valeur `None` n'est plus remplacé par la valeur de topologie pour les quatre infos de l'alarme) ; statut `review`.

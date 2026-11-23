@@ -864,3 +864,47 @@ def test_distinct_mode_labels_do_not_warn(caplog):
     with caplog.at_level(logging.WARNING, logger="mapping.alarm_control_panel"):
         _map(_alarm_eq())
     assert [r for r in caplog.records if r.levelno == logging.WARNING] == []
+
+
+# --- Revue Codex de 12.4 (2e passe) : un événement à None n'est pas « aucun événement » --------------
+
+@pytest.mark.asyncio
+async def test_enable_none_event_is_kept_for_the_next_event_of_another_info():
+    """Actif=1 en topologie, puis Actif=None, puis Mode : l'état reste inconnu (pas de retour à la topologie)."""
+    sync, bridge, _d = _state_sync(_map(_alarm_eq(enable="1", mode="mode total")))
+    await sync.handle_state_message(EQ, ENABLE, None)
+    await sync.handle_state_message(EQ, MODE, "mode nuit")
+    await sync.handle_state_message(EQ, STATUS, "0")
+    await sync.handle_state_message(EQ, IMMEDIATE, "0")
+    assert [p[1] for p in bridge.published] == ["None"]          # jamais armed_away / armed_night
+    await sync.handle_state_message(EQ, ENABLE, "1")              # Actif relu : l'état revient
+    assert [p[1] for p in bridge.published] == ["None", "armed_night"]
+
+
+@pytest.mark.asyncio
+async def test_republication_after_enable_none_stays_unknown():
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(enable="1", mode="mode total")))
+    await sync.handle_state_message(EQ, ENABLE, None)
+    bridge.published.clear()
+    assert await sync.republish_alarm_states(decision) == 1
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", "None", 1, True)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cmd_id,topology,later,expected", [
+    # Statut=1 en topologie, Statut=None : jamais « triggered » ressuscité par un autre événement.
+    (STATUS, {"status": "1"}, (ENABLE, "1"), "armed_night"),
+    # Immédiat=1 en topologie, Immédiat=None : jamais « pending » ressuscité.
+    (IMMEDIATE, {"immediate": "1"}, (ENABLE, "1"), "armed_night"),
+    # Mode « Mode Jour » en topologie, Mode=None : mode inconnu -> armed_away (règle 5), jamais armed_home.
+    (MODE, {"mode": "Mode Jour"}, (ENABLE, "1"), "armed_away"),
+])
+async def test_none_event_of_status_immediate_or_mode_is_kept_too(cmd_id, topology, later, expected):
+    kwargs = {"enable": "1", "status": "0", "immediate": "0", "mode": "mode nuit", **topology}
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(**kwargs)))
+    await sync.handle_state_message(EQ, cmd_id, None)
+    await sync.handle_state_message(EQ, *later)
+    assert bridge.published[-1][1] == expected
+    bridge.published.clear()
+    await sync.republish_alarm_states(decision)
+    assert [p[1] for p in bridge.published] == [expected]

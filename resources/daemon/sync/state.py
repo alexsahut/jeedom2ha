@@ -448,7 +448,7 @@ class StateSynchronizer:
         """
         published, _failed = await self._publish_initial_states_loop(
             decision,
-            lambda eq_id, binding: self._last_known_value(eq_id, binding.cmd),
+            lambda eq_id, binding: self._last_known_alarm_value(eq_id, binding.cmd),
             only_types=_ALARM_ACTIONABLE,
         )
         return published
@@ -1081,7 +1081,7 @@ class StateSynchronizer:
         """
         commands = mapping.commands or {}
         read_peer = peer if callable(peer) else (
-            lambda peer_cmd: self._last_known_value(mapping.jeedom_eq_id, peer_cmd)
+            lambda peer_cmd: self._last_known_alarm_value(mapping.jeedom_eq_id, peer_cmd)
         )
         event_cmd_id = self._coerce_cmd_id(cmd)
         values: Dict[str, Any] = {}
@@ -1097,6 +1097,19 @@ class StateSynchronizer:
             values["status"], values["enable"], values["immediate"], values["mode"],
             alarm_mode_labels(mapping),
         )
+
+    def _last_known_alarm_value(self, eq_id: Any, cmd: Any) -> Any:
+        """Revue Codex de 12.4 — last known value of one of the four alarm infos.
+
+        Unlike ``_last_known_value``, an event whose value is explicitly ``None`` (unreadable
+        info) is kept as ``None``: it never falls back to the older topology ``current_value``,
+        so a later event of another info (or a republication) stays ``unknown`` instead of
+        resurrecting a stale value. Only "no event at all" falls back to the topology.
+        """
+        event = self.last_event(eq_id, getattr(cmd, "id", None))
+        if event is not None:
+            return event[1]
+        return getattr(cmd, "current_value", None)
 
     def _last_known_value(self, eq_id: Any, cmd: Any) -> Any:
         """Story 24.15 — last Jeedom event of ``cmd``, else its topology value (never invented)."""
