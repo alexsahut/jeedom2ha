@@ -443,6 +443,15 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   const REPLACED_BY_12_5 = [
     "resources/daemon/sync/command.py::return CommandTranslation(cmd_id=cmd_id, options={}, command_family=family), None",
   ];
+  // Story 12.6 (correctif CC-45, « Listener non trouvé ») — syncStateListeners recale les listeners d'état par différence :
+  // docstring, retour et journal du réalignement remplacés. Admis dans son fichier seulement.
+  const REPLACED_BY_12_6 = [
+    "core/class/jeedom2ha.class.php::* Les listeners précédents de cette classe/fonction sont purgés puis recréés à neuf",
+    "core/class/jeedom2ha.class.php::* pour rester alignés sur le périmètre publié courant. À appeler après chaque sync OK.",
+    "core/class/jeedom2ha.class.php::* @return int nombre de listeners enregistrés",
+    "core/class/jeedom2ha.class.php::return 0; // rien touché : avertissement déjà journalisé, listeners existants conservés",
+    "core/class/jeedom2ha.class.php::log::add(__CLASS__, 'info', '[STATE-LISTENER] ' . $count . ' listener(s) état (re)enregistré(s)');",
+  ];
 
   it('git diff --stat sur les scripts de déploiement : vide (hors le correctif DEPLOY_VENV_FIX de deploy-to-box.sh)', () => {
     const diff = diffAgainstBase(['--stat'], ['scripts/parity-snapshot.sh', 'scripts/deploy-inventory-diff.sh']);
@@ -476,7 +485,8 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
         && !REPLACED_BY_SELECT_MODE.includes(`${f}::${line}`)
         && !REPLACED_BY_BARRIER_STATE_SENSOR.includes(`${f}::${line}`)
         && !REPLACED_BY_12_4.includes(`${f}::${line}`)
-        && !REPLACED_BY_12_5.includes(`${f}::${line}`))
+        && !REPLACED_BY_12_5.includes(`${f}::${line}`)
+        && !REPLACED_BY_12_6.includes(`${f}::${line}`))
       .map(({ line }) => line);
     assert.deepEqual(unexpected, []);
   });

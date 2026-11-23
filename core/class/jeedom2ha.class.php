@@ -643,10 +643,11 @@ class jeedom2ha extends eqLogic {
    * Source autoritative : le daemon (/system/state_listeners) renvoie l'ensemble exact
    * des cmds info sensor/binary_sensor publiées en discovery. On écoute UNIQUEMENT
    * celles-ci (state ⊆ discovery, AC#5) : un listener par cmd, callback stateListener().
-   * Les listeners précédents de cette classe/fonction sont purgés puis recréés à neuf
-   * pour rester alignés sur le périmètre publié courant. À appeler après chaque sync OK.
+   * Story 12.6 (CC-45) : recalage PAR DIFFÉRENCE — les listeners encore voulus et bien formés
+   * sont conservés (même identifiant), seuls les manquants sont créés et seuls les indésirables
+   * (plus voulus, doublons, mal formés) supprimés. À appeler après chaque sync OK.
    *
-   * @return int nombre de listeners enregistrés
+   * @return int nombre de listeners en place pour le parc publié (conservés + créés)
    */
   public static function syncStateListeners(?callable $_targetsFetcher = null, int $_timeout = 15, ?int $_maxAttempts = null): int {
     // Story 19.5 (AC11) — ordre récupérer -> valider -> créer -> purger, délégué à une
@@ -659,6 +660,37 @@ class jeedom2ha extends eqLogic {
       return self::callDaemon('/system/state_listeners', null, 'GET', $_timeout, $_maxAttempts);
     };
 
+    // Story 12.6 (revue 7) — un seul réalignement à la fois (cron5 et un clic, par exemple) : verrou `flock` sur un
+    // fichier du dossier temporaire du plugin. Il est rendu à la fermeture de la poignée : fin de cette fonction (y compris
+    // sur exception, la variable locale étant libérée) ou mort du processus : jamais de blocage permanent. Attente bornée
+    // au budget de l'appelant ; à l'échéance, rien n'est touché et le réalignement suivant recale.
+    $lockHandle = null;
+    if (!jeedom2ha_state_listener_acquire_lock(
+      function () use (&$lockHandle) {
+        if ($lockHandle === null) {
+          $handle = fopen(jeedom::getTmpFolder(__CLASS__) . '/state_listeners.lock', 'c');
+          if ($handle === false) {
+            throw new Exception('fichier de verrou impossible à ouvrir');
+          }
+          $lockHandle = $handle;
+        }
+        return flock($lockHandle, LOCK_EX | LOCK_NB);
+      },
+      function (float $seconds) {
+        usleep((int) round($seconds * 1000000));
+      },
+      function () {
+        return microtime(true);
+      },
+      (float) $_timeout,
+      function (string $message) {
+        log::add(__CLASS__, 'warning', $message);
+      }
+    )) {
+      return 0;
+    }
+
+    $stats = null;
     $count = jeedom2ha_realign_state_listeners(
       $fetcher,
       function () {
@@ -668,6 +700,10 @@ class jeedom2ha extends eqLogic {
             $existing[] = $listener;
           }
         }
+        // Story 12.6 (revue 5) — identifiants croissants : le plus ancien d'un groupe de doublons est celui conservé.
+        usort($existing, function ($a, $b) {
+          return intval($a->getId()) <=> intval($b->getId());
+        });
         return $existing;
       },
       function ($listener) {
@@ -684,13 +720,29 @@ class jeedom2ha extends eqLogic {
       },
       function (string $message) {
         log::add(__CLASS__, 'warning', $message);
-      }
+      },
+      // Story 12.6 (CC-45) — description lue sans écriture : recalage par différence, les listeners encore voulus
+      // gardent leur identifiant (plus de « Listener non trouvé » pendant une resynchronisation).
+      function ($listener) {
+        return array(
+          'id' => $listener->getId(),
+          'eq_id' => $listener->getOption('eq_id'),
+          'cmd_id' => $listener->getOption('cmd_id'),
+          'events' => $listener->getEvent(),
+        );
+      },
+      $stats
     );
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
     if ($count === null) {
-      return 0; // rien touché : avertissement déjà journalisé, listeners existants conservés
+      return 0; // rien appliqué : avertissement déjà journalisé, listeners existants conservés
     }
 
-    log::add(__CLASS__, 'info', '[STATE-LISTENER] ' . $count . ' listener(s) état (re)enregistré(s)');
+    $changed = ($stats['created'] ?? 0) > 0 || ($stats['removed'] ?? 0) > 0;
+    log::add(__CLASS__, $changed ? 'info' : 'debug', '[STATE-LISTENER] ' . $count . ' listener(s) état en place ('
+      . ($stats['kept'] ?? 0) . ' conservé(s), ' . ($stats['created'] ?? 0) . ' créé(s), '
+      . ($stats['removed'] ?? 0) . ' supprimé(s))');
     return $count;
   }
 
