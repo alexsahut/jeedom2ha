@@ -266,6 +266,31 @@ export async function captureFinallyFailure(state, operation) {
   }
 }
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/**
+ * Capture pleine page `failure.png` d'un gate en échec, seulement si `JEEDOM2HA_GATE_SCREENSHOT_DIR` est défini.
+ * La page montre la configuration réelle : un dossier situé dans le dépôt est refusé. La capture ne fait jamais
+ * échouer le gate et ne remplace pas le premier échec.
+ */
+export async function captureFailureScreenshot(page, { dir = process.env.JEEDOM2HA_GATE_SCREENSHOT_DIR, repoRoot = REPO_ROOT } = {}) {
+  if (!dir || !page) return null;
+  const target = path.resolve(dir);
+  const relative = path.relative(repoRoot, target);
+  const outside = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+  if (!outside) {
+    console.error('capture-echec-ignoree: dossier-dans-le-depot');
+    return null;
+  }
+  const file = path.join(target, 'failure.png');
+  try {
+    await page.screenshot({ path: file, fullPage: true, timeout: 15_000 });
+    return file;
+  } catch {
+    return null;
+  }
+}
+
 export async function jsonPost(request, url, form) {
   const response = await request.post(url, { form, maxRedirects: 0 });
   if (!isExpectedJsonResponse(response)) throw new Error(`sonde-http-invalide:${response.status()}`);
@@ -496,6 +521,7 @@ async function main() {
   let probeAfter;
   let authenticated = false;
   let stopConsoleCollection;
+  let failurePage;
   try {
     const { chromium } = loadPlaywright();
     browser = await chromium.launch({ headless: true });
@@ -556,6 +582,7 @@ async function main() {
     // sonde) ; la configuration réelle n'est jamais écrite (`saveRoomExclusion` est simulée par la politique).
     setRoomExclusionBase(simState, probeBefore.configValues.excludedObjects);
     const page = await context.newPage();
+    failurePage = page;
     const navigation = await page.goto(`${ORIGIN}${PLUGIN}`, { waitUntil: 'load' });
     if (!expectedUrl(page) || !redirectsStayOnOrigin(navigation)) {
       throw new Error('navigation-finale-invalide');
@@ -579,6 +606,8 @@ async function main() {
     assertOpenPagesAllowed(context, ctx, journal);
   } catch (error) {
     failure = error instanceof Error ? error : new Error(String(error));
+    // Avant sealContext/closePages : la page est encore affichée.
+    await captureFailureScreenshot(failurePage);
   } finally {
     const finalization = { failure };
     // CC-43 (reprise G43b) : neutraliser les pages (navigation vers about:blank,
