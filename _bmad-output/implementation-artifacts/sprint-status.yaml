@@ -426,6 +426,31 @@ development_status:
   a1-limite-de-performance-relais-15s: done  # AC5 amende par decision Alex 2026-10-12 15:17 (D8 = a) : charge reelle prouvee sur la box en 69a4b47 (292 equipements reels, Rescanner -> succes, synchro 09:38:05, journal "[RELAY-BUDGET] relais=TOPOLOGY R=60 duration_s=1.811") et en CI par test_story_a1_parc_300_load.py (300 equipements, vrai serveur HTTP) ; gate A4 sur Jeedom vierge couvre installation/dependances/demon ; dev cloud (PR #243) : budget fixe R=60s + delais clients 90s pour scanTopology/getDiagnostics/exportDiagnostic (aucune pause de lissage cote demon => pas de deadline_s) ; budget court 15s conserve pour testMqttConnection/getMappingOverrides ; precedemment : cadrage PR #241, parcours complet uniquement, motif (b') de la story 19-6 (budget relais fixe 60s, deadline_s transmise au demon, plafond de pauses min(15s, deadline_s/2)) applique aux 5 relais restants de core/ajax/jeedom2ha.ajax.php
   a2-paquet-distribuable-promotion-epuree: done  # gate A4 execute par clawbox, supervise par ClaudeBox, 2026-10-12 sur Jeedom vierge (go Telegram Alex, msg-id 11558) : paquet construit via scripts/build-market-package.sh depuis main b1acad7, 75 fichiers, manifeste respecte, pluginVersion 1.2.0 ; precedemment : cadrage PR #241 : parcours complet uniquement, promotion main->beta->stable par branche release/vX.Y.Z + PR + merge commit (jamais fast-forward), paquet epure incluant docs/fr_FR ; protection de branche beta/stable documentee comme decision ouverte a soumettre a ClaudeBox
   a3-conformite-market: done  # gate A4 execute par clawbox, supervise par ClaudeBox, 2026-10-12 sur Jeedom vierge (go Telegram Alex, msg-id 11558) : activation Debian 12 / Jeedom 4.6.1 ok (demon ok, bridge online sur Mosquitto local, 0 ERROR), activation Debian 11.11 / Python 3.9.2 ok (demon ok, MQTT non teste faute de broker, decision ClaudeBox) ; dev cloud termine (PR #242) : info.json corrige, template_icon.png supprime, test CI de coherence pluginVersion/tag/changelog, README utilisateur ajoute (approuve ClaudeBox 07:45, 95bec8d) ; precedemment : cadrage PR #241, parcours rapide + test CI uniquement, correction info.json (description fr_FR >= 80 car sans nom reel, language fr_FR seul, changelogs beta/stable, pluginVersion 1.2.0), suppression template_icon.png, README utilisateur
+
+  # ==============================================================
+  # Chantier hors cycle BMAD 2026-11 (stories retrospectives, backfill du 2026-11-23)
+  # Decision d'Alexandre du 2026-11-23 : tracer dans BMAD les PR fusionnees sur main depuis le
+  # 2026-11-13 sans fichier de story (developpement hors du cycle BMAD). Stories redigees apres coup,
+  # depuis les PR lues par l'API REST GitHub, sous stories/ (meme forme que market-epic-a / a1-a3).
+  # Rattachement a un epic du plan : aucun (non etabli) ; d'ou ce bloc dedie, identifiants h1-h6.
+  # Toutes contenues dans c015cc9, deploye en production le 2026-11-22 12:13 -> done.
+  # Validation UX d'usage reel (h1, h2, h3, h5) et preuve terrain du gate (h2, h3, h4) : non etablies.
+  # ==============================================================
+  hors-cycle-epic-h: done  # backfill BMAD 2026-11-23 : h1-h6 done (en production avec c015cc9) ; pas de retrospective dediee
+  h1-refonte-interface-front-v2-v3: done  # PR #406 (lots #387-#405, #407, #408), fusion 40e1421 2026-11-15 ; story redigee apres coup ; validation UX non etablie
+  h2-appariement-paire-on-off-reliee-a-l-etat: done  # PR #410, fusion 0aa0852 2026-11-15 ; story redigee apres coup ; preuve terrain non etablie
+  h3-mode-jeedom-publie-en-select: done  # PR #411, fusion 8e881e0 2026-11-15 ; select ouvert dans PRODUCT_SCOPE (AR13/FR40) ; story redigee apres coup ; preuve terrain non etablie
+  h4-capteur-etat-des-portails-et-portes-de-garage: done  # PR #412, fusion 0b826bb 2026-11-16 ; suite de 24-7 ; story redigee apres coup ; preuve terrain non etablie
+  h5-appareil-sante-de-jeedom: done  # PR #414, fusion 5f25cdb 2026-11-20 ; demo validee avant la production (400 trouve -> h6) ; production c015cc9 2026-11-22 12:13, appareil actif, 427 entites
+  h6-sante-de-jeedom-enveloppe-calldaemon: done  # PR #415, fusion c015cc9 2026-11-20 ; cause = 400 trouve sur la demo apres h5 ; production c015cc9 2026-11-22 12:13
+  # Suivi hors story (outillage / CI, sans effet sur l'interface ni sur la publication HA ; la methode
+  # prevoit le parcours rapide quick-spec AVANT le code, sans forme retrospective : simple ligne de suivi) :
+  #   - PR #409 fix(deploy) promotion atomique (scripts/deploy-promote-lib.sh, scripts/deploy-to-box.sh), fusion e332b8f 2026-11-15, dans c015cc9
+  #   - PR #413 ci epingler ubuntu-24.04 (Python 3.9 absent d'ubuntu-latest 26.04), fusion 3dfae83 2026-11-16, dans c015cc9
+  #   - PR #416 ci timeout du Burn-In planifie 30 -> 90 min, fusion e55cf5e 2026-11-22, apres c015cc9
+  #   - PR #417 chore(gate) capture pleine page facultative d'un gate en echec, fusion 9f56005 2026-11-23, apres c015cc9 ;
+  #     documentee dans la story 20-0 (section « Invocation du gate »)
+  # Ecartee : PR #378 (2026-11-13, fix limite de taille des synchros) deja tracee dans la story 24-15.
   # Epic 23 — promotion et beta Market; clôturé après validation des cinq stories.
   pe-epic-23: done  # 23-1 à 23-5 sont done ; clôture actée le 2026-11-01
   23-1-environnement-de-demonstration-rejouable: done  # preuve terrain 2026-10-13 : VM demo, peuplement et snapshot demo verifies
