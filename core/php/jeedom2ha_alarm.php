@@ -116,3 +116,53 @@ function jeedom2ha_alarm_code_to_store($_value, $_current, callable $_encrypt): 
 function jeedom2ha_alarm_code_clear_requested($_value): bool {
   return $_value === true || $_value === 1 || $_value === '1';
 }
+
+/**
+ * Revue Codex de 12.4 (4e passe) — une commande est l'une des quatre infos de l'alarme lues
+ * par le démon (Actif, Statut, Mode par generic type ; Immédiat par logicalId, plugin « alarm »),
+ * même règle que `mapping/alarm_control_panel.py`.
+ */
+function jeedom2ha_alarm_is_info_cmd($_genericType, $_logicalId, $_eqTypeName): bool {
+  if (in_array($_genericType, array('ALARM_ENABLE_STATE', 'ALARM_STATE', 'ALARM_MODE'), true)) {
+    return true;
+  }
+  return $_logicalId === 'immediatState' && $_eqTypeName === 'alarm';
+}
+
+/**
+ * Lecture au clic « Publier » d'une commande : rend la valeur telle quelle (le payload
+ * `current_values` des autres types ne change pas) et note dans `$_readNull` une info d'alarme
+ * effectivement LUE à null. Une commande non lue (échéance dépassée) n'appelle jamais cette
+ * fonction : elle reste « non lue » pour le démon, qui garde sa lecture précédente.
+ */
+function jeedom2ha_alarm_click_read(array $_cmd, $_value, ArrayObject $_readNull) {
+  if ($_value === null && !empty($_cmd['alarm_info'])) {
+    $cmdId = (int) ($_cmd['cmd_id'] ?? 0);
+    if ($cmdId > 0) {
+      $_readNull[] = $cmdId;
+    }
+  }
+  return $_value;
+}
+
+/**
+ * Ajoute `current_values_null` (ids des infos d'alarme lues à null) au payload de
+ * /action/execute, seulement si la lecture au clic a eu lieu (`current_values` présent) et
+ * qu'au moins une info d'alarme a été lue à null. Sinon le payload est inchangé.
+ */
+function jeedom2ha_alarm_add_click_null_reads(array $_params, ArrayObject $_readNull): array {
+  if (!array_key_exists('current_values', $_params) || count($_readNull) === 0) {
+    return $_params;
+  }
+  $ids = array();
+  foreach ($_readNull as $cmdId) {
+    $cmdId = (int) $cmdId;
+    if ($cmdId > 0 && !in_array($cmdId, $ids, true)) {
+      $ids[] = $cmdId;
+    }
+  }
+  if (!empty($ids)) {
+    $_params['current_values_null'] = $ids;
+  }
+  return $_params;
+}

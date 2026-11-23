@@ -486,21 +486,8 @@ class StateSynchronizer:
             eq_id_int = int(eq_id)
         except (TypeError, ValueError):
             return
-        # Revue Codex de 12.4 — the fresh read (sync topology or click) feeds the alarm store;
-        # ``None`` read is stored as a value. A click that did not read a command leaves it.
-        for alarm_cmd in self._alarm_info_cmds(mapping):
-            alarm_cmd_id = self._coerce_cmd_id(alarm_cmd)
-            if alarm_cmd_id is None:
-                continue
-            if values is None:
-                self._record_alarm_read(eq_id_int, alarm_cmd_id, getattr(alarm_cmd, "current_value", None), read_at)
-            elif alarm_cmd_id in values:
-                self._record_alarm_read(eq_id_int, alarm_cmd_id, values.get(alarm_cmd_id), read_at)
-            # An event received after this read (possibly before the equipment was published,
-            # hence not yet recognised as an alarm info) stays the most recent read.
-            pending = self._pending_click_values.get((eq_id_int, alarm_cmd_id))
-            if pending is not None and pending[0] > read_at:
-                self._record_alarm_read(eq_id_int, alarm_cmd_id, pending[1], pending[0])
+        # Revue Codex de 12.4 — the fresh read (sync topology or click) feeds the alarm store.
+        self._record_alarm_fresh_read(mapping, eq_id_int, read_at, values)
         for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
             for cmd in (getattr(candidate, "commands", None) or {}).values():
                 cmd_id = self._coerce_cmd_id(cmd)
@@ -520,6 +507,64 @@ class StateSynchronizer:
                     self._pending_click_values.pop(key, None)
                 else:
                     self._pending_click_values[key] = (read_at, value)
+
+    def record_alarm_click_reads(
+        self,
+        decision: PublicationDecision,
+        read_at: float,
+        values: Optional[Mapping[int, Any]],
+        read_null: Any = (),
+    ) -> None:
+        """Revue Codex de 12.4 — the « Publier » click read of the alarm infos feeds the alarm store.
+
+        Called for every clicked equipment, broker connected or not: ``values`` are the values
+        read (``current_values``), ``read_null`` the alarm infos READ at null by the PHP relay
+        (``current_values_null``). A command in neither was not read (read deadline reached):
+        it keeps its previous read. Alarm only: nothing else is touched.
+        """
+        mapping = getattr(decision, "mapping_result", None)
+        eq_id = getattr(mapping, "jeedom_eq_id", None)
+        if mapping is None or eq_id is None:
+            return
+        try:
+            eq_id_int = int(eq_id)
+        except (TypeError, ValueError):
+            return
+        self._record_alarm_fresh_read(mapping, eq_id_int, read_at, values or {}, read_null)
+
+    def _record_alarm_fresh_read(
+        self,
+        mapping: Any,
+        eq_id_int: int,
+        read_at: float,
+        values: Optional[Mapping[int, Any]],
+        read_null: Any = (),
+    ) -> None:
+        """Feed the alarm store from a fresh read: ``values is None`` = full sync topology.
+
+        ``None`` read is stored as a value. A click that did not read a command leaves it.
+        """
+        null_ids = set()
+        for raw in read_null or ():
+            try:
+                null_ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+        for alarm_cmd in self._alarm_info_cmds(mapping):
+            alarm_cmd_id = self._coerce_cmd_id(alarm_cmd)
+            if alarm_cmd_id is None:
+                continue
+            if values is None:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, getattr(alarm_cmd, "current_value", None), read_at)
+            elif alarm_cmd_id in values:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, values.get(alarm_cmd_id), read_at)
+            elif alarm_cmd_id in null_ids:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, None, read_at)
+            # An event received after this read (possibly before the equipment was published,
+            # hence not yet recognised as an alarm info) stays the most recent read.
+            pending = self._pending_click_values.get((eq_id_int, alarm_cmd_id))
+            if pending is not None and pending[0] > read_at:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, pending[1], pending[0])
 
     async def _publish_initial_states_loop(
         self,

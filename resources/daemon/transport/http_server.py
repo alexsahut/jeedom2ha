@@ -5094,6 +5094,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 continue
         if coerced:
             fresh_values = coerced
+    # FR49 (12.4, revue Codex) — infos d'alarme LUES à null au clic (le relais PHP omet les null de
+    # `current_values`) : sans cette liste, « lu à null » et « non lu » se confondent.
+    alarm_read_null = _parse_click_null_reads(body.get("current_values_null"))
 
     # Validation — intention
     if intention not in _INTENTIONS_VALIDES:
@@ -5589,6 +5592,15 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                 # inconditionnellement (I11, un secondaire peut être publié sous un principal
                 # refusé) dès qu'il y a une valeur fraîche à publier.
                 click_publish_failed = False
+                # FR49 (12.4, revue Codex) — la lecture au clic des infos d'alarme alimente leur
+                # magasin, broker connecté ou non ; si seules des infos d'alarme ont été lues (à
+                # null), l'état de l'alarme est republié depuis ce magasin.
+                alarm_state_sync = request.app.get("state_synchronizer")
+                if alarm_state_sync is not None and callable(getattr(alarm_state_sync, "record_alarm_click_reads", None)) \
+                        and (fresh_values is not None or alarm_read_null):
+                    alarm_state_sync.record_alarm_click_reads(decision, fresh_since, fresh_values, alarm_read_null)
+                    if fresh_values is None and mqtt_bridge and mqtt_bridge.is_connected:
+                        await alarm_state_sync.republish_alarm_states(decision)
                 if fresh_values is not None:
                     state_sync = request.app.get("state_synchronizer")
                     if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:
@@ -5773,6 +5785,21 @@ def _normalize_state_update_body(body: Any) -> Dict[str, Any]:
     if isinstance(wrapped, dict) and ("eq_id" in wrapped or "cmd_id" in wrapped):
         return wrapped
     return body
+
+
+def _parse_click_null_reads(raw: Any) -> frozenset:
+    """FR49 (12.4) — ids de `current_values_null` (liste d'entiers) ; tout autre contenu est ignoré."""
+    if not isinstance(raw, list):
+        return frozenset()
+    ids = set()
+    for item in raw:
+        if isinstance(item, bool):
+            continue
+        try:
+            ids.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return frozenset(ids)
 
 
 async def _handle_action_state_update(request: web.Request) -> web.Response:

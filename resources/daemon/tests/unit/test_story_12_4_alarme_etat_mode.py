@@ -1021,3 +1021,115 @@ async def test_full_sync_with_unreadable_enable_then_mode_event_and_republicatio
     bridge.publish_message.reset_mock()
     await (on_reconnect if which == "reconnect" else on_birth)()
     assert [c[1] for c in _calls(bridge) if c[0] == state_topic] == ["None"]
+
+
+# --- Revue Codex de 12.4 (4e passe) : « lu à null » au clic, du relais PHP jusqu'au démon ------------
+
+import shutil  # noqa: E402
+import subprocess  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+_REPO = Path(__file__).resolve().parents[4]
+_STATE_TOPIC = f"jeedom2ha/{EQ}/alarm/state"
+
+# Vrai relais PHP : lecture au clic (Actif lu à null, Mode lu, Statut non lu car l'échéance est
+# dépassée), puis appel de /action/execute avec le même câblage que l'ajax. Imprime le payload.
+_PHP_CLICK = r"""
+define('JEEDOM2HA_AJAX_FUNCTIONS_ONLY', true);
+require_once $argv[1] . '/core/ajax/jeedom2ha.ajax.php';
+$cmds = array(
+    array('cmd_id' => %(enable)d, 'type' => 'info', 'alarm_info' => true, 'value' => null),
+    array('cmd_id' => %(mode)d, 'type' => 'info', 'alarm_info' => true, 'value' => 'mode total'),
+    array('cmd_id' => %(status)d, 'type' => 'info', 'alarm_info' => true, 'value' => null),
+);
+$clock = 0.0;
+$readNull = new ArrayObject();
+$values = _jeedom2ha_collect_click_values('equipement', array('%(eq)d'),
+    function ($p) { return array(); }, function () { return array(); },
+    function ($eqId) use ($cmds) { return $cmds; },
+    function ($c) use ($readNull, &$clock) { $clock += 1.0; return jeedom2ha_alarm_click_read($c, $c['value'], $readNull); },
+    function ($m) {}, function () use (&$clock) { return $clock; }, 1.5);
+$sent = null;
+jeedom2ha_dispatch_action_relay('publier',
+    array('intention' => 'publier', 'portee' => 'equipement', 'selection' => array(%(eq)d)),
+    function ($t, $a) { return array('status' => 'ok'); },
+    function () use ($values) { return $values; },
+    function (array $p, $t) use ($readNull, &$sent) { $sent = jeedom2ha_alarm_add_click_null_reads($p, $readNull); return array('status' => 'ok'); },
+    function ($r) {}, function ($l, $m) {}, function () { return 0.0; });
+unset($sent['deadline_s']);
+echo json_encode($sent);
+""" % {"enable": ENABLE, "mode": MODE, "status": STATUS, "eq": EQ}
+
+
+def _php_click_payload():
+    if shutil.which("php") is None:
+        pytest.skip("php indisponible")
+    out = subprocess.run(["php", "-r", _PHP_CLICK, "--", str(_REPO)], capture_output=True, text=True, check=True)
+    return json.loads(out.stdout)
+
+
+async def _publier(cli, body):
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+        resp = await cli.post("/action/execute", json=body, headers=HEADERS)
+    assert resp.status == 200, await resp.text()
+
+
+def _alarm_states(bridge):
+    return [c[1] for c in _calls(bridge) if c[0] == _STATE_TOPIC]
+
+
+def test_the_php_relay_sends_read_null_alarm_infos_apart():
+    payload = _php_click_payload()
+    assert payload["current_values"] == {str(MODE): "mode total"}      # inchangé : les null restent omis
+    assert payload["current_values_null"] == [ENABLE]                 # Statut, non lu, n'y est pas
+
+
+@pytest.mark.parametrize("which", ["reconnect", "birth"])
+async def test_end_to_end_click_reading_enable_at_null_keeps_the_alarm_unknown(cli, app, which):
+    """Du payload PHP réel jusqu'au démon : Actif=1 (synchro) -> clic lit Actif à null -> Mode -> inconnu."""
+    payload = _php_click_payload()
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    bridge = app["mqtt_bridge"]
+    assert _alarm_states(bridge)[-1] == "armed_away"
+    await _publier(cli, payload)
+    assert _alarm_states(bridge)[-1] == "None"
+    await app["state_synchronizer"].handle_state_message(EQ, MODE, "mode nuit")
+    await app["state_synchronizer"].handle_state_message(EQ, STATUS, "0")
+    assert _alarm_states(bridge)[-1] == "None"
+    _params, on_reconnect, on_birth = await _connect(cli, app)
+    bridge.publish_message.reset_mock()
+    await (on_reconnect if which == "reconnect" else on_birth)()
+    assert _alarm_states(bridge) == ["None"]
+
+
+async def test_a_command_not_read_at_the_click_keeps_its_previous_read(cli, app):
+    """Ancien relais (ou échéance dépassée) : Actif absent des deux listes = non lu -> lecture précédente."""
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    await _publier(cli, {"intention": "publier", "portee": "equipement", "selection": [EQ],
+                         "current_values": {str(MODE): "mode nuit"}})
+    assert _alarm_states(app["mqtt_bridge"])[-1] == "armed_night"
+
+
+async def test_a_click_reading_only_null_alarm_infos_still_republishes_unknown(cli, app):
+    """Tout lu à null : `current_values` vide (PHP `[]`), la liste des null suffit."""
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    await _publier(cli, {"intention": "publier", "portee": "equipement", "selection": [EQ],
+                         "current_values": [], "current_values_null": [ENABLE]})
+    assert _alarm_states(app["mqtt_bridge"])[-1] == "None"
+    await app["state_synchronizer"].handle_state_message(EQ, MODE, "mode nuit")
+    assert _alarm_states(app["mqtt_bridge"])[-1] == "None"
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ([1, "2", 3.0], {1, 2, 3}), ([True, None, "x", {}], set()), ("1,2", set()), (None, set()), ({"1": 1}, set()),
+])
+def test_click_null_reads_parsing(raw, expected):
+    assert set(http_server._parse_click_null_reads(raw)) == expected
+
+
+def test_a_read_null_only_concerns_alarm_infos():
+    """La liste ne touche que les infos d'alarme : une autre commande n'entre jamais dans le magasin."""
+    sync, _bridge, decision = _state_sync(_map(_alarm_eq()))
+    sync.record_alarm_click_reads(decision, time.monotonic(), {}, [ENABLE, 99999, ARMED])
+    assert set(sync._alarm_reads) == {(EQ, ENABLE)}
+    assert sync._alarm_reads[(EQ, ENABLE)][1] is None

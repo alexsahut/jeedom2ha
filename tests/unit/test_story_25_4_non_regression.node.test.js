@@ -345,6 +345,14 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   // supported_features, docstring de sync/state.py ; lignes de base de projection et gardes 19-4 : seules les entrées de l'alarme
   // (eq 230 et 12000) changent. Admis dans leur fichier seulement.
   const REPLACED_BY_12_4 = [
+    // Revue Codex de 12.4 (3e et 4e passes) : les infos de l'alarme sont lues dans leur magasin unique (boucle de
+    // publication de sync/state.py) ; le relais du clic note les infos d'alarme lues à null (current_values_null).
+    "resources/daemon/sync/state.py::raw_value = value_resolver(eq_id, binding)",
+    "resources/daemon/sync/state.py::peer=lambda peer_cmd: value_resolver(eq_id, self._peer_binding(peer_cmd)),",
+    "core/ajax/jeedom2ha.ajax.php::function ($c) {",
+    "core/ajax/jeedom2ha.ajax.php::function (array $callParams, int $timeoutS) {",
+    "core/ajax/jeedom2ha.ajax.php::$collectClickValues = ($params['intention'] === 'publier') ? function () use ($params) {",
+    "core/ajax/jeedom2ha.ajax.php::return $c['_cmd']->getCache('value', null);",
     "resources/daemon/discovery/publisher.py::Minimal useful payload: state + arming/disarming commands.",
     "resources/daemon/discovery/publisher.py::Scope: armed_away / disarmed states only (Story 10.3 guardrail).",
     "resources/daemon/discovery/publisher.py::\"value_template\": \"{{ 'armed_away' if value == '1' else 'disarmed' }}\",",
