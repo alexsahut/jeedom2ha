@@ -114,6 +114,7 @@ Voir AC4. Le fichier `/home/asahut/.config/jeedom2ha-gate/jeedom.env` est dépos
 ## Invocation du gate par une story suivante
 
 - **Prérequis** : le fichier d'identifiants est en mode `600` ; Playwright est présent dans le dossier indiqué par `JEEDOM2HA_GATE_TOOLS`.
+- **Capture d'échec (facultative)** : si `JEEDOM2HA_GATE_SCREENSHOT_DIR` est défini, un gate en échec (exception, erreur console ou requête bloquée, constatés avant la fermeture de la page) enregistre une capture pleine page `failure.png` dans ce dossier, créé au besoin ; il doit être hors du dépôt, liens symboliques résolus, et un `failure.png` existant qui est un lien symbolique est refusé ; sans la variable, aucune capture n'est prise.
 - **Module de parcours** : il exporte `name`, `declaredEquipments`, `declaredBascules` et `run(page, { helpers })`. Le parcours consigne ses seuls constats bornés avec `helpers.record` : clé `[a-z][a-z0-9_-]{0,79}`, nombre fini, booléen, ou chaîne de 80 caractères au plus sans `?` ni `=`.
 - **Commande** : `node tests/e2e/gate/run-gate.mjs --parcours <module-parcours.mjs> --report <dossier-rapport>`.
 - **Artefact de story** : le dossier de rapport contient `gate-report.md` et `gate-report.json`. La story joint un artefact `_bmad-output/implementation-artifacts/<story>-gate-<date>.md` qui reprend le verdict, les vérifications, les réponses simulées et les constats du parcours.
