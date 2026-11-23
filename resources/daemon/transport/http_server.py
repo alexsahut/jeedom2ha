@@ -1511,11 +1511,18 @@ async def _republish_alarm_state(app, decision, eq_id: int, reason: str) -> None
     if not any(getattr(c, "ha_entity_type", None) == "alarm_control_panel" for c in candidates):
         return
     state_sync = app.get("state_synchronizer")
-    republish = getattr(state_sync, "republish_alarm_states", None)
+    republish = getattr(state_sync, "republish_alarm_states_counted", None)
     if not callable(republish):
         return
     try:
-        count = await republish(decision)
+        count, failed = await republish(decision)
+        if failed:
+            # Revue Codex de 12.4 — comme un échec de discovery republiée : ERROR, jamais avalé.
+            _LOGGER.error(
+                "[SYNC-STATE] eq_id=%d : republication de l'état d'alarme échouée (reason=%s, %d échec(s))",
+                eq_id, reason, failed,
+            )
+            return
         _LOGGER.info("[SYNC-STATE] eq_id=%d : état d'alarme republié (reason=%s, %d)", eq_id, reason, count)
     except Exception as exc:
         _LOGGER.error("[SYNC-STATE] eq_id=%d : republication de l'état d'alarme échouée — %s", eq_id, exc)
@@ -5600,7 +5607,9 @@ async def _handle_action_execute(request: web.Request) -> web.Response:
                         and (fresh_values is not None or alarm_read_null):
                     alarm_state_sync.record_alarm_click_reads(decision, fresh_since, fresh_values, alarm_read_null)
                     if fresh_values is None and mqtt_bridge and mqtt_bridge.is_connected:
-                        await alarm_state_sync.republish_alarm_states(decision)
+                        # Revue Codex de 12.4 — échecs comptés comme sur le chemin des valeurs lues.
+                        _alarm_published, alarm_failed_count = await alarm_state_sync.publish_alarm_click_states(decision)
+                        click_publish_failed = alarm_failed_count > 0
                 if fresh_values is not None:
                     state_sync = request.app.get("state_synchronizer")
                     if state_sync is not None and mqtt_bridge and mqtt_bridge.is_connected:

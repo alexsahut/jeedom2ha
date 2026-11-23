@@ -1133,3 +1133,138 @@ def test_a_read_null_only_concerns_alarm_infos():
     sync.record_alarm_click_reads(decision, time.monotonic(), {}, [ENABLE, 99999, ARMED])
     assert set(sync._alarm_reads) == {(EQ, ENABLE)}
     assert sync._alarm_reads[(EQ, ENABLE)][1] is None
+
+
+# --- Revue Codex de 12.4 (5e passe) : un échec de publication d'état n'est jamais avalé -------------
+
+class _FailingBridge(_Bridge):
+    """Broker connecté qui refuse les publications d'état de l'alarme."""
+
+    def publish_message(self, topic, payload, qos=0, retain=False):
+        self.published.append((topic, payload, qos, retain))
+        return not topic.endswith("/alarm/state")
+
+
+def _failing_state_sync(mapping):
+    bridge = _FailingBridge()
+    decision = _decision(mapping)
+    sync = StateSynchronizer(app={"publications": {mapping.jeedom_eq_id: decision}}, mqtt_bridge=bridge)
+    return sync, bridge, decision
+
+
+def _warnings(caplog, reason):
+    return [r for r in caplog.records if r.levelno == logging.WARNING and f"reason_code={reason}" in r.getMessage()]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", ["1", None])
+async def test_event_publication_failure_is_logged_and_retried(caplog, value):
+    sync, bridge, _d = _failing_state_sync(_map(_alarm_eq(enable="1")))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.handle_state_message(EQ, ENABLE, value) is False
+    assert len(_warnings(caplog, "mqtt_publish_failed")) == 1
+    # Rien n'est retenu comme publié : l'événement suivant republie (un état inconnu compris).
+    bridge.publish_message = lambda *a, **k: True
+    assert await sync.handle_state_message(EQ, STATUS, "0") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("enable", ["1", None])
+async def test_sync_publication_failure_is_logged(caplog, enable):
+    sync, _bridge, decision = _failing_state_sync(_map(_alarm_eq(enable=enable)))
+    sync.reconcile_fresh_read(decision, time.monotonic())
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.publish_initial_states(decision) == 0
+    assert len(_warnings(caplog, "alarm_state_publish_failed")) == 1
+
+
+@pytest.mark.asyncio
+async def test_sync_failure_logging_does_not_touch_the_other_types(caplog):
+    """Les autres types gardent le comportement de la synchro (aucun journal d'échec, Story 19.5 AC9)."""
+    from models.mapping import MappingResult
+    sync = StateSynchronizer(app={}, mqtt_bridge=_FailingBridge())
+    candidate = MagicMock(spec=MappingResult)
+    candidate.ha_entity_type = "sensor"
+    with caplog.at_level(logging.DEBUG):
+        assert sync._alarm_needs_unknown(candidate, "jeedom2ha/1/state") is False
+    assert _warnings(caplog, "alarm_state_publish_failed") == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("values", [{ENABLE: "1", MODE: "mode nuit"}, {ENABLE: None}])
+async def test_click_with_values_publication_failure_is_counted(caplog, values):
+    sync, _bridge, decision = _failing_state_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.publish_click_states(decision, values, fresh_since=time.monotonic()) == (0, 1)
+    assert len(_warnings(caplog, "initial_state_publish_failed")) == 1
+
+
+@pytest.mark.asyncio
+async def test_click_with_only_null_alarm_reads_publication_failure_is_counted(caplog):
+    sync, _bridge, decision = _failing_state_sync(_map(_alarm_eq()))
+    sync.record_alarm_click_reads(decision, time.monotonic(), {}, [ENABLE])
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.publish_alarm_click_states(decision) == (0, 1)
+    assert len(_warnings(caplog, "initial_state_publish_failed")) == 1
+
+
+@pytest.mark.asyncio
+async def test_republication_failure_is_counted_and_logged(caplog):
+    sync, _bridge, decision = _failing_state_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.republish_alarm_states_counted(decision) == (0, 1)
+        assert await sync.republish_alarm_states(decision) == 0
+    assert len(_warnings(caplog, "alarm_state_republish_failed")) == 2
+
+
+def _fail_alarm_state(bridge):
+    def publish(topic, payload, qos=0, retain=False):
+        return not topic.endswith("/alarm/state")
+    bridge.publish_message = MagicMock(side_effect=publish)
+
+
+async def test_end_to_end_click_reading_only_null_alarm_infos_counts_the_failure(cli, app, caplog):
+    """Le cas Codex : clic qui ne lit qu'Actif à null, publication d'état en échec -> équipement en erreur."""
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    _fail_alarm_state(app["mqtt_bridge"])
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()), caplog.at_level(logging.WARNING):
+        resp = await cli.post("/action/execute", headers=HEADERS, json={
+            "intention": "publier", "portee": "equipement", "selection": [EQ],
+            "current_values": [], "current_values_null": [ENABLE]})
+    body = (await resp.json())
+    body = body.get("payload", body)
+    assert body["scope_reel"]["equipements_publies_ou_crees"] == 0
+    assert body["resultat"] in ("echec", "succes_partiel")
+    assert len(_warnings(caplog, "initial_state_publish_failed")) == 1
+
+
+async def test_end_to_end_click_with_values_counts_the_failure(cli, app, caplog):
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    _fail_alarm_state(app["mqtt_bridge"])
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()), caplog.at_level(logging.WARNING):
+        resp = await cli.post("/action/execute", headers=HEADERS, json={
+            "intention": "publier", "portee": "equipement", "selection": [EQ],
+            "current_values": {str(MODE): "mode nuit"}, "current_values_null": [ENABLE]})
+    body = (await resp.json())
+    body = body.get("payload", body)
+    assert body["scope_reel"]["equipements_publies_ou_crees"] == 0
+
+
+async def test_end_to_end_sync_failure_is_logged(cli, app, caplog):
+    _fail_alarm_state(app["mqtt_bridge"])
+    with caplog.at_level(logging.WARNING):
+        assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    assert len(_warnings(caplog, "alarm_state_publish_failed")) == 1
+
+
+@pytest.mark.parametrize("which", ["reconnect", "birth"])
+async def test_end_to_end_republication_failure_is_logged_as_an_error(cli, app, caplog, which):
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    _params, on_reconnect, on_birth = await _connect(cli, app)
+    _fail_alarm_state(app["mqtt_bridge"])
+    with caplog.at_level(logging.DEBUG):
+        await (on_reconnect if which == "reconnect" else on_birth)()
+    assert len(_warnings(caplog, "alarm_state_republish_failed")) == 1
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR and "état d'alarme échouée" in r.getMessage()]
+    assert len(errors) == 1
+    assert not any("état d'alarme republié" in r.getMessage() for r in caplog.records)

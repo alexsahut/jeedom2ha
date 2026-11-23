@@ -312,6 +312,18 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
   6. **Calcul de l'état** : `alarm_state` lit `None`, `''` ou une valeur illisible comme « inconnue » pour Actif / Statut / Immédiat ; Mode `None` → `armed_away` (règle 5) ; payload `None` pour `unknown`. Inchangé.
 - [x] [Auto-constat] La garde 25.4 (Node) était rouge depuis `2626aee` : deux lignes de `sync/state.py` remplacées par la lecture du magasin n'étaient pas déclarées (la suite Node n'avait pas été relancée à cette passe). Elles sont déclarées dans `REPLACED_BY_12_4`, avec les quatre lignes de l'ajax remplacées par cette passe.
 
+### Revue Codex de la tête `4c7aa54` (2026-11-23) — remontée des échecs de publication
+
+- [x] [Codex][P2] Clic « Publier » qui ne lit que des infos d'alarme à null : `fresh_values` reste `None`, la branche appelait `republish_alarm_states()`, dont le compteur d'échecs était perdu ; `click_publish_failed` restait faux et l'équipement comptait comme publié alors que HA gardait son ancien état retenu. Correctif : `StateSynchronizer.publish_alarm_click_states()` (même comptage et même journal que `publish_click_states` : `initial_state_publish_failed` en WARNING, `(publiés, échecs)` rendus) et `click_publish_failed = échecs > 0` [sync/state.py, transport/http_server.py]
+- **Audit de la remontée des erreurs**, chemin par chemin, pour la publication de l'état de l'alarme :
+  1. **Événement** (`handle_state_message`) : WARNING `mqtt_publish_failed`, rend `False` (réponse `published: false` de `/action/state_update`), comme les autres types ; le payload n'est pas retenu comme publié, l'événement suivant republie (un état inconnu compris). Inchangé, testé.
+  2. **Synchro** (`publish_initial_states`) : les autres types ne journalisent ni ne comptent un échec à la synchro (Story 19.5, AC9, comportement d'avant 19.5) — c'est un échec avalé. **Corrigé pour l'alarme seulement** : WARNING `alarm_state_publish_failed` (code d'échec par candidat ; les autres types gardent `failure_reason_code`, donc rien). Le reste de la synchro n'est pas changé (pas de compteur d'erreur nouveau).
+  3. **Clic avec valeurs** (`publish_click_states`) : WARNING `initial_state_publish_failed`, `click_publish_failed`, équipement compté en erreur, comme les autres types. Inchangé, testé.
+  4. **Clic sans valeur** (infos d'alarme lues à null seulement) : **corrigé** (constat Codex).
+  5. **Naissance de HA, reconnexion** (`_republish_alarm_state`) : les échecs étaient perdus et le journal disait « état d'alarme republié ». **Corrigé** : `republish_alarm_states_counted()` rend `(publiés, échecs)`, WARNING `alarm_state_republish_failed` par topic, puis ERROR « republication de l'état d'alarme échouée », au même niveau qu'un échec de discovery republiée ; plus de message de réussite dans ce cas.
+  6. **Autre constat corrigé** : en cas d'échec, les quatre infos d'une alarme (même topic, même état calculé) étaient retentées l'une après l'autre (quatre publications, quatre échecs comptés). Désormais une seule tentative, et au plus un échec, par topic et par publication.
+- Tests : un test d'échec de publication par chemin (événement, synchro, clic avec valeurs, clic sans valeur, republication), dont des tests de bout en bout par `/action/sync`, `/action/execute` et les rappels de naissance et de reconnexion. Neuf sont rouges sur `4c7aa54`. Garde 25.4 : deux lignes remplacées de `sync/state.py` déclarées ; suite Node complète passée (3 échecs, ceux de `25.4 / AC8`, qui existent déjà sur `main`).
+
 ### `bmad-code-review` de la passe de corrections (diff `623e0bf..892433e`, 2026-11-23)
 
 Même session que les corrections (pas de contexte neuf ni d'autre modèle : écart à la recommandation du workflow, comme à la première revue). File List conforme au diff ; Tasks 10.x vérifiées dans le code et les tests ; AC9 implémenté. Aucun constat High.
@@ -340,3 +352,4 @@ Retenus (corrigés dans cette passe) :
 - 2026-11-23 — Revue Codex de `ddceae7` : P2 corrigé (un événement de valeur `None` n'est plus remplacé par la valeur de topologie pour les quatre infos de l'alarme) ; statut `review`.
 - 2026-11-23 — Revue Codex de `b74efea` : P2 corrigé à la racine (magasin unique des lectures des quatre infos de l'alarme, audit des chemins, un test par chemin) ; statut `review`.
 - 2026-11-23 — Revue Codex de `2626aee` : infos d'alarme lues à null au clic transmises à part (`current_values_null`), audit de bout en bout PHP compris, garde 25.4 remise au vert ; statut `review`.
+- 2026-11-23 — Revue Codex de `4c7aa54` : échecs de publication de l'état de l'alarme remontés sur tous les chemins (clic sans valeur, synchro, naissance de HA, reconnexion), une tentative par topic ; statut `review`.

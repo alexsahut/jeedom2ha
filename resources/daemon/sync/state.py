@@ -449,6 +449,33 @@ class StateSynchronizer:
             no_value_reason_code="initial_state_no_click_value",
         )
 
+    async def publish_alarm_click_states(self, decision: PublicationDecision) -> Tuple[int, int]:
+        """Revue Codex de 12.4 — « Publier » qui n'a lu que des infos d'alarme à null.
+
+        Same counting and logging as ``publish_click_states`` (``initial_state_publish_failed``
+        WARNING, failures returned to the caller), restricted to the alarm, values from the alarm
+        store (fed by ``record_alarm_click_reads`` just before). Returns (published, failed).
+        """
+        return await self._publish_initial_states_loop(
+            decision,
+            lambda eq_id, binding: self._last_known_alarm_value(eq_id, binding.cmd),
+            failure_reason_code="initial_state_publish_failed",
+            only_types=_ALARM_ACTIONABLE,
+        )
+
+    async def republish_alarm_states_counted(self, decision: PublicationDecision) -> Tuple[int, int]:
+        """Revue Codex de 12.4 — HA birth / broker reconnection: (published, failed).
+
+        Each failed state publication is logged (WARNING ``alarm_state_republish_failed``) and
+        counted for the caller, which logs the equipment in error like a failed discovery.
+        """
+        return await self._publish_initial_states_loop(
+            decision,
+            lambda eq_id, binding: self._last_known_alarm_value(eq_id, binding.cmd),
+            failure_reason_code="alarm_state_republish_failed",
+            only_types=_ALARM_ACTIONABLE,
+        )
+
     async def republish_alarm_states(self, decision: PublicationDecision) -> int:
         """FR49 / CC-08 — republish the alarm state at HA birth and broker reconnection.
 
@@ -456,11 +483,7 @@ class StateSynchronizer:
         ``alarm_control_panel`` candidates; values are the last Jeedom event of each info,
         else its value at the last sync (never invented). Returns the count published.
         """
-        published, _failed = await self._publish_initial_states_loop(
-            decision,
-            lambda eq_id, binding: self._last_known_alarm_value(eq_id, binding.cmd),
-            only_types=_ALARM_ACTIONABLE,
-        )
+        published, _failed = await self.republish_alarm_states_counted(decision)
         return published
 
     def reconcile_fresh_read(
@@ -614,6 +637,9 @@ class StateSynchronizer:
             # Revue Codex de 12.4 — alarm topics whose state is unknown at this (re)publication.
             unknown_alarm_topics: List[_Binding] = []
             is_alarm = getattr(candidate, "ha_entity_type", None) in _ALARM_ACTIONABLE
+            # Revue Codex de 12.4 — a failed alarm state publication is never silent, the sync path
+            # (no failure code: pre-19.5 behaviour of the other types) included.
+            fail_code = failure_reason_code or ("alarm_state_publish_failed" if is_alarm else None)
             # Revue Codex de 12.4 — every (re)publication of an alarm (sync, « Publier », HA birth,
             # broker reconnection) reads its four infos from the alarm store, and only from it.
             resolver = (
@@ -650,9 +676,13 @@ class StateSynchronizer:
                               state_topic=binding.topic, ha_type=candidate.ha_entity_type)
                 else:
                     failed += 1
-                    if failure_reason_code:
+                    if is_alarm:
+                        # Revue Codex de 12.4 — the four alarm infos feed ONE topic with ONE computed
+                        # state: one attempt (and at most one failure) per topic and publication.
+                        done_topics.add(binding.topic)
+                    if fail_code:
                         self._log(logging.WARNING, eq_id=eq_id, cmd_id=binding.cmd_id,
-                                  reason_code=failure_reason_code, action="publish_snapshot",
+                                  reason_code=fail_code, action="publish_snapshot",
                                   state_topic=binding.topic)
             # Revue Codex de 12.4 — an alarm with no honest state at (re)publication: HA is brought
             # back to ``unknown`` (a retained state of an earlier run or event may still be there).
@@ -669,9 +699,9 @@ class StateSynchronizer:
                               state_topic=binding.topic, ha_type=candidate.ha_entity_type)
                 else:
                     failed += 1
-                    if failure_reason_code:
+                    if fail_code:
                         self._log(logging.WARNING, eq_id=eq_id, cmd_id=binding.cmd_id,
-                                  reason_code=failure_reason_code, action="publish_snapshot",
+                                  reason_code=fail_code, action="publish_snapshot",
                                   state_topic=binding.topic)
         return published, failed
 

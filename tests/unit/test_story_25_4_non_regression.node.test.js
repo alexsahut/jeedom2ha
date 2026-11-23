@@ -349,6 +349,10 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     // publication de sync/state.py) ; le relais du clic note les infos d'alarme lues à null (current_values_null).
     "resources/daemon/sync/state.py::raw_value = value_resolver(eq_id, binding)",
     "resources/daemon/sync/state.py::peer=lambda peer_cmd: value_resolver(eq_id, self._peer_binding(peer_cmd)),",
+    // Revue Codex de 12.4 (5e passe) : un échec de publication d'état de l'alarme n'est jamais avalé (code d'échec par
+    // candidat dans la boucle de publication de sync/state.py ; les autres types gardent failure_reason_code).
+    "resources/daemon/sync/state.py::if failure_reason_code:",
+    "resources/daemon/sync/state.py::reason_code=failure_reason_code, action=\"publish_snapshot\",",
     "core/ajax/jeedom2ha.ajax.php::function ($c) {",
     "core/ajax/jeedom2ha.ajax.php::function (array $callParams, int $timeoutS) {",
     "core/ajax/jeedom2ha.ajax.php::$collectClickValues = ($params['intention'] === 'publier') ? function () use ($params) {",
