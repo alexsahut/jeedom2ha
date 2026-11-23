@@ -78,6 +78,9 @@ class DecisionMemo:
     sync_at: Optional[str] = None
     # Story 24.14 (AC9) — origine de la synchro qui a produit ces verdicts : boot, rescan, service.
     sync_origin: Optional[str] = None
+    # Story 24.18 — instant de la dernière synchro légère (activation de scénarios publiés seulement) depuis la
+    # dernière synchro complète ; None après une synchro complète. `sync_at` reste celui de la synchro complète.
+    scenario_activation_at: Optional[str] = None
     config: Dict[str, Any] = field(default_factory=lambda: {
         "excluded_plugins": [], "excluded_piece_ids": [],
     })
@@ -461,6 +464,7 @@ def build_decision_export(
         "generated_at": _utc_z(generated_at),
         "sync_at": memo.sync_at,
         "sync_origin": memo.sync_origin,  # Story 24.14 (AC9), champ additif
+        "scenario_activation_at": memo.scenario_activation_at,  # Story 24.18, champ additif
         "producer": {"plugin_version": plugin_version, "confidence_policy": confidence_policy},
         "config": {
             "excluded_plugins": list(config.get("excluded_plugins", [])),

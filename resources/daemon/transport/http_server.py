@@ -2791,6 +2791,7 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
     decision_memo.config = normalize_export_config(sync_config)
     decision_memo.sync_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     decision_memo.sync_origin = _sync_origin(request)  # Story 24.14 (AC9)
+    decision_memo.scenario_activation_at = None  # Story 24.18 : la synchro complète remplace toute synchro légère
     _refresh_decision_export(
         request.app, data_dir,
         overrides=overrides_cache, equipment_overrides=equipment_overrides_cache,
@@ -2873,6 +2874,166 @@ async def _do_handle_action_sync_body(request: web.Request) -> web.Response:
         "request_id": str(uuid.uuid4()),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+
+
+# ---------------------------------------------------------------------------
+# Story 24.18 — synchro légère : seule l'activation de scénarios publiés a changé
+# ---------------------------------------------------------------------------
+
+SCENARIO_ACTIVATION_FULL_SYNC_REQUIRED = "full_sync_required"
+
+
+def _parse_scenario_activation_states(data) -> Optional[Dict[int, bool]]:
+    """Corps de ``/action/scenario_activation`` -> {id: is_active} ; None si mal formé (400).
+
+    Identifiants entiers strictement positifs (jamais un booléen), activation booléenne, sans doublon.
+    """
+    if not isinstance(data, dict):
+        return None
+    payload = data.get("payload")
+    raw = payload.get("scenarios") if isinstance(payload, dict) else None
+    if not isinstance(raw, list):
+        return None
+    states: Dict[int, bool] = {}
+    for item in raw:
+        if not isinstance(item, dict):
+            return None
+        sc_id = item.get("id")
+        active = item.get("is_active")
+        if isinstance(sc_id, bool) or not isinstance(sc_id, int) or sc_id <= 0 or not isinstance(active, bool):
+            return None
+        if sc_id in states:
+            return None
+        states[sc_id] = active
+    return states
+
+
+def _published_scenario_ids(app) -> Set[int]:
+    """Scénarios dont le bouton a été publié par la dernière synchro complète (verdict ``scenario_button``)."""
+    return {
+        sc_id for sc_id, decision in (app.get("scenario_publications") or {}).items()
+        if getattr(decision, "reason", None) == "scenario_button"
+        and getattr(decision, "should_publish", False)
+        and getattr(decision, "discovery_published", False)
+    }
+
+
+def _has_pending_overrides(app, data_dir: str) -> bool:
+    """Réglage en attente (même règle que ``pending_changes`` de l'export) : overrides courants != appliqués."""
+    topology = app.get("topology")
+    if topology is None:
+        return False
+    current = index_overrides(list_overrides(data_dir), list_equipment_overrides(data_dir))
+    memo_equipments = app["decision_memo"].equipments
+    empty = {"publication": None, "commands": {}}
+    for eq_id in topology.eq_logics:
+        applied = (memo_equipments.get(eq_id) or {}).get("overrides") or empty
+        if (current.get(eq_id) or empty) != applied:
+            return True
+    return False
+
+
+def _has_failed_equipment_publication(app) -> bool:
+    """Revue 24.18 — une publication d'équipement est restée en échec : la synchro complète la rejouerait."""
+    for decision in (app.get("publications") or {}).values():
+        result = getattr(getattr(decision, "mapping_result", None), "publication_result", None)
+        if result is not None and getattr(result, "status", None) == "failed":
+            return True
+    return False
+
+
+def _scenario_activation_refusal(app, states: Dict[int, bool], data_dir: str) -> Optional[str]:
+    """Story 24.18 — raison de refuser le chemin léger (synchro complète demandée), ou None.
+
+    Dans le doute, la synchro complète : elle seule applique ce qui a changé hors activation (ensemble des scénarios
+    publiés, publication en échec, opération différée, réglage en attente — décision du 13/11).
+    """
+    if app.get("topology") is None or app["decision_memo"].sync_at is None:
+        return "no_previous_sync"
+    if set(states) != _published_scenario_ids(app):
+        return "scenario_set_mismatch"
+    if any(sc_id not in app["topology"].scenarios for sc_id in states):
+        return "scenario_set_mismatch"
+    if app.get("scenario_publication_failed_ids") or _has_failed_equipment_publication(app):
+        return "previous_publication_failed"
+    if app.get("pending_discovery_unpublish") or app.get("pending_local_availability_cleanup"):
+        return "deferred_operations"
+    if _has_pending_overrides(app, data_dir):
+        return "pending_overrides"
+    return None
+
+
+async def _handle_action_scenario_activation(request: web.Request) -> web.Response:
+    """Handle POST /action/scenario_activation — Story 24.18, synchro légère.
+
+    Met à jour la disponibilité retenue des seuls boutons de scénario dont l'activation a changé, exactement
+    comme la synchro complète (même topic, charge, qos, retenue), puis la mémoire (instantané, décision) et
+    l'export. Aucune autre publication, aucun réalignement des listeners. Sérialisée avec la synchro.
+    """
+    if not _check_secret(request, request.app["local_secret"]):
+        return web.json_response({"status": "error", "message": "Unauthorized"}, status=401)
+    try:
+        data = await request.json()
+    except Exception:
+        data = None
+    states = _parse_scenario_activation_states(data)
+    if states is None:
+        return web.json_response({"status": "error", "code": "invalid_payload",
+                                  "message": "Liste des scénarios invalide."}, status=400)
+    action_lock: asyncio.Lock = request.app["action_lock"]
+    try:
+        await asyncio.wait_for(action_lock.acquire(), timeout=_SYNC_ACTION_LOCK_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        return web.json_response({"status": "error", "code": "action_in_progress",
+                                  "message": "Une opération Home Assistant est déjà en cours."}, status=409)
+    try:
+        return _apply_scenario_activation(request.app, states, _resolve_data_dir(request))
+    finally:
+        action_lock.release()
+
+
+def _apply_scenario_activation(app, states: Dict[int, bool], data_dir: str) -> web.Response:
+    refusal = _scenario_activation_refusal(app, states, data_dir)
+    if refusal is not None:
+        _LOGGER.info("[SCENARIO-ACTIVATION] Synchro complète demandée : %s", refusal)
+        return web.json_response({"action": "scenario_activation", "status": "error",
+                                  "code": SCENARIO_ACTIVATION_FULL_SYNC_REQUIRED, "reason": refusal})
+    topology = app["topology"]
+    changed = sorted(sc_id for sc_id, active in states.items()
+                     if bool(topology.scenarios[sc_id].is_active) != active)
+    if not changed:
+        return web.json_response({"action": "scenario_activation", "status": "ok", "result": "unchanged",
+                                  "scenario_ids": []})
+    mqtt_bridge = app.get("mqtt_bridge")
+    if mqtt_bridge is None or not mqtt_bridge.is_connected:
+        _LOGGER.warning("[SCENARIO-ACTIVATION] Broker injoignable : synchro complète au prochain pas")
+        return web.json_response({"action": "scenario_activation", "status": "error",
+                                  "code": "broker_unavailable", "scenario_ids": changed})
+    applied = []
+    failed = []
+    for sc_id in changed:
+        active = states[sc_id]
+        if not _publish_scenario_availability(mqtt_bridge, sc_id, active):
+            failed.append(sc_id)
+            break
+        # Publié : la mémoire suit HA (appui accepté / refusé, republication à la naissance de HA, export).
+        topology.scenarios[sc_id].is_active = active
+        app["scenario_publications"][sc_id].active_or_alive = active
+        applied.append(sc_id)
+    if applied:
+        app["decision_memo"].scenario_activation_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        _refresh_decision_export(app, data_dir)
+        _invalidate_equipment_states(app)
+        _LOGGER.info("[SCENARIO-ACTIVATION] Disponibilité mise à jour : ids=%s", applied)
+    if failed:
+        failed_memo = app.get("scenario_publication_failed_ids")
+        if isinstance(failed_memo, set):
+            failed_memo.update(failed)
+        _LOGGER.warning("[SCENARIO-ACTIVATION] Disponibilité non publiée : ids=%s", failed)
+        return web.json_response({"action": "scenario_activation", "status": "error",
+                                  "code": "publish_failed", "scenario_ids": failed})
+    return web.json_response({"action": "scenario_activation", "status": "ok", "result": "applied",
+                              "scenario_ids": applied})
 
 
 _DIAGNOSTIC_MESSAGES = {
@@ -5931,6 +6092,7 @@ def create_app(local_secret: str) -> web.Application:
     app.router.add_post("/action/mqtt_test", _handle_mqtt_test)
     app.router.add_post("/action/mqtt_connect", _handle_mqtt_connect)
     app.router.add_post("/action/sync", _handle_action_sync)
+    app.router.add_post("/action/scenario_activation", _handle_action_scenario_activation)  # Story 24.18
     app.router.add_get("/system/diagnostics", _handle_system_diagnostics)
     app.router.add_post("/system/overrides/preview", _handle_overrides_preview)
     # Story 16.5 — UI de configuration par équipement : arbre par commande (GET),

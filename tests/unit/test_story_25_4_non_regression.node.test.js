@@ -164,6 +164,13 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
   // climate (anciens topics `temperature/state`, `modes` fixes), l'entrée de registre (`required_fields`), la regex des canaux
   // retenus de sync/state.py, trois assertions des tests 10-2, et les références du golden 8.4 et des gardes 19-4 régénérées
   // (seuls les thermostats synthétiques changent). Admis dans leur fichier seulement (« fichier::ligne »).
+  // Story 24.18 (synchro légère) — la tâche périodique lit l'empreinte en deux parties ; readDecisionFingerprint rend la
+  // composite. Admis dans son fichier seulement.
+  const REPLACED_BY_24_18 = [
+    'core/class/jeedom2ha.class.php::return self::readDecisionFingerprint();',
+    'core/class/jeedom2ha.class.php::return jeedom2ha_decision_fingerprint(',
+  ];
+
   const REPLACED_BY_24_15 = [
     "resources/daemon/discovery/publisher.py::\"modes\": [\"heat\", \"off\"],",
     "resources/daemon/discovery/publisher.py::\"temperature_command_topic\", f\"jeedom2ha/{eq_id}/temperature/set\"",
@@ -461,6 +468,7 @@ describe('25.4 / AC31 — le démon, les routes et les artefacts figés ne chang
     const unexpected = removed
       .filter(({ file: f, line }) => !allowed.includes(line) && !REPLACED_BY_24_8.includes(`${f}::${line}`)
         && !REPLACED_BY_24_9.includes(`${f}::${line}`) && !REPLACED_BY_24_14.includes(`${f}::${line}`)
+        && !REPLACED_BY_24_18.includes(`${f}::${line}`)
         && !REPLACED_BY_24_15.includes(`${f}::${line}`)
         && !REPLACED_BY_FIX_SYNC_BODY_LIMIT.includes(`${f}::${line}`)
         && !REPLACED_BY_24_17.includes(`${f}::${line}`)

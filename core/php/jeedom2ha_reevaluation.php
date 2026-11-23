@@ -175,6 +175,148 @@ function jeedom2ha_decision_fingerprint(array $eqRows, array $scenarioRows, arra
 }
 
 /**
+ * Story 24.18 — empreinte en deux parties, pour la « synchro légère ».
+ *
+ * - `structural` : tout ce que contient l'empreinte 24.14 SAUF l'activation des scénarios (équipements, identifiants de
+ *   tous les scénarios, exclusions, choix de publication des scénarios) ;
+ * - `activation` : `id:isActive` des seuls scénarios PUBLIÉS (même règle que le démon et l'export : `publishedScenarios`
+ *   absent -> tous publiés ; sinon publié si l'identifiant y figure). L'activation d'un scénario non publié n'entre dans
+ *   aucune partie : sa bascule ne déclenche rien (elle ne change rien dans HA) ;
+ * - `states` : `[['id' => int, 'is_active' => bool], ...]` des scénarios publiés, triés (envoyés au démon) ;
+ * - `fingerprint` : valeur composite `v2:<structural>:<activation>`, la seule mémorisée (clé `decisionFingerprint`).
+ *   Deux composites égales <=> les deux parties égales.
+ *
+ * @return array{structural:string,activation:string,states:array,fingerprint:string}
+ */
+function jeedom2ha_decision_fingerprint_parts(array $eqRows, array $scenarioRows, array $settings, string $selfEqType = 'jeedom2ha'): array {
+  $excludedPlugins = jeedom2ha_reevaluation_csv_plugins($settings['excludedPlugins'] ?? '');
+  $excludedObjects = jeedom2ha_reevaluation_csv_ids($settings['excludedObjects'] ?? '');
+
+  $equipments = array();
+  foreach ($eqRows as $raw) {
+    $row = is_array($raw) ? jeedom2ha_reevaluation_eq_row($raw) : null;
+    if ($row === null || $row['eq_type'] === $selfEqType) {
+      continue;
+    }
+    // Même source d'exclusion effective que l'empreinte 24.14 : équipement > plugin > pièce.
+    $exclusion = '-';
+    if ($row['excluded']) {
+      $exclusion = 'e';
+    } elseif (in_array($row['eq_type'], $excludedPlugins, true)) {
+      $exclusion = 'p';
+    } elseif ($row['object_id'] !== null && in_array($row['object_id'], $excludedObjects, true)) {
+      $exclusion = 'o';
+    }
+    $equipments[$row['id']] = $row['id'] . ':' . ($row['is_enable'] ? '1' : '0') . ':' . $exclusion;
+  }
+  ksort($equipments);
+
+  $published = jeedom2ha_reevaluation_scenario_ids($settings['publishedScenarios'] ?? null);
+  $known = jeedom2ha_reevaluation_scenario_ids($settings['knownScenarioIds'] ?? null);
+  $scenarioIds = array();
+  $states = array();
+  foreach ($scenarioRows as $raw) {
+    if (!is_array($raw) || !isset($raw['id']) || !is_numeric($raw['id'])) {
+      continue;
+    }
+    $id = (int) $raw['id'];
+    $scenarioIds[$id] = $id;
+    if ($published === null || in_array($id, $published, true)) {
+      $states[$id] = (bool) ($raw['isActive'] ?? false);
+    }
+  }
+  ksort($scenarioIds);
+  ksort($states);
+
+  $structural = hash('sha256', (string) json_encode(array(
+    'v' => 2,
+    'eq' => array_values($equipments),
+    'sc_ids' => array_values($scenarioIds),
+    'excluded_plugins' => $excludedPlugins,
+    'excluded_objects' => $excludedObjects,
+    'scenario_publication' => array('published' => $published, 'known' => $known),
+  )));
+  $activationRows = array();
+  $stateList = array();
+  foreach ($states as $id => $active) {
+    $activationRows[] = $id . ':' . ($active ? '1' : '0');
+    $stateList[] = array('id' => $id, 'is_active' => $active);
+  }
+  $activation = hash('sha256', (string) json_encode(array('v' => 2, 'sc' => $activationRows)));
+  return array(
+    'structural' => $structural,
+    'activation' => $activation,
+    'states' => $stateList,
+    'fingerprint' => 'v2:' . $structural . ':' . $activation,
+  );
+}
+
+/**
+ * Story 24.18 — lit une empreinte composite `v2:<structurelle>:<activation>` ; null si elle n'est pas à ce format
+ * (vide, ancienne empreinte 24.14, valeur abîmée) : le chemin léger est alors impossible, synchro complète.
+ *
+ * @return array{structural:string,activation:string}|null
+ */
+function jeedom2ha_reevaluation_parse_fingerprint($fingerprint): ?array {
+  if (!is_string($fingerprint) || !preg_match('/^v2:([0-9a-f]{64}):([0-9a-f]{64})$/', $fingerprint, $m)) {
+    return null;
+  }
+  return array('structural' => $m[1], 'activation' => $m[2]);
+}
+
+/**
+ * Story 24.18 — le chemin léger s'applique-t-il ? Oui seulement si l'empreinte mémorisée et la courante sont toutes deux
+ * au format composite, avec la même partie structurelle et une activation différente. Tout autre cas : synchro complète.
+ */
+function jeedom2ha_reevaluation_light_candidate($stored, $current): bool {
+  $s = jeedom2ha_reevaluation_parse_fingerprint($stored);
+  $c = jeedom2ha_reevaluation_parse_fingerprint($current);
+  return $s !== null && $c !== null
+    && hash_equals($s['structural'], $c['structural'])
+    && !hash_equals($s['activation'], $c['activation']);
+}
+
+/**
+ * Story 24.18 — chemin léger d'un pas de la tâche périodique (seule l'activation de scénarios publiés a changé).
+ *
+ * Retour : un résultat du pas (`light`, `deferred`, `failed`), ou null si le démon demande une synchro complète
+ * (`full_sync_required`) : l'appelant la lance alors dans le même pas.
+ */
+function jeedom2ha_reevaluation_light_step(array $deps, string $stored, string $current, array $states): ?array {
+  $log = $deps['log'];
+  $log('info', '[REEVAL] Seule l\'activation de scénarios publiés a changé : mise à jour légère');
+  // Invalidée avant l'envoi : une réponse perdue laisse une empreinte vide, donc une synchro complète au pas suivant.
+  jeedom2ha_reevaluation_invalidate_before_sync($deps['store']);
+  try {
+    $result = $deps['light']($states);
+  } catch (\Throwable $e) {
+    $log('warning', '[REEVAL] Mise à jour légère échouée, synchro complète au prochain pas : ' . $e->getMessage());
+    return array('status' => 'failed', 'reason' => 'light_failed');
+  }
+  $code = is_array($result) ? ($result['code'] ?? null) : null;
+  if ($code === 'action_in_progress') {
+    // Le démon n'a rien fait, mais l'opération en cours peut être une relecture qui a elle-même invalidé l'empreinte :
+    // ne rien remettre (revue 24.18), l'empreinte reste vide et le pas suivant fait une synchro complète, comme en 24.14.
+    $log('info', '[REEVAL] Opération en cours dans le démon : synchro complète à la prochaine échéance');
+    return array('status' => 'deferred', 'reason' => 'action_in_progress');
+  }
+  if ($code === 'full_sync_required') {
+    $log('info', '[REEVAL] Le démon demande une synchro complète (' . (string) ($result['reason'] ?? 'inconnu') . ')');
+    return null;
+  }
+  if (is_array($result) && ($result['status'] ?? null) === 'ok'
+      && in_array($result['result'] ?? null, array('applied', 'unchanged'), true)) {
+    $deps['store']($current);
+    $log('info', '[REEVAL] Mise à jour légère terminée (scénarios : '
+      . implode(',', array_map('intval', (array) ($result['scenario_ids'] ?? array()))) . ')');
+    return array('status' => 'light', 'reason' => 'scenario_activation');
+  }
+  $message = is_array($result) ? (string) ($result['code'] ?? ($result['message'] ?? 'réponse inattendue')) : 'aucune réponse du démon';
+  $log('warning', '[REEVAL] Mise à jour légère échouée (' . $message . ') : synchro complète au prochain pas');
+  return array('status' => 'failed', 'reason' => 'light_failed');
+}
+
+/**
  * Story 24.14 (revue P2) — une réponse de POST /action/sync permet-elle de mémoriser l'empreinte ?
  * Oui seulement si la synchro a complètement réussi (`status` ok, `operation_result` `succes`) et si tous les boutons de scénario et leurs disponibilités
  * ont été publiés (`scenario_availability_complete` différent de false ; absent chez un démon plus ancien = oui).
@@ -233,7 +375,9 @@ function jeedom2ha_reevaluation_remember_after_sync(?string $fingerprint, $resul
  * Un pas de la tâche périodique : synchro de service seulement si l'empreinte a changé et si le démon est prêt.
  *
  * Dépendances injectées (toutes obligatoires) :
- * - `fingerprint` () => string        empreinte courante (peut lever)
+ * - `fingerprint` () => string|array  empreinte courante (peut lever) ; Story 24.18 : ou
+ *                                     `['fingerprint' => composite, 'states' => états des scénarios publiés]`
+ * - `light`       (array) => ?array   facultatif (Story 24.18) : POST /action/scenario_activation ; absent = 24.14 strict
  * - `stored`      () => string        empreinte de la dernière synchro réussie ('' si aucune)
  * - `store`       (string) => void    mémorise l'empreinte
  * - `ready`       () => bool          démon joignable et broker connecté
@@ -250,13 +394,21 @@ function jeedom2ha_reevaluation_remember_after_sync(?string $fingerprint, $resul
  */
 function jeedom2ha_reevaluation_tick(array $deps): array {
   $log = $deps['log'];
+  // Story 24.18 — `fingerprint` peut rendre les parties (`fingerprint` + `states`) ou, comme en 24.14, une chaîne.
+  $states = null;
   try {
-    $current = (string) $deps['fingerprint']();
+    $read = $deps['fingerprint']();
+    if (is_array($read)) {
+      $states = isset($read['states']) && is_array($read['states']) ? $read['states'] : null;
+      $read = $read['fingerprint'] ?? '';
+    }
+    $current = (string) $read;
   } catch (\Throwable $e) {
     $log('warning', '[REEVAL] Empreinte illisible, réévaluation reportée : ' . $e->getMessage());
     return array('status' => 'skipped', 'reason' => 'fingerprint_unreadable');
   }
-  if ($current !== '' && hash_equals((string) $deps['stored'](), $current)) {
+  $stored = (string) $deps['stored']();
+  if ($current !== '' && hash_equals($stored, $current)) {
     return array('status' => 'unchanged', 'reason' => 'fingerprint_unchanged');
   }
   try {
@@ -267,6 +419,14 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
   if (!$ready) {
     $log('debug', '[REEVAL] État Jeedom changé, démon non prêt : réévaluation reportée');
     return array('status' => 'skipped', 'reason' => 'daemon_not_ready');
+  }
+  // Story 24.18 — seule l'activation de scénarios publiés a changé : synchro légère (aucune topologie, aucun listener).
+  if (isset($deps['light']) && $states !== null && jeedom2ha_reevaluation_light_candidate($stored, $current)) {
+    $light = jeedom2ha_reevaluation_light_step($deps, $stored, $current, $states);
+    if ($light !== null) {
+      return $light;
+    }
+    // Le démon doute : synchro complète dans le même pas, comme avant 24.18.
   }
   try {
     $topology = $deps['topology']();
@@ -280,7 +440,8 @@ function jeedom2ha_reevaluation_tick(array $deps): array {
   }
   // Revue P2 (5e passe) — relecture après l'extraction : l'empreinte mémorisée doit être celle de la topologie envoyée.
   try {
-    $after = (string) $deps['fingerprint']();
+    $after = $deps['fingerprint']();
+    $after = (string) (is_array($after) ? ($after['fingerprint'] ?? '') : $after);
   } catch (\Throwable $e) {
     $after = null;
   }
