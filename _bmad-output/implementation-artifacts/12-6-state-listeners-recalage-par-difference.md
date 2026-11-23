@@ -106,11 +106,16 @@ Quatre conditions peuvent mener à une synchro de service et à un réalignement
 ### Constat de prod du 23/11 (relevé en lecture seule, après le diagnostic)
 
 - **62 synchros** dans la journée (et non ≈ 26 : l'estimation tirée des 7 500 recréations était basse), **par salves de tics consécutifs** : 00:00–01:25, 06:15–06:50, 10:00–10:15, 15:30–15:55, 16:25–16:40, 20:05–20:55 UTC, y compris la nuit.
-- H2 et H4 étant écartées, la cause reste **ouverte** : H1 par un scénario (ou un équipement) qui bascule en boucle pendant ces fenêtres, ou un champ instable dans l'empreinte que la lecture du code n'a pas trouvé. Elle sera traitée **à part** (relevés 1, 2 et 5 ci-dessous pendant une salve). Avec cette story, ces salves ne touchent plus aux listeners tant que le parc publié ne change pas.
+- **H1 confirmée** (relevés de prod en lecture seule, 23/11 au soir) : le scénario 123 active puis désactive le scénario 129 (action `scenario` activate / deactivate) toutes les 1 à 5 minutes.
+- Le 129 est publié dans HA comme bouton (`button.jeedom2ha_scenario_129`, `reason: scenario_button`) : chaque bascule de son `isActive` change l'empreinte, d'où une synchro de service complète et un réalignement des listeners.
+- Les heures du 23/11 où le 129 bascule le plus correspondent aux salves ; exemple : dernière bascule à 20:52 UTC, synchro à 20:55, puis plus rien à 21:00 ni à 21:05.
+- Le scénario 58, inactif, pilote le 130 de la même façon. Les scénarios 39 et 40 se désactivent eux-mêmes, ce qui explique les bascules notées pendant les déploiements (point ouvert O81).
+- Avec cette story, ces salves ne touchent plus aux listeners tant que le parc publié ne change pas.
+- **Suite décidée par le porteur du projet** : une « synchro légère » quand seule l'activation d'un scénario change (au lieu d'une synchro de service complète) ; story et PR séparées.
 
 ### Conclusion
 
-- **Pas de réalignement inconditionnel, pas d'empreinte instable trouvée à la lecture du code** : les resynchronisations viennent de C2 sur changement d'empreinte (62 le 23/11, par salves ; H2 et H4 écartées par les relevés de prod). **H1 reste l'hypothèse la plus probable**, la cause précise des salves restant ouverte (voir le constat ci-dessus) : des scénarios ou équipements qui basculent `isActive` / `isEnable` dans la journée, ce que 24.14 traite volontairement par une synchro de service. La configuration du plugin ne bouge pas, mais l'empreinte ne dépend pas seulement d'elle.
+- **Pas de réalignement inconditionnel, pas d'empreinte instable trouvée à la lecture du code** : les resynchronisations viennent de C2 sur changement d'empreinte (62 le 23/11, par salves ; H2 et H4 écartées par les relevés de prod). **H1 est confirmée** (voir le constat ci-dessus : scénarios 129 et 130 basculés en boucle par les scénarios 123 et 58, scénarios 39 et 40 qui se désactivent eux-mêmes) : des scénarios qui basculent `isActive` dans la journée, ce que 24.14 traite volontairement par une synchro de service. La configuration du plugin ne bouge pas, mais l'empreinte ne dépend pas seulement d'elle.
 - **Ce n'est donc pas, en l'état, un second défaut prouvé** : la synchro de service sur bascule est le comportement voulu ; le défaut était qu'elle recrée les 291 listeners, ce que corrige cette story (une synchro sans changement de parc publié ne touche plus aucun listener).
 - **H2, piste examinée puis écartée en prod** (conservée pour mémoire) : si les relevés montrent des tics **consécutifs** avec l'empreinte mémorisée vide, une synchro partielle persistante relance une synchro complète toutes les 5 minutes. Cause probable : un échec de publication ou une dépublication différée qui ne se résorbe pas ; pointeurs : `core/php/jeedom2ha_reevaluation.php` (`jeedom2ha_reevaluation_tick`, branche `$partial`), `resources/daemon/transport/http_server.py` (calcul de `_has_failures` / `_has_deferred` et de `scenario_availability_complete`). Correction proposée (PR séparée) : borner les relances d'une synchro partielle (par exemple mémoriser l'empreinte avec un marqueur « partiel » et ne relancer qu'après N tics ou sur changement réel), et journaliser en `warning` la cause exacte (identifiants en échec) pour qu'elle soit visible au niveau de log par défaut.
 - **Amélioration possible, non retenue ici** : l'empreinte inclut le `isActive` de tous les scénarios, y compris ceux que l'utilisateur ne publie pas, et le `isEnable` d'équipements exclus. Les retirer réduirait les synchros, mais le statut du démon expose `is_active` pour tous les scénarios (liste de la page) : à trancher par le porteur du projet, pas un défaut.
@@ -177,7 +182,7 @@ Verdict de la relecture indépendante : OK pour fusion, aucun point bloquant. Po
 - [x] [Relecture 7] Verrou autour du réalignement : `jeedom2ha_state_listener_acquire_lock()` (fonction pure : attente bornée, échec de prise = rien fait) + `flock` non bloquant dans la classe ; testé en simulé et avec un vrai `flock` sur deux poignées (refus puis acceptation après fermeture).
 - [x] [Relecture 8] Limite « Listener non trouvé isolé » étendue aux suppressions de doublons et de listeners mal formés (ci-dessus).
 - [x] [Relecture 9] Test de câblage renforcé : découpage des arguments de l'appel (7 arguments ; 6e = fonction de description avec `getEvent()` et `getOption('cmd_id')` ; 7e = `$stats`), tri par identifiant, verrou pris avant l'appel et `return 0` s'il est refusé.
-- [x] Enquête complétée : H2 (causes `scenarios_section_complete` / `scenario_purge_complete`, écartée en prod), H4 (redémarrage du démon, écartée en prod), constat de prod du 23/11 (62 synchros par salves, cause ouverte, traitée à part), AC12 corrigé (niveau de log de la prod).
+- [x] Enquête complétée : H2 (causes `scenarios_section_complete` / `scenario_purge_complete`, écartée en prod), H4 (redémarrage du démon, écartée en prod), constat de prod du 23/11 (62 synchros par salves ; H1 confirmée : scénario 129 basculé en boucle par le 123 ; suite : « synchro légère », story séparée), AC12 corrigé (niveau de log de la prod).
 
 ## Change Log
 
@@ -185,6 +190,7 @@ Verdict de la relecture indépendante : OK pour fusion, aucun point bloquant. Po
 |---|---|---|
 | 2026-11-23 | 1.0 | Story créée, développée et auto-revue ; PR #421 (`ef1f8e2`). |
 | 2026-11-23 | 1.1 | Corrections de la relecture indépendante et de Codex (P2 événement exact, tri par identifiant, WARNING des mal formés, verrou, test de câblage) ; enquête complétée (H2, H4, constat du 23/11) ; AC12 corrigé, AC13 ajouté. |
+| 2026-11-23 | 1.2 | Enquête : cause des salves prouvée en prod (H1 : scénario 129 basculé par le 123, 130 par le 58, 39 et 40 qui se désactivent, O81) ; suite décidée : « synchro légère », story et PR séparées. |
 
 ## Dev Agent Record
 
