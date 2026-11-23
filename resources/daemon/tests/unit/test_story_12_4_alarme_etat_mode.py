@@ -9,6 +9,7 @@ du virtuel générique (AC7).
 from __future__ import annotations
 
 import json
+import time
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -908,3 +909,115 @@ async def test_none_event_of_status_immediate_or_mode_is_kept_too(cmd_id, topolo
     bridge.published.clear()
     await sync.republish_alarm_states(decision)
     assert [p[1] for p in bridge.published] == [expected]
+
+
+# --- Revue Codex de 12.4 (3e passe) : magasin unique des quatre infos de l'alarme ----------------
+# Pour CHAQUE chemin qui lit une valeur d'alarme : Actif=1 dans la topologie -> lecture ``None`` par ce
+# chemin -> événement Mode -> toujours inconnu ; puis la republication (naissance HA / reconnexion).
+
+async def _none_by_event(sync, decision):
+    await sync.handle_state_message(EQ, ENABLE, None)
+
+
+async def _none_by_event_while_mqtt_down(sync, decision):
+    sync._mqtt_bridge.is_connected = False
+    assert await sync.handle_state_message(EQ, ENABLE, None) is False   # rejeté, mais lu
+    sync._mqtt_bridge.is_connected = True
+
+
+async def _none_by_click(sync, decision):
+    published, failed = await sync.publish_click_states(
+        decision, {ENABLE: None, STATUS: "0", IMMEDIATE: "0", MODE: "mode total"}, fresh_since=time.monotonic())
+    assert (published, failed) == (1, 0)
+
+
+async def _none_by_click_then_later_click_without_enable(sync, decision):
+    await _none_by_click(sync, decision)
+    # Un second clic qui ne relit pas Actif ne fait pas revenir la topologie.
+    await sync.publish_click_states(decision, {MODE: "mode total"}, fresh_since=time.monotonic())
+
+
+async def _none_by_fresh_read(sync, decision):
+    sync.reconcile_fresh_read(decision, time.monotonic(), {ENABLE: None})
+
+
+async def _none_by_sync_topology(sync, decision):
+    decision.mapping_result.commands["ALARM_ENABLE_STATE"].current_value = None
+    sync.reconcile_fresh_read(decision, time.monotonic())
+    await sync.publish_initial_states(decision)
+
+
+async def _none_by_event_older_than_a_sync_is_replaced_but_newer_is_kept(sync, decision):
+    read_at = time.monotonic()
+    await sync.handle_state_message(EQ, ENABLE, None)                  # reçu APRÈS la lecture de la synchro
+    sync.reconcile_fresh_read(decision, read_at)                       # topologie (Actif=1) plus ancienne
+    await sync.publish_initial_states(decision)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("read_none", [
+    _none_by_event, _none_by_event_while_mqtt_down, _none_by_click, _none_by_click_then_later_click_without_enable,
+    _none_by_fresh_read, _none_by_sync_topology, _none_by_event_older_than_a_sync_is_replaced_but_newer_is_kept,
+], ids=lambda f: f.__name__.lstrip("_"))
+async def test_a_none_read_by_any_path_keeps_the_alarm_unknown(read_none):
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(enable="1", mode="mode total")))
+    sync.reconcile_fresh_read(decision, time.monotonic())             # 1re synchro : Actif=1
+    assert await sync.publish_initial_states(decision) == 1
+    assert bridge.published[-1][1] == "armed_away"
+    await read_none(sync, decision)
+    await sync.handle_state_message(EQ, MODE, "mode nuit")
+    await sync.handle_state_message(EQ, STATUS, "0")
+    await sync.handle_state_message(EQ, IMMEDIATE, "0")
+    assert bridge.published[-1][1] == "None"
+    assert "armed_night" not in [p[1] for p in bridge.published]
+    bridge.published.clear()
+    assert await sync.republish_alarm_states(decision) == 1           # naissance HA / reconnexion
+    assert [p[1] for p in bridge.published] == ["None"]
+    # Seule une lecture plus récente d'Actif rend un état.
+    await sync.handle_state_message(EQ, ENABLE, "1")
+    assert bridge.published[-1][1] == "armed_night"
+
+
+@pytest.mark.asyncio
+async def test_after_a_restart_the_store_is_rebuilt_from_the_sync_topology():
+    """Redémarrage : un nouveau démon n'a aucune lecture ; la 1re synchro (Actif=None) fait foi."""
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(enable=None, mode="mode total")))
+    sync.reconcile_fresh_read(decision, time.monotonic())
+    await sync.publish_initial_states(decision)
+    await sync.handle_state_message(EQ, MODE, "mode nuit")
+    assert [p[1] for p in bridge.published] == ["None"]
+
+
+@pytest.mark.asyncio
+async def test_an_event_received_before_the_equipment_is_published_is_kept_by_the_sync():
+    """Événement reçu avant que l'alarme soit au registre, mais après la lecture de la synchro."""
+    mapping = _map(_alarm_eq(enable="1", mode="mode total"))
+    bridge = _Bridge()
+    app = {"publications": {}}
+    sync = StateSynchronizer(app=app, mqtt_bridge=bridge)
+    read_at = time.monotonic()
+    await sync.handle_state_message(EQ, ENABLE, None)                  # pas encore publiée : rejeté
+    decision = _decision(mapping)
+    app["publications"][EQ] = decision
+    sync.reconcile_fresh_read(decision, read_at)
+    await sync.publish_initial_states(decision)
+    assert [p[1] for p in bridge.published] == ["None"]
+
+
+@pytest.mark.parametrize("which", ["reconnect", "birth"])
+async def test_full_sync_with_unreadable_enable_then_mode_event_and_republication(cli, app, which):
+    """Bout en bout par /action/sync : Actif=1, puis synchro avec Actif illisible, puis Mode, puis CC-08."""
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    body = _sync_body()
+    for raw in body["payload"]["eq_logics"][0]["cmds"]:
+        if raw["id"] == ENABLE:
+            raw["current_value"] = None
+    assert (await cli.post("/action/sync", json=body, headers=HEADERS)).status == 200
+    _params, on_reconnect, on_birth = await _connect(cli, app)
+    bridge = app["mqtt_bridge"]
+    state_topic = f"jeedom2ha/{EQ}/alarm/state"
+    assert [c[1] for c in _calls(bridge) if c[0] == state_topic][-1] == "None"
+    await app["state_synchronizer"].handle_state_message(EQ, MODE, "mode nuit")
+    bridge.publish_message.reset_mock()
+    await (on_reconnect if which == "reconnect" else on_birth)()
+    assert [c[1] for c in _calls(bridge) if c[0] == state_topic] == ["None"]

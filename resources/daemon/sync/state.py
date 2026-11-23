@@ -206,6 +206,13 @@ class StateSynchronizer:
         # computed state becomes unknown after a state was published, ``ALARM_UNKNOWN_PAYLOAD`` is
         # published (retained) so HA does not stay on a stale ``triggered`` / ``armed_*``.
         self._alarm_published: Dict[str, str] = {}
+        # Revue Codex de 12.4 (3e passe) — SINGLE source of truth of the four alarm infos (Actif,
+        # Statut, Immédiat, Mode): last known read per (eq_id, cmd_id) -> (monotonic read time,
+        # value). Fed by EVERY read: Jeedom event, « Publier » click read, full sync topology
+        # (``reconcile_fresh_read``). ``None`` is a value (unreadable info), never an absence.
+        # Nothing removes an entry: a newer read replaces it (the sync topology included, for
+        # entries older than its read time). Alarm only: the other types keep their behaviour.
+        self._alarm_reads: Dict[Tuple[int, int], Tuple[float, Any]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -248,6 +255,9 @@ class StateSynchronizer:
         # (mqtt unavailable, unresolved target) must still count as "more recent than
         # the click" for `publish_click_states`.
         self._pending_click_values[(eq_id_int, cmd_id_int)] = (time.monotonic(), value)
+        # Revue Codex de 12.4 — an alarm info event feeds the alarm store before any guard too.
+        if cmd_id_int in self._alarm_info_ids_of(eq_id_int):
+            self._record_alarm_read(eq_id_int, cmd_id_int, value, time.monotonic())
 
         if not self._mqtt_bridge or not getattr(self._mqtt_bridge, "is_connected", False):
             self._log(logging.INFO, eq_id=eq_id_int, cmd_id=cmd_id_int,
@@ -476,6 +486,21 @@ class StateSynchronizer:
             eq_id_int = int(eq_id)
         except (TypeError, ValueError):
             return
+        # Revue Codex de 12.4 — the fresh read (sync topology or click) feeds the alarm store;
+        # ``None`` read is stored as a value. A click that did not read a command leaves it.
+        for alarm_cmd in self._alarm_info_cmds(mapping):
+            alarm_cmd_id = self._coerce_cmd_id(alarm_cmd)
+            if alarm_cmd_id is None:
+                continue
+            if values is None:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, getattr(alarm_cmd, "current_value", None), read_at)
+            elif alarm_cmd_id in values:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, values.get(alarm_cmd_id), read_at)
+            # An event received after this read (possibly before the equipment was published,
+            # hence not yet recognised as an alarm info) stays the most recent read.
+            pending = self._pending_click_values.get((eq_id_int, alarm_cmd_id))
+            if pending is not None and pending[0] > read_at:
+                self._record_alarm_read(eq_id_int, alarm_cmd_id, pending[1], pending[0])
         for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
             for cmd in (getattr(candidate, "commands", None) or {}).values():
                 cmd_id = self._coerce_cmd_id(cmd)
@@ -544,10 +569,15 @@ class StateSynchronizer:
             # Revue Codex de 12.4 — alarm topics whose state is unknown at this (re)publication.
             unknown_alarm_topics: List[_Binding] = []
             is_alarm = getattr(candidate, "ha_entity_type", None) in _ALARM_ACTIONABLE
+            # Revue Codex de 12.4 — every (re)publication of an alarm (sync, « Publier », HA birth,
+            # broker reconnection) reads its four infos from the alarm store, and only from it.
+            resolver = (
+                (lambda eq, b: self._last_known_alarm_value(eq, b.cmd)) if is_alarm else value_resolver
+            )
             for binding in self._candidate_bindings(candidate, cand_decision, eq_id):
                 if binding.topic in done_topics:
                     continue
-                raw_value = value_resolver(eq_id, binding)
+                raw_value = resolver(eq_id, binding)
                 if raw_value is None:
                     if no_value_reason_code:
                         self._log(logging.DEBUG, eq_id=eq_id, cmd_id=binding.cmd_id,
@@ -559,7 +589,7 @@ class StateSynchronizer:
                 payload = self._translate_value(
                     candidate, raw_value, binding.channel, binding.cmd,
                     # Story 24.15: a peer command (climate action) is read from the same source.
-                    peer=lambda peer_cmd: value_resolver(eq_id, self._peer_binding(peer_cmd)),
+                    peer=lambda peer_cmd, _r=resolver: _r(eq_id, self._peer_binding(peer_cmd)),
                 )
                 if payload is None:
                     if is_alarm:
@@ -1106,10 +1136,54 @@ class StateSynchronizer:
         so a later event of another info (or a republication) stays ``unknown`` instead of
         resurrecting a stale value. Only "no event at all" falls back to the topology.
         """
-        event = self.last_event(eq_id, getattr(cmd, "id", None))
-        if event is not None:
-            return event[1]
+        cmd_id = self._coerce_cmd_id(cmd)
+        try:
+            key = (int(eq_id), cmd_id)
+        except (TypeError, ValueError):
+            key = None
+        if key is not None and cmd_id is not None and key in self._alarm_reads:
+            return self._alarm_reads[key][1]
+        # Never read by any path yet (no sync, no event, no click): the mapping's topology value.
         return getattr(cmd, "current_value", None)
+
+    def _record_alarm_read(self, eq_id: int, cmd_id: int, value: Any, read_at: float) -> None:
+        """Store one alarm info read; an older read never replaces a newer one."""
+        key = (eq_id, cmd_id)
+        stored = self._alarm_reads.get(key)
+        if stored is not None and stored[0] > read_at:
+            return
+        self._alarm_reads[key] = (read_at, value)
+
+    @staticmethod
+    def _alarm_info_cmds(mapping: Any) -> List[Any]:
+        """The four alarm info commands (Actif, Statut, Immédiat, Mode) of an equipment."""
+        cmds: List[Any] = []
+        if mapping is None:
+            return cmds
+        for candidate in [mapping, *(getattr(mapping, "additional_mappings", None) or [])]:
+            if getattr(candidate, "ha_entity_type", None) not in _ALARM_ACTIONABLE:
+                continue
+            commands = getattr(candidate, "commands", None) or {}
+            for key in ALARM_INFO_KEYS.values():
+                if commands.get(key) is not None:
+                    cmds.append(commands[key])
+        return cmds
+
+    def _alarm_info_ids_of(self, eq_id: int) -> Set[int]:
+        """Alarm info command ids of ``eq_id`` in the publication registry (empty if none)."""
+        publications = self._app.get("publications", {}) if hasattr(self._app, "get") else {}
+        if not isinstance(publications, Mapping):
+            return set()
+        ids: Set[int] = set()
+        for decision in publications.values():
+            mapping = getattr(decision, "mapping_result", None)
+            if mapping is None or getattr(mapping, "jeedom_eq_id", None) != eq_id:
+                continue
+            for cmd in self._alarm_info_cmds(mapping):
+                cmd_id = self._coerce_cmd_id(cmd)
+                if cmd_id is not None:
+                    ids.add(cmd_id)
+        return ids
 
     def _last_known_value(self, eq_id: Any, cmd: Any) -> Any:
         """Story 24.15 — last Jeedom event of ``cmd``, else its topology value (never invented)."""
