@@ -25,6 +25,7 @@ require_once __DIR__  . '/../php/jeedom2ha_command_bounds.php'; // correctif fix
 require_once __DIR__  . '/../php/jeedom2ha_command_links.php'; // fix/switch-appariement-etat — info reliée à une action
 require_once __DIR__  . '/../php/jeedom2ha_scenario_publication.php'; // front v3 (Lot 4a) — publication des scénarios
 require_once __DIR__  . '/../php/jeedom2ha_system_health.php'; // story/system-health — appareil « Santé de Jeedom »
+require_once __DIR__  . '/../php/jeedom2ha_alarm.php'; // FR49 (CC-64) — modes et code de désarmement de l'alarme
 
 class jeedom2ha extends eqLogic {
   /*     * *************************Attributs****************************** */
@@ -62,6 +63,27 @@ class jeedom2ha extends eqLogic {
       return;
     }
     config::save('mqttPassword', utils::encrypt($password), __CLASS__);
+  }
+
+  /**
+   * FR49 (CC-64) — appelé par le cœur (config::save) avant d'enregistrer le code de désarmement :
+   * le code est stocké chiffré ; une saisie vide garde le code actuel.
+   */
+  public static function preConfig_alarmDisarmCode($_value) {
+    return jeedom2ha_alarm_code_to_store($_value, config::byKey(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__, ''), function ($code) {
+      return utils::encrypt($code);
+    });
+  }
+
+  /**
+   * FR49 (CC-64) — case « Retirer le code » : efface le code enregistré, puis se décoche.
+   */
+  public static function preConfig_alarmDisarmCodeClear($_value) {
+    if (jeedom2ha_alarm_code_clear_requested($_value)) {
+      config::remove(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__);
+      log::add(__CLASS__, 'info', '[ALARM] Code de désarmement retiré (pris en compte au prochain démarrage du démon)');
+    }
+    return '0';
   }
 
   /**
@@ -271,6 +293,14 @@ class jeedom2ha extends eqLogic {
         'tls'        => config::byKey('mqttTls', __CLASS__, '0') === '1',
         'tls_verify' => config::byKey('mqttTlsVerify', __CLASS__, '1') === '1',
       );
+      // FR49 (CC-64) — code de désarmement de l'alarme : dans ce corps HTTP local (secret local), jamais
+      // en ligne de commande ni dans un journal ; absent quand aucun code n'est configuré.
+      $alarmCode = jeedom2ha_alarm_code_for_daemon(config::byKey(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__, ''), function ($stored) {
+        return utils::decrypt($stored);
+      });
+      if ($alarmCode !== '') {
+        $mqttConfig['alarm_disarm_code'] = $alarmCode;
+      }
       log::add(__CLASS__, 'info', '[MQTT] Connexion MQTT initiée vers ' . $mqttHost . ':' . $mqttConfig['port'] . ' (user=' . ($mqttConfig['user'] !== '' ? $mqttConfig['user'] : 'anonymous') . ' tls=' . ($mqttConfig['tls'] ? 'true' : 'false') . ')');
       $result = self::callDaemon('/action/mqtt_connect', $mqttConfig, 'POST');
       if ($result === null || !isset($result['status']) || $result['status'] !== 'ok') {
@@ -1197,6 +1227,16 @@ class jeedom2ha extends eqLogic {
       // Ajouter exclusion_source uniquement si exclu (ne pas polluer le payload)
       if ($isExcluded) {
         $eqData['exclusion_source'] = $exclusionSource;
+      }
+      // FR49 (CC-64) — clés de mode d'une alarme (Homebridge), lecture seule, ajoutées seulement si présentes.
+      $alarmModeConfig = jeedom2ha_alarm_mode_config(
+        array_map(function ($c) { return $c['generic_type'] ?? null; }, $cmds),
+        function (string $key) use ($eq) {
+          return method_exists($eq, 'getConfiguration') ? $eq->getConfiguration($key, null) : null;
+        }
+      );
+      if (!empty($alarmModeConfig)) {
+        $eqData['alarm_mode_config'] = $alarmModeConfig;
       }
       $result['eq_logics'][] = $eqData;
 

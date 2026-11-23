@@ -30,6 +30,8 @@ from sync.readback import (
     has_reliable_channel,
 )
 from sync.readback import barrier_mode  # Story 24.7 (M1)
+from sync.alarm_code import alarm_code_configured  # FR49 (CC-64)
+from mapping.alarm_control_panel import alarm_supported_features  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
     CHANNEL_ACTION,
     CHANNEL_CURRENT_TEMPERATURE,
@@ -1083,11 +1085,18 @@ class DiscoveryPublisher:
     def _build_alarm_control_panel_payload(self, mapping: MappingResult, snapshot: TopologySnapshot) -> dict:
         """Build the MQTT Discovery JSON payload for an alarm_control_panel entity.
 
-        Minimal useful payload: state + arming/disarming commands.
-        Scope: armed_away / disarmed states only (Story 10.3 guardrail).
+        FR49 (CC-64): the state topic carries the HA state itself (``disarmed``, ``armed_home``,
+        ``armed_away``, ``armed_night``, ``pending``, ``triggered``), computed by the daemon
+        (``sync.readback.alarm_state``) — no ``value_template``. ``supported_features`` only
+        announces the armings that really exist. With a disarm code configured, only its
+        presence is published (``REMOTE_CODE``): the code itself never leaves the daemon.
         """
         eq_id = mapping.jeedom_eq_id
         device = self._build_device_block(mapping, snapshot)
+        reason_details = mapping.reason_details or {}
+        features = reason_details.get("supported_features")
+        if not isinstance(features, list):
+            features = alarm_supported_features(mapping.commands or {})
 
         payload = {
             "name": self._entity_name_for_payload(mapping, device),
@@ -1095,10 +1104,11 @@ class DiscoveryPublisher:
             "object_id": f"jeedom2ha_{eq_id}",
             "state_topic": f"jeedom2ha/{eq_id}/alarm/state",
             "command_topic": f"jeedom2ha/{eq_id}/alarm/set",
-            "value_template": "{{ 'armed_away' if value == '1' else 'disarmed' }}",
             "payload_disarm": "DISARM",
             "payload_arm_home": "ARM_HOME",
             "payload_arm_away": "ARM_AWAY",
+            "payload_arm_night": "ARM_NIGHT",
+            "supported_features": list(features),
             "platform": "mqtt",
             "device": device,
             "origin": {
@@ -1106,6 +1116,11 @@ class DiscoveryPublisher:
                 "sw_version": _SW_VERSION,
             },
         }
+        if alarm_code_configured():
+            payload["code"] = "REMOTE_CODE"
+            payload["code_disarm_required"] = True
+            payload["code_arm_required"] = False
+            payload["command_template"] = '{{ {"action": action, "code": code} | tojson }}'
         self._add_default_entity_id(payload, "alarm_control_panel")
         payload.update(self._build_availability_fields(mapping, snapshot))
 

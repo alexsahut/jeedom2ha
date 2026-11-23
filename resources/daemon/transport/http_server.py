@@ -81,6 +81,7 @@ from discovery.publisher import DiscoveryPublisher
 from discovery.registry import PublisherRegistry
 from discovery.system_health import SystemHealthPublisher  # story/system-health
 from cache.disk_cache import save_publications_cache
+from sync.alarm_code import alarm_code_configured, set_alarm_code  # FR49 (CC-64)
 from export.decision_export import (
     DecisionMemo,
     build_decision_export,
@@ -1496,7 +1497,28 @@ async def _republish_all_from_cache_body(app: web.Application, reason: str) -> N
                 )
             await asyncio.sleep(delay)
 
+        # FR49 / CC-08 — l'état d'une alarme est republié après sa discovery (birth HA,
+        # reconnexion au broker) : un broker sans persistance l'aurait perdu.
+        await _republish_alarm_state(app, decision, eq_id, reason)
+
     await _republish_scenarios_from_cache(app, publisher_registry, mqtt_bridge, topology, reason)
+
+
+async def _republish_alarm_state(app, decision, eq_id: int, reason: str) -> None:
+    """FR49 / CC-08 — republie l'état des alarmes publiées de cet équipement (aucun autre type)."""
+    mapping = getattr(decision, "mapping_result", None)
+    candidates = [mapping, *(getattr(mapping, "additional_mappings", None) or [])] if mapping is not None else []
+    if not any(getattr(c, "ha_entity_type", None) == "alarm_control_panel" for c in candidates):
+        return
+    state_sync = app.get("state_synchronizer")
+    republish = getattr(state_sync, "republish_alarm_states", None)
+    if not callable(republish):
+        return
+    try:
+        count = await republish(decision)
+        _LOGGER.info("[SYNC-STATE] eq_id=%d : état d'alarme republié (reason=%s, %d)", eq_id, reason, count)
+    except Exception as exc:
+        _LOGGER.error("[SYNC-STATE] eq_id=%d : republication de l'état d'alarme échouée — %s", eq_id, exc)
 
 
 def _scenario_republish_entries(app) -> list:
@@ -1859,6 +1881,12 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     data = await request.json()
     # Envelope format: params may be under "payload" key (callDaemon wrapping)
     params = data.get("payload", data)
+    # FR49 (CC-64) — le code de désarmement de l'alarme voyage dans ce corps local (protégé par
+    # le secret local), jamais en ligne de commande. Il est retiré des réglages du broker, gardé
+    # en mémoire seulement (sync.alarm_code), jamais journalisé. Absent ou vide : pas de code.
+    params = dict(params)
+    set_alarm_code(params.pop("alarm_disarm_code", None))
+    _LOGGER.info("[ALARM] Code de désarmement %s", "configuré" if alarm_code_configured() else "non configuré")
     host = params.get("host", "")
     if not host:
         return web.json_response({

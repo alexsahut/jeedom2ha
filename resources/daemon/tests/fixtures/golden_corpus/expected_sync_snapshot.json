@@ -39,6 +39,14 @@
             },
             {
               "attendu_ha": "alarm_control_panel",
+              "cmd_id": 23002,
+              "cmd_name": "Etat alarme",
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23003,
               "cmd_name": "Armer",
               "generic_type": "ALARM_ARMED",
@@ -50,6 +58,14 @@
               "cmd_id": 23004,
               "cmd_name": "Desactiver",
               "generic_type": "ALARM_RELEASED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
+              "cmd_id": 23006,
+              "cmd_name": "Mode courant",
+              "generic_type": "ALARM_MODE",
               "mapping_decision": "alarm_control_panel",
               "retained": true
             }
@@ -119,6 +135,18 @@
                 "used_type": "ALARM_ENABLE_STATE"
               },
               {
+                "command_id": 23002,
+                "configured_type": "ALARM_STATE",
+                "logical_role": "ALARM_STATE",
+                "used_type": "ALARM_STATE"
+              },
+              {
+                "command_id": 23006,
+                "configured_type": "ALARM_MODE",
+                "logical_role": "ALARM_MODE",
+                "used_type": "ALARM_MODE"
+              },
+              {
                 "command_id": 23003,
                 "configured_type": "ALARM_ARMED",
                 "logical_role": "ALARM_ARMED",
@@ -135,25 +163,9 @@
           "unmatched_commands": [
             {
               "attendu_ha": null,
-              "cmd_id": 23002,
-              "cmd_name": "Etat alarme",
-              "generic_type": "ALARM_STATE",
-              "mapping_decision": null,
-              "retained": false
-            },
-            {
-              "attendu_ha": null,
               "cmd_id": 23005,
               "cmd_name": "Mode",
               "generic_type": "ALARM_SET_MODE",
-              "mapping_decision": null,
-              "retained": false
-            },
-            {
-              "attendu_ha": null,
-              "cmd_id": 23006,
-              "cmd_name": "Mode courant",
-              "generic_type": "ALARM_MODE",
               "mapping_decision": null,
               "retained": false
             }
@@ -6428,6 +6440,14 @@
             },
             {
               "attendu_ha": "alarm_control_panel",
+              "cmd_id": 12002,
+              "cmd_name": "Etat activation",
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12003,
               "cmd_name": "Activer",
               "generic_type": "ALARM_ENABLE",
@@ -6498,6 +6518,12 @@
                 "used_type": "ALARM_STATE"
               },
               {
+                "command_id": 12002,
+                "configured_type": "ALARM_ENABLE_STATE",
+                "logical_role": "ALARM_ENABLE_STATE",
+                "used_type": "ALARM_ENABLE_STATE"
+              },
+              {
                 "command_id": 12003,
                 "configured_type": "ALARM_ENABLE",
                 "logical_role": "ALARM_ENABLE",
@@ -6511,16 +6537,7 @@
               }
             ]
           },
-          "unmatched_commands": [
-            {
-              "attendu_ha": null,
-              "cmd_id": 12002,
-              "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE",
-              "mapping_decision": null,
-              "retained": false
-            }
-          ],
+          "unmatched_commands": [],
           "v1_compatibility": false,
           "v1_limitation": false
         }
@@ -6562,6 +6579,14 @@
             },
             {
               "attendu_ha": "alarm_control_panel",
+              "cmd_id": 23002,
+              "cmd_name": "Etat alarme",
+              "generic_type": "ALARM_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 23003,
               "cmd_name": "Armer",
               "generic_type": "ALARM_ARMED",
@@ -6573,6 +6598,14 @@
               "cmd_id": 23004,
               "cmd_name": "Desactiver",
               "generic_type": "ALARM_RELEASED",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
+              "cmd_id": 23006,
+              "cmd_name": "Mode courant",
+              "generic_type": "ALARM_MODE",
               "mapping_decision": "alarm_control_panel",
               "retained": true
             }
@@ -6642,6 +6675,18 @@
                 "used_type": "ALARM_ENABLE_STATE"
               },
               {
+                "command_id": 23002,
+                "configured_type": "ALARM_STATE",
+                "logical_role": "ALARM_STATE",
+                "used_type": "ALARM_STATE"
+              },
+              {
+                "command_id": 23006,
+                "configured_type": "ALARM_MODE",
+                "logical_role": "ALARM_MODE",
+                "used_type": "ALARM_MODE"
+              },
+              {
                 "command_id": 23003,
                 "configured_type": "ALARM_ARMED",
                 "logical_role": "ALARM_ARMED",
@@ -6658,25 +6703,9 @@
           "unmatched_commands": [
             {
               "attendu_ha": null,
-              "cmd_id": 23002,
-              "cmd_name": "Etat alarme",
-              "generic_type": "ALARM_STATE",
-              "mapping_decision": null,
-              "retained": false
-            },
-            {
-              "attendu_ha": null,
               "cmd_id": 23005,
               "cmd_name": "Mode",
               "generic_type": "ALARM_SET_MODE",
-              "mapping_decision": null,
-              "retained": false
-            },
-            {
-              "attendu_ha": null,
-              "cmd_id": 23006,
-              "cmd_name": "Mode courant",
-              "generic_type": "ALARM_MODE",
               "mapping_decision": null,
               "retained": false
             }
@@ -12895,6 +12924,14 @@
             },
             {
               "attendu_ha": "alarm_control_panel",
+              "cmd_id": 12002,
+              "cmd_name": "Etat activation",
+              "generic_type": "ALARM_ENABLE_STATE",
+              "mapping_decision": "alarm_control_panel",
+              "retained": true
+            },
+            {
+              "attendu_ha": "alarm_control_panel",
               "cmd_id": 12003,
               "cmd_name": "Activer",
               "generic_type": "ALARM_ENABLE",
@@ -12965,6 +13002,12 @@
                 "used_type": "ALARM_STATE"
               },
               {
+                "command_id": 12002,
+                "configured_type": "ALARM_ENABLE_STATE",
+                "logical_role": "ALARM_ENABLE_STATE",
+                "used_type": "ALARM_ENABLE_STATE"
+              },
+              {
                 "command_id": 12003,
                 "configured_type": "ALARM_ENABLE",
                 "logical_role": "ALARM_ENABLE",
@@ -12978,16 +13021,7 @@
               }
             ]
           },
-          "unmatched_commands": [
-            {
-              "attendu_ha": null,
-              "cmd_id": 12002,
-              "cmd_name": "Etat activation",
-              "generic_type": "ALARM_ENABLE_STATE",
-              "mapping_decision": null,
-              "retained": false
-            }
-          ],
+          "unmatched_commands": [],
           "v1_compatibility": false,
           "v1_limitation": false
         }
@@ -14229,6 +14263,12 @@
             "sub_type": "other",
             "type": "action"
           },
+          "ALARM_ENABLE_STATE": {
+            "generic_type": "ALARM_ENABLE_STATE",
+            "id": 12002,
+            "sub_type": "binary",
+            "type": "info"
+          },
           "ALARM_STATE": {
             "generic_type": "ALARM_STATE",
             "id": 12001,
@@ -14268,7 +14308,10 @@
         "reason_code": "alarm_control_panel_state_commands",
         "reason_details": {
           "command_topic": "jeedom2ha/12000/alarm/set",
-          "state_topic": "jeedom2ha/12000/alarm/state"
+          "state_topic": "jeedom2ha/12000/alarm/state",
+          "supported_features": [
+            "arm_away"
+          ]
         },
         "suggested_area": "Salon"
       },
@@ -14793,11 +14836,23 @@
             "sub_type": "binary",
             "type": "info"
           },
+          "ALARM_MODE": {
+            "generic_type": "ALARM_MODE",
+            "id": 23006,
+            "sub_type": "string",
+            "type": "info"
+          },
           "ALARM_RELEASED": {
             "generic_type": "ALARM_RELEASED",
             "id": 23004,
             "sub_type": "other",
             "type": "action"
+          },
+          "ALARM_STATE": {
+            "generic_type": "ALARM_STATE",
+            "id": 23002,
+            "sub_type": "binary",
+            "type": "info"
           }
         },
         "confidence": "sure",
@@ -14832,7 +14887,10 @@
         "reason_code": "alarm_control_panel_state_commands",
         "reason_details": {
           "command_topic": "jeedom2ha/230/alarm/set",
-          "state_topic": "jeedom2ha/230/alarm/state"
+          "state_topic": "jeedom2ha/230/alarm/state",
+          "supported_features": [
+            "arm_away"
+          ]
         },
         "suggested_area": "Salon"
       },

@@ -48,6 +48,13 @@ $j2haPluginActive = function ($pluginId) {
   }
 };
 $j2haHasMqttManager = $j2haPluginActive('mqtt2');
+// FR49 (CC-64) — un code de désarmement est-il enregistré ? Seule sa présence est lue : le code (chiffré) n'entre jamais dans le DOM.
+$j2haAlarmCodeSet = false;
+try {
+  $j2haAlarmCodeSet = (string) config::byKey('alarmDisarmCode', 'jeedom2ha', '') !== '';
+} catch (Throwable $e) {
+  $j2haAlarmCodeSet = false;
+}
 // Front v3 (Lot 6) : adresse de la documentation du plugin, base des liens « En savoir plus » des info-bulles ⓘ (vide = pas de lien).
 $j2haDocUrl = '';
 try {
@@ -187,6 +194,32 @@ include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha');
   </fieldset>
 </form>
 
+<!-- FR49 (CC-64) : code de désarmement de l'alarme. Champ mot de passe : enregistré chiffré, jamais rechargé dans la page ;
+     le démon le lit à son démarrage. -->
+<form class="form-horizontal" id="form_j2haAlarmCode">
+  <fieldset>
+    <legend><i class="fas fa-shield-alt"></i> {{Alarme}}
+      <sup><button type="button" class="j2ha-info j2ha-v3-info" id="i_alarmDisarmCode" data-j2ha-tip="{{Avec un code, Home Assistant le demande pour désarmer l'alarme ; l'armement reste libre. Sans code, désarmer n'en demande pas. Le code est enregistré chiffré et le démon ne le lit qu'à son démarrage : redémarrez le démon après l'avoir changé.}}" aria-label="{{Aide}} : {{Code de désarmement}}" aria-expanded="false" data-j2ha-doc="alarmes"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
+    </legend>
+    <div class="form-group">
+      <label class="col-md-4 control-label" for="in_alarmDisarmCode">{{Code de désarmement}}</label>
+      <div class="col-md-4">
+        <input type="password" class="form-control" data-l1key="alarmDisarmCode" id="in_alarmDisarmCode"
+               autocomplete="new-password" placeholder="{{Laisser vide pour conserver l'actuel}}"/>
+        <small id="span_alarmDisarmCodeStatus" class="text-success"<?php echo $j2haAlarmCodeSet ? '' : ' style="display:none;"'; ?>>
+          <i class="fas fa-lock"></i> {{Code déjà configuré}}
+        </small>
+      </div>
+    </div>
+    <div class="form-group" id="div_alarmDisarmCodeClear"<?php echo $j2haAlarmCodeSet ? '' : ' style="display:none;"'; ?>>
+      <label class="col-md-4 control-label" for="cb_alarmDisarmCodeClear">{{Retirer le code}}</label>
+      <div class="col-md-4">
+        <input type="checkbox" class="configKey" data-l1key="alarmDisarmCodeClear" id="cb_alarmDisarmCodeClear"/>
+      </div>
+    </div>
+  </fieldset>
+</form>
+
 <!-- Front v3 (Lot 3) : ce qui est publié se choisit dans un seul panneau, sur la page du plugin. -->
 <p id="p_j2haChoosePublished">
   <a href="index.php?v=d&amp;m=jeedom2ha&amp;p=jeedom2ha#j2ha-choisir" id="lnk_j2haChoosePublished"><i class="fas fa-check-square"></i> {{Choisir ce qui est publié}} <i class="fas fa-external-link-alt"></i></a>
@@ -271,6 +304,14 @@ function j2haNormalizeMqttConfiguration(configuration) {
   return out;
 }
 /* j2ha-mqtt-test-messages:end */
+
+/* j2ha-alarm-code:begin */
+// FR49 (CC-64) — le champ du code n'est enregistré (classe configKey) que s'il est saisi et que « Retirer le code » n'est pas coché :
+// une saisie vide garde le code actuel, comme le mot de passe MQTT. Le code n'est jamais affiché, ni écrit dans la console.
+function j2haAlarmCodeIsSaved(value, clearChecked) {
+  return !clearChecked && String(value === undefined || value === null ? '' : value).trim() !== '';
+}
+/* j2ha-alarm-code:end */
 
 // Confirmation : même boîte que la page du plugin (bootbox du cœur), repli sur la confirmation du navigateur.
 function j2haConfirm(title, message, confirmLabel, onConfirm) {
@@ -479,6 +520,11 @@ function j2haRunGuidedConnection(skipTest) {
         $('#in_mqttPassword').val('').removeClass('configKey');
         $('#span_mqttPasswordStatus').show();
       }
+      // Story 12.4 — de même pour le code de désarmement de l'alarme, enregistré avec les autres réglages.
+      if ($('#in_alarmDisarmCode').val() !== '') {
+        $('#in_alarmDisarmCode').val('').removeClass('configKey');
+        $('#span_alarmDisarmCodeStatus, #div_alarmDisarmCodeClear').show();
+      }
       restart();
     }, function(reason) {
       j2haSetStep('save', 'failed');
@@ -573,6 +619,18 @@ $(function() {
       $(this).removeClass('configKey');
     }
   });
+
+  // ---- FR49 (CC-64) : code de désarmement de l'alarme ----
+  function j2haSyncAlarmCodeField() {
+    var clear = $('#cb_alarmDisarmCodeClear').is(':checked');
+    var $code = $('#in_alarmDisarmCode');
+    if (clear) {
+      $code.val('');
+    }
+    $code.prop('disabled', clear).toggleClass('configKey', j2haAlarmCodeIsSaved($code.val(), clear));
+  }
+  $('#in_alarmDisarmCode').on('input keyup change', j2haSyncAlarmCodeField);
+  $('#cb_alarmDisarmCodeClear').on('change', j2haSyncAlarmCodeField);
 
   // ---- Import forcé depuis MQTT Manager (bouton rendu seulement si MQTT Manager est installé et actif) ----
   // forceMqttManagerImport enregistre aussitôt côté serveur : confirmation avant d'écraser les réglages.

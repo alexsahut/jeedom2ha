@@ -8,7 +8,10 @@
       "jeedom_eq_id": 230,
       "reason_code": "alarm_control_panel_state_commands",
       "reason_details": {
-        "command_topic": "jeedom2ha/230/alarm/set"
+        "command_topic": "jeedom2ha/230/alarm/set",
+        "supported_features": [
+          "arm_away"
+        ]
       }
     },
     "op": "publish"
@@ -960,7 +963,10 @@
       "jeedom_eq_id": 12000,
       "reason_code": "alarm_control_panel_state_commands",
       "reason_details": {
-        "command_topic": "jeedom2ha/12000/alarm/set"
+        "command_topic": "jeedom2ha/12000/alarm/set",
+        "supported_features": [
+          "arm_away"
+        ]
       }
     },
     "op": "publish"

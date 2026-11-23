@@ -1,0 +1,620 @@
+"""Story 12.4 (FR49, CC-64) — alarme : état diffusé vers HA, armement par mode, code de désarmement.
+
+Identifiants, noms et libellés de mode fictifs uniquement (CC-48) : aucun identifiant ni libellé de
+la maison. Couvre : table de vérité de ``alarm_state`` (AC1), mapper et clés Homebridge (AC4, AC5),
+diffusion (AC2), republication à la naissance de HA et à la reconnexion au broker (AC3, CC-08),
+commandes par mode (AC4), code de désarmement (AC6), discovery sans code (AC6) et non-régression
+du virtuel générique (AC7).
+"""
+from __future__ import annotations
+
+import json
+import logging
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from discovery.publisher import DiscoveryPublisher
+from mapping.alarm_control_panel import (
+    AlarmControlPanelMapper,
+    alarm_arm_targets,
+    alarm_supported_features,
+    parse_mode_config_value,
+)
+from models.mapping import PublicationDecision
+from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
+from sync import alarm_code
+from sync.alarm_code import ALARM_CODE, set_alarm_code
+from sync.command import CommandSynchronizer, CommandTranslation
+from sync.readback import alarm_readback_commands, alarm_state, normalize_alarm_mode_label
+from sync.state import StateSynchronizer
+from transport import http_server
+from transport.http_server import create_app
+
+EQ = 7100           # alarme du plugin « alarm » (ids d'exemple)
+VIRTUAL = 7200      # virtuel générique
+ENABLE, STATUS, IMMEDIATE, MODE = 71001, 71002, 71003, 71004
+ARMED, RELEASED = 71005, 71006
+MODE_A, MODE_B, MODE_C, MODE_D = 71011, 71012, 71013, 71014
+LABELS = {"armed_home": "Mode Jour", "armed_away": "mode   total", "armed_night": "mode nuit"}
+CONFIG = {
+    "SetModePresent": f"{MODE_C}|Mode Jour",
+    "SetModeAbsent": f"{MODE_A}|mode   total",
+    "SetModeNuit": f"{MODE_B}|mode nuit",
+}
+SECRET = "test-secret-12-4"
+HEADERS = {"X-Local-Secret": SECRET}
+CODE = "8213-sentinelle"
+
+
+@pytest.fixture(autouse=True)
+def _no_code():
+    """Le code vit dans le démon (objet global) : chaque test part sans code et le rend sans code."""
+    ALARM_CODE.clear()
+    yield
+    ALARM_CODE.clear()
+
+
+def _cmd(cmd_id, generic_type, type_="action", sub_type="other", value=None, logical_id=None):
+    return JeedomCmd(id=cmd_id, name=f"Cmd {cmd_id}", generic_type=generic_type, type=type_,
+                     sub_type=sub_type, current_value=value, logical_id=logical_id)
+
+
+def _alarm_eq(config=None, eq_type="alarm", enable="1", status="0", immediate="0", mode="mode nuit"):
+    return JeedomEqLogic(
+        id=EQ, name="Alarme essai", object_id=1, eq_type_name=eq_type,
+        alarm_mode_config=dict(CONFIG if config is None else config),
+        cmds=[
+            _cmd(ENABLE, "ALARM_ENABLE_STATE", "info", "binary", enable, "enable"),
+            _cmd(STATUS, "ALARM_STATE", "info", "binary", status, "state"),
+            _cmd(IMMEDIATE, None, "info", "binary", immediate, "immediatState"),
+            _cmd(MODE, "ALARM_MODE", "info", "string", mode, "mode"),
+            _cmd(ARMED, "ALARM_ARMED"),
+            _cmd(RELEASED, "ALARM_RELEASED"),
+            _cmd(MODE_A, "ALARM_SET_MODE"),
+            _cmd(MODE_B, "ALARM_SET_MODE"),
+            _cmd(MODE_C, "ALARM_SET_MODE"),
+            _cmd(MODE_D, "ALARM_SET_MODE"),
+        ],
+    )
+
+
+def _virtual_eq(enable="1", status="0"):
+    return JeedomEqLogic(
+        id=VIRTUAL, name="Alarme virtuelle", object_id=1, eq_type_name="virtual",
+        cmds=[
+            _cmd(72001, "ALARM_STATE", "info", "binary", status),
+            _cmd(72002, "ALARM_ENABLE_STATE", "info", "binary", enable),
+            _cmd(72003, "ALARM_ENABLE"),
+            _cmd(72004, "ALARM_DISABLE"),
+        ],
+    )
+
+
+def _snapshot(*eqs):
+    return TopologySnapshot(timestamp="2026-11-23T00:00:00Z", objects={1: JeedomObject(id=1, name="Zone")},
+                            eq_logics={eq.id: eq for eq in eqs})
+
+
+def _map(eq):
+    return AlarmControlPanelMapper().map(eq, _snapshot(eq))
+
+
+class _Bridge:
+    def __init__(self):
+        self.is_connected = True
+        self.published = []
+
+    def publish_message(self, topic, payload, qos=0, retain=False):
+        self.published.append((topic, payload, qos, retain))
+        return True
+
+
+def _decision(mapping):
+    decision = PublicationDecision(
+        should_publish=True, reason="sure", mapping_result=mapping,
+        state_topic=mapping.reason_details["state_topic"], active_or_alive=True, discovery_published=True,
+    )
+    mapping.publication_decision_ref = decision
+    return decision
+
+
+def _discovery(eq):
+    return DiscoveryPublisher(MagicMock())._build_alarm_control_panel_payload(_map(eq), _snapshot(eq))
+
+
+# --- AC1 : table de vérité ------------------------------------------------------------------
+
+@pytest.mark.parametrize("status,enable,immediate,mode,expected", [
+    # 1. Statut = 1 : déclenchée, quoi qu'il en soit du reste (Actif jamais lu compris)
+    ("1", "1", "1", "mode nuit", "triggered"),
+    ("1", "0", "0", None, "triggered"),
+    ("1", None, None, None, "triggered"),
+    (1, None, None, None, "triggered"),
+    ("true", "1", "0", None, "triggered"),
+    # 2. Actif = 0 : désarmée (Immédiat et Mode ignorés)
+    ("0", "0", "1", "Mode Jour", "disarmed"),
+    (None, "0", None, None, "disarmed"),
+    ("0", "false", "0", None, "disarmed"),
+    # 3. Immédiat = 1 : délai d'entrée
+    ("0", "1", "1", "Mode Jour", "pending"),
+    (None, "1", "1", None, "pending"),
+    # 4. Mode : libellés des clés Homebridge, casse et espaces normalisés
+    ("0", "1", "0", "Mode Jour", "armed_home"),
+    ("0", "1", "0", "  mode   jour ", "armed_home"),
+    ("0", "1", "0", "MODE TOTAL", "armed_away"),
+    ("0", "1", "0", "mode nuit", "armed_night"),
+    ("0", "1", "0", "Mode\tNuit", "armed_night"),
+    # 5. mode inconnu, vide ou absent : armed_away (Homebridge / HomeKit)
+    ("0", "1", "0", "mode inconnu", "armed_away"),
+    ("0", "1", "0", "", "armed_away"),
+    ("0", "1", None, None, "armed_away"),
+    # 6. Actif jamais lu ou illisible : rien d'inventé
+    ("0", None, "0", "mode nuit", None),
+    ("0", "", "0", "mode nuit", None),
+    ("0", "2", "0", "mode nuit", None),
+    ("0", "abc", "1", "mode nuit", None),
+    (None, None, None, None, None),
+])
+def test_alarm_state_truth_table(status, enable, immediate, mode, expected):
+    assert alarm_state(status, enable, immediate, mode, LABELS) == expected
+
+
+def test_alarm_state_without_mode_configuration_is_armed_away():
+    assert alarm_state("0", "1", "0", "Mode Jour", None) == "armed_away"
+    assert alarm_state("0", "1", "0", "Mode Jour", {}) == "armed_away"
+
+
+def test_alarm_state_never_publishes_arming():
+    seen = {alarm_state(s, e, i, m, LABELS)
+            for s in ("0", "1", None) for e in ("0", "1", None) for i in ("0", "1", None)
+            for m in (None, "Mode Jour", "mode total", "mode nuit", "x")}
+    assert "arming" not in seen
+    assert seen <= {None, "disarmed", "armed_home", "armed_away", "armed_night", "pending", "triggered"}
+
+
+def test_mode_label_normalization():
+    assert normalize_alarm_mode_label("  Mode   SOIR ") == "mode soir"
+    assert normalize_alarm_mode_label("") is None
+    assert normalize_alarm_mode_label(None) is None
+
+
+# --- AC4 / AC5 : mapper, clés Homebridge -------------------------------------------------------
+
+@pytest.mark.parametrize("raw,expected", [
+    ("71011|mode total", (71011, "mode total")),
+    ("71011|a|b", (71011, "a|b")),
+    (" 71011 |x", (71011, "x")),
+    ("71011|", None), ("71011", None), ("abc|x", None), ("0|x", None), ("-3|x", None),
+    ("#71011#|x", None), ("", None), (None, None), (71011, None),
+])
+def test_parse_mode_config_value(raw, expected):
+    assert parse_mode_config_value(raw) == expected
+
+
+def test_mapper_reads_the_four_infos_and_the_three_modes():
+    mapping = _map(_alarm_eq())
+    cmds = {k: c.id for k, c in mapping.commands.items()}
+    assert cmds == {
+        "ALARM_ENABLE_STATE": ENABLE, "ALARM_STATE": STATUS, "ALARM_IMMEDIATE_STATE": IMMEDIATE,
+        "ALARM_MODE": MODE, "ALARM_ARMED": ARMED, "ALARM_RELEASED": RELEASED,
+        "ALARM_SET_MODE_HOME": MODE_C, "ALARM_SET_MODE_AWAY": MODE_A, "ALARM_SET_MODE_NIGHT": MODE_B,
+    }
+    assert mapping.reason_details["supported_features"] == ["arm_home", "arm_away", "arm_night"]
+    assert mapping.reason_details["alarm_mode_labels"] == LABELS
+    assert mapping.capabilities.has_state and mapping.capabilities.has_command
+    assert [c.id for _ch, c in alarm_readback_commands(mapping)] == [ENABLE, STATUS, IMMEDIATE, MODE]
+
+
+def test_immediate_info_only_for_the_alarm_plugin():
+    mapping = _map(_alarm_eq(eq_type="virtual"))
+    assert "ALARM_IMMEDIATE_STATE" not in mapping.commands
+
+
+@pytest.mark.parametrize("value,why", [
+    ("99999|mode", "id absent de l'équipement"),
+    (f"{ARMED}|mode", "action d'un autre generic type"),
+    (f"{MODE}|mode", "info, pas une action"),
+    ("pas-un-id", "format invalide"),
+])
+def test_a_mode_command_is_kept_only_if_it_is_an_alarm_set_mode_action_of_the_equipment(value, why):
+    mapping = _map(_alarm_eq(config={"SetModePresent": value, "SetModeAbsent": f"{MODE_A}|mode total"}))
+    assert "ALARM_SET_MODE_HOME" not in mapping.commands, why
+    assert mapping.reason_details["supported_features"] == ["arm_away"]
+
+
+def test_partial_configuration_announces_only_the_available_armings():
+    mapping = _map(_alarm_eq(config={"SetModeNuit": f"{MODE_B}|mode nuit"}))
+    assert mapping.reason_details["supported_features"] == ["arm_night"]
+    assert set(alarm_arm_targets(mapping.commands)) == {"armed_night"}
+
+
+def test_without_mode_configuration_arming_is_the_generic_armed_command():
+    mapping = _map(_alarm_eq(config={}))
+    assert mapping.reason_details["supported_features"] == ["arm_away"]
+    assert alarm_arm_targets(mapping.commands)["armed_away"].id == ARMED
+    assert "alarm_mode_labels" not in mapping.reason_details
+
+
+def test_topology_payload_carries_the_mode_keys_read_only():
+    snapshot = TopologySnapshot.from_jeedom_payload({"eq_logics": [{
+        "id": EQ, "name": "Alarme", "eq_type": "alarm", "cmds": [],
+        "alarm_mode_config": {"SetModePresent": "1|a", "SetModeAbsent": "", "SetModeNuit": ["x"], "Autre": "2|b"},
+    }, {"id": EQ + 1, "name": "Lampe", "eq_type": "virtual", "cmds": []}]})
+    assert snapshot.eq_logics[EQ].alarm_mode_config == {"SetModePresent": "1|a"}
+    assert snapshot.eq_logics[EQ + 1].alarm_mode_config == {}
+
+
+# --- AC2 : diffusion ---------------------------------------------------------------------------
+
+def _state_sync(mapping):
+    bridge = _Bridge()
+    decision = _decision(mapping)
+    sync = StateSynchronizer(app={"publications": {mapping.jeedom_eq_id: decision}}, mqtt_bridge=bridge)
+    return sync, bridge, decision
+
+
+@pytest.mark.asyncio
+async def test_initial_state_is_published_retained_on_the_declared_topic():
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(mode="Mode Jour")))
+    assert await sync.publish_initial_states(decision) == 1
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", "armed_home", 1, True)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cmd_id,value,expected", [
+    (ENABLE, "0", "disarmed"),
+    (STATUS, "1", "triggered"),
+    (IMMEDIATE, "1", "pending"),
+    (MODE, "mode total", "armed_away"),
+    (MODE, "Mode Jour", "armed_home"),
+])
+async def test_each_of_the_four_infos_recomputes_and_publishes_the_state(cmd_id, value, expected):
+    sync, bridge, _decision_ = _state_sync(_map(_alarm_eq(mode="mode nuit")))
+    assert await sync.handle_state_message(EQ, cmd_id, value) is True
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", expected, 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_the_other_infos_are_read_from_their_last_event():
+    sync, bridge, _d = _state_sync(_map(_alarm_eq(enable="0", mode="mode nuit")))
+    await sync.handle_state_message(EQ, ENABLE, "1")        # armée, mode nuit (topologie)
+    await sync.handle_state_message(EQ, IMMEDIATE, "1")     # délai d'entrée
+    await sync.handle_state_message(EQ, STATUS, "1")        # déclenchée
+    await sync.handle_state_message(EQ, STATUS, "0")        # retour : Immédiat toujours à 1
+    await sync.handle_state_message(EQ, IMMEDIATE, "0")
+    await sync.handle_state_message(EQ, ENABLE, "0")
+    assert [p[1] for p in bridge.published] == [
+        "armed_night", "pending", "triggered", "pending", "armed_night", "disarmed"]
+
+
+@pytest.mark.asyncio
+async def test_never_read_enable_publishes_nothing():
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(enable=None)))
+    assert await sync.publish_initial_states(decision) == 0
+    assert await sync.handle_state_message(EQ, MODE, "Mode Jour") is False
+    assert bridge.published == []
+
+
+def test_the_four_infos_are_registered_as_state_listeners():
+    sync, _bridge, _d = _state_sync(_map(_alarm_eq()))
+    targets = sync.list_state_targets()
+    assert sorted(t["cmd_id"] for t in targets) == sorted([ENABLE, STATUS, IMMEDIATE, MODE])
+    assert {t["state_topic"] for t in targets} == {f"jeedom2ha/{EQ}/alarm/state"}
+    assert sync.streams_actionable_type("alarm_control_panel") is True
+
+
+@pytest.mark.asyncio
+async def test_click_publication_uses_the_fresh_values():
+    sync, bridge, decision = _state_sync(_map(_alarm_eq(enable="0")))
+    published, failed = await sync.publish_click_states(
+        decision, {ENABLE: "1", STATUS: "0", IMMEDIATE: "0", MODE: "mode total"}, fresh_since=0.0)
+    assert (published, failed) == (1, 0)
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", "armed_away", 1, True)]
+
+
+# --- AC3 : CC-08, naissance de HA et reconnexion au broker --------------------------------------
+
+def _raw_cmd(cmd_id, generic_type, type_="action", sub_type="other", value=None, logical_id=None):
+    return {"id": cmd_id, "name": f"cmd {cmd_id}", "generic_type": generic_type, "type": type_,
+            "sub_type": sub_type, "current_value": value, "logical_id": logical_id}
+
+
+def _sync_body():
+    alarm = {
+        "id": EQ, "name": "Alarme essai", "object_id": 1, "is_enable": True, "is_visible": True,
+        "eq_type": "alarm", "is_excluded": False, "status": {"timeout": 0}, "alarm_mode_config": CONFIG,
+        "cmds": [_raw_cmd(ENABLE, "ALARM_ENABLE_STATE", "info", "binary", "1"),
+                 _raw_cmd(STATUS, "ALARM_STATE", "info", "binary", "0"),
+                 _raw_cmd(IMMEDIATE, None, "info", "binary", "0", "immediatState"),
+                 _raw_cmd(MODE, "ALARM_MODE", "info", "string", "mode total"),
+                 _raw_cmd(ARMED, "ALARM_ARMED"), _raw_cmd(RELEASED, "ALARM_RELEASED"),
+                 _raw_cmd(MODE_A, "ALARM_SET_MODE"), _raw_cmd(MODE_B, "ALARM_SET_MODE"),
+                 _raw_cmd(MODE_C, "ALARM_SET_MODE")],
+    }
+    light = {
+        "id": 7300, "name": "Lampe", "object_id": 1, "is_enable": True, "is_visible": True, "eq_type": "virtual",
+        "is_excluded": False, "status": {"timeout": 0},
+        "cmds": [_raw_cmd(73001, "LIGHT_ON"), _raw_cmd(73002, "LIGHT_OFF"),
+                 _raw_cmd(73003, "LIGHT_STATE", "info", "binary", "1")],
+    }
+    payload = {"timestamp": "2026-11-23T00:00:00Z", "objects": [{"id": 1, "name": "Zone"}],
+               "eq_logics": [alarm, light], "scenarios": [], "scenarios_complete": True,
+               "sync_config": {"confidence_policy": "sure_probable"}}
+    return {"action": "sync", "payload": payload, "request_id": "t12-4", "timestamp": "2026-11-23T00:00:00Z"}
+
+
+def _bridge_mock():
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message = MagicMock(return_value=True)
+    bridge.start = AsyncMock()
+    bridge.stop = AsyncMock()
+    bridge.state = "connected"
+    bridge.broker_info = "broker.example.invalid:1883"
+    return bridge
+
+
+@pytest.fixture
+def app(tmp_path):
+    application = create_app(local_secret=SECRET)
+    application["data_dir"] = str(tmp_path)
+    application["mqtt_bridge"] = _bridge_mock()
+    application["state_synchronizer"] = StateSynchronizer(app=application, mqtt_bridge=application["mqtt_bridge"])
+    return application
+
+
+@pytest.fixture
+async def cli(aiohttp_client, app):
+    with patch("transport.http_server.asyncio.sleep", new=AsyncMock()):
+        yield await aiohttp_client(app)
+
+
+async def _connect(cli, app, extra=None):
+    body = {"payload": {"host": "broker.example.invalid", "port": 1883, **(extra or {})}}
+    resp = await cli.post("/action/mqtt_connect", json=body, headers=HEADERS)
+    assert resp.status == 200
+    kwargs = app["mqtt_bridge"].start.call_args.kwargs
+    return app["mqtt_bridge"].start.call_args.args[0], kwargs["on_reconnect_cb"], kwargs["on_ha_birth_cb"]
+
+
+def _calls(bridge):
+    return [(c.args[0], c.args[1], c.kwargs) for c in bridge.publish_message.call_args_list]
+
+
+async def test_sync_publishes_the_alarm_state(cli, app):
+    resp = await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)
+    assert resp.status == 200, await resp.text()
+    states = [c for c in _calls(app["mqtt_bridge"]) if c[0] == f"jeedom2ha/{EQ}/alarm/state"]
+    assert states == [(f"jeedom2ha/{EQ}/alarm/state", "armed_away", {"qos": 1, "retain": True})]
+
+
+@pytest.mark.parametrize("which", ["reconnect", "birth"])
+async def test_ha_birth_and_broker_reconnect_republish_the_alarm_state_after_its_discovery(cli, app, which):
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    _params, on_reconnect, on_birth = await _connect(cli, app)
+    # Un événement reçu depuis la synchro est repris (dernière valeur connue).
+    await app["state_synchronizer"].handle_state_message(EQ, ENABLE, "0")
+    bridge = app["mqtt_bridge"]
+    bridge.publish_message.reset_mock()
+    await (on_reconnect if which == "reconnect" else on_birth)()
+    topics = [c[0] for c in _calls(bridge)]
+    state_topic = f"jeedom2ha/{EQ}/alarm/state"
+    assert topics.count(state_topic) == 1
+    assert topics.index(state_topic) > topics.index(f"homeassistant/alarm_control_panel/jeedom2ha_{EQ}/config")
+    assert [c for c in _calls(bridge) if c[0] == state_topic] == [(state_topic, "disarmed", {"qos": 1, "retain": True})]
+    # Aucun autre type ne republie son état (la lumière garde son comportement d'avant).
+    assert "jeedom2ha/7300/state" not in topics
+
+
+# --- AC4 : commandes par mode --------------------------------------------------------------------
+
+def _cmd_sync(mapping, state_sync=None):
+    decision = _decision(mapping)
+    bridge = MagicMock()
+    bridge.is_connected = True
+    bridge.publish_message.return_value = True
+    app = {"publications": {mapping.jeedom_eq_id: decision}, "state_synchronizer": state_sync}
+    sync = CommandSynchronizer(app=app, mqtt_bridge=bridge,
+                               jeedom_api_endpoint="http://127.0.0.1/core/api/jeeApi.php",
+                               jeedom_core_apikey="core-apikey")
+    sync._execute_exec_cmd = AsyncMock(return_value=True)
+    return sync, bridge
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload,cmd_id", [
+    ("ARM_HOME", MODE_C), ("ARM_AWAY", MODE_A), ("ARM_NIGHT", MODE_B), ("DISARM", RELEASED)])
+async def test_orders_by_mode(payload, cmd_id):
+    sync, bridge = _cmd_sync(_map(_alarm_eq()))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is True
+    sync._execute_exec_cmd.assert_awaited_once_with(cmd_id, {})
+    bridge.publish_message.assert_not_called()  # jamais d'état optimiste
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", ["ARM_VACATION", "ARM_CUSTOM_BYPASS", "TRIGGER", "arm_away", "", "ON", "{}"])
+async def test_unknown_payloads_are_refused(payload):
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_an_arming_not_announced_is_refused():
+    sync, _bridge = _cmd_sync(_map(_alarm_eq(config={"SetModeNuit": f"{MODE_B}|mode nuit"})))
+    for payload in ("ARM_HOME", "ARM_AWAY"):
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_NIGHT") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(MODE_B, {})
+
+
+@pytest.mark.asyncio
+async def test_without_mode_configuration_arm_away_runs_the_generic_arm_command():
+    sync, _bridge = _cmd_sync(_map(_alarm_eq(config={})))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_AWAY") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(ARMED, {})
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_HOME") is False
+
+
+@pytest.mark.asyncio
+async def test_a_foreign_command_slipped_into_the_mapping_is_refused():
+    mapping = _map(_alarm_eq())
+    mapping.commands["ALARM_SET_MODE_HOME"] = _cmd(99999, "ALARM_SET_MODE")  # pas une commande retenue
+    mapping.commands["ALARM_SET_MODE_AWAY"] = _cmd(MODE_A, "ENERGY_ON")      # mauvais generic type
+    sync, _bridge = _cmd_sync(mapping)
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+
+
+def test_confirmation_policy_is_never_optimistic():
+    mapping = _map(_alarm_eq())
+    translation = CommandTranslation(cmd_id=MODE_A, options={}, command_family="alarm_arm")
+    streamed = StateSynchronizer(app={}, mqtt_bridge=_Bridge())
+    sync, _b = _cmd_sync(mapping, state_sync=streamed)
+    assert sync._select_confirmation_policy(mapping, mapping.publication_decision_ref, translation) \
+        == "real_state_confirmation"
+    sync, _b = _cmd_sync(mapping, state_sync=None)
+    assert sync._select_confirmation_policy(mapping, mapping.publication_decision_ref, translation) == "stateless"
+
+
+# --- AC6 : code de désarmement -----------------------------------------------------------------
+
+def _coded(action, code):
+    return json.dumps({"action": action, "code": code})
+
+
+@pytest.mark.asyncio
+async def test_code_good_disarms(caplog):
+    set_alarm_code(CODE)
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", _coded("DISARM", CODE)) is True
+    sync._execute_exec_cmd.assert_awaited_once_with(RELEASED, {})
+    assert CODE not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload,reason", [
+    (_coded("DISARM", "0000"), "alarm_code_invalid"),
+    (_coded("DISARM", CODE + " "), "alarm_code_invalid"),
+    (_coded("DISARM", CODE.upper() + "x"), "alarm_code_invalid"),
+    (_coded("DISARM", ""), "alarm_code_missing"),
+    (_coded("DISARM", None), "alarm_code_missing"),
+    (json.dumps({"action": "DISARM"}), "alarm_code_missing"),
+    ("DISARM", "alarm_code_missing"),
+])
+async def test_code_wrong_or_missing_is_refused_with_a_warning_without_the_code(caplog, payload, reason):
+    set_alarm_code(CODE)
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING and f"reason_code={reason}" in r.getMessage()]
+    assert len(warnings) == 1
+    assert CODE not in caplog.text and "0000" not in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [_coded("ARM_AWAY", ""), _coded("ARM_AWAY", None), "ARM_AWAY"])
+async def test_with_a_code_arming_stays_free(payload):
+    set_alarm_code(CODE)
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is True
+    sync._execute_exec_cmd.assert_awaited_once_with(MODE_A, {})
+
+
+@pytest.mark.asyncio
+async def test_without_a_configured_code_disarm_needs_no_code():
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "DISARM") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(RELEASED, {})
+
+
+def test_comparison_is_constant_time_and_the_vault_never_shows_the_code():
+    set_alarm_code(CODE)
+    with patch("sync.alarm_code.hmac.compare_digest", wraps=alarm_code.hmac.compare_digest) as spy:
+        assert alarm_code.alarm_code_matches(CODE) is True
+        assert alarm_code.alarm_code_matches("autre") is False
+    assert spy.call_count == 2
+    assert CODE not in repr(ALARM_CODE) and CODE not in str(ALARM_CODE)
+    set_alarm_code("   ")
+    assert alarm_code.alarm_code_configured() is False
+
+
+async def test_the_code_arrives_in_the_local_body_and_never_reaches_the_broker_settings(cli, app, caplog):
+    with caplog.at_level(logging.DEBUG):
+        params, _r, _b = await _connect(cli, app, {"alarm_disarm_code": CODE, "password": "mqtt-pass"})
+    assert alarm_code.alarm_code_configured() is True
+    assert "alarm_disarm_code" not in params and params["password"] == "mqtt-pass"
+    assert CODE not in caplog.text
+    # Sans la clé : pas de code (un démon relancé sans code repart sans code).
+    await _connect(cli, app)
+    assert alarm_code.alarm_code_configured() is False
+
+
+def test_the_code_is_never_on_the_daemon_command_line():
+    """Le démon n'a aucun argument de ligne de commande pour le code (visible par ``ps``)."""
+    import main
+    config = main.Jeedom2haConfig()
+    parser = getattr(config, "_BaseConfig__parser")
+    options = [opt for action in parser._actions for opt in action.option_strings]
+    assert options and not any("alarm" in opt or "code" in opt for opt in options)
+    source = open(main.__file__, encoding="utf-8").read()
+    assert "alarm" not in source.lower()
+
+
+# --- AC6 : discovery -----------------------------------------------------------------------------
+
+def test_discovery_without_code():
+    payload = _discovery(_alarm_eq())
+    assert payload["supported_features"] == ["arm_home", "arm_away", "arm_night"]
+    assert "value_template" not in payload
+    assert payload["payload_arm_night"] == "ARM_NIGHT"
+    for key in ("code", "code_disarm_required", "code_arm_required", "command_template"):
+        assert key not in payload
+
+
+def test_discovery_with_code_publishes_only_its_presence():
+    set_alarm_code(CODE)
+    payload = _discovery(_alarm_eq())
+    assert payload["code"] == "REMOTE_CODE"
+    assert payload["code_disarm_required"] is True
+    assert payload["code_arm_required"] is False
+    assert "action" in payload["command_template"] and "code" in payload["command_template"]
+    assert CODE not in json.dumps(payload)
+
+
+async def test_published_discovery_never_contains_the_code(cli, app):
+    await _connect(cli, app, {"alarm_disarm_code": CODE})
+    assert (await cli.post("/action/sync", json=_sync_body(), headers=HEADERS)).status == 200
+    calls = _calls(app["mqtt_bridge"])
+    config = [c for c in calls if c[0] == f"homeassistant/alarm_control_panel/jeedom2ha_{EQ}/config"]
+    assert len(config) == 1 and json.loads(config[0][1])["code"] == "REMOTE_CODE"
+    assert all(CODE not in str(c[1]) for c in calls)
+
+
+# --- AC7 : non-régression du virtuel générique ---------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_generic_virtual_alarm_still_works():
+    mapping = _map(_virtual_eq())
+    assert mapping.reason_details["supported_features"] == ["arm_away"]
+    assert "alarm_mode_labels" not in mapping.reason_details
+    sync, bridge, decision = _state_sync(mapping)
+    assert await sync.publish_initial_states(decision) == 1
+    await sync.handle_state_message(VIRTUAL, 72002, "0")
+    await sync.handle_state_message(VIRTUAL, 72002, "1")
+    await sync.handle_state_message(VIRTUAL, 72001, "1")
+    assert [p[1] for p in bridge.published] == ["armed_away", "disarmed", "armed_away", "triggered"]
+    cmd, _b = _cmd_sync(_map(_virtual_eq()))
+    assert await cmd.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_AWAY") is True
+    assert await cmd.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "DISARM") is True
+    assert [c.args for c in cmd._execute_exec_cmd.await_args_list] == [(72003, {}), (72004, {})]
+    assert await cmd.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_HOME") is False
+
+
+def test_alarm_supported_features_helper_is_the_single_source():
+    mapping = _map(_virtual_eq())
+    assert alarm_supported_features(mapping.commands) == mapping.reason_details["supported_features"]

@@ -35,6 +35,15 @@ from mapping.climate import (  # Story 24.15
     THERMOSTAT_STATE,
     THERMOSTAT_TEMPERATURE,
 )
+from mapping.alarm_control_panel import (  # FR49 (CC-64)
+    ALARM_ENABLE_STATE,
+    ALARM_IMMEDIATE_STATE,
+    ALARM_MODE,
+    ALARM_READBACK_KEYS,
+    ALARM_STATE,
+    HA_ARMED_AWAY,
+    MODE_SLOTS,
+)
 
 CHANNEL_STATE = "state"
 CHANNEL_BRIGHTNESS = "brightness"
@@ -100,6 +109,8 @@ def readback_commands(ha_type: Any, mapping: Any) -> List[Tuple[str, Any]]:
 
     if ha_type == "climate":
         return climate_readback_commands(mapping)  # Story 24.15
+    if ha_type == "alarm_control_panel":
+        return alarm_readback_commands(mapping)  # FR49 (CC-64)
 
     state_keys = STATE_KEYS.get(ha_type)
     if state_keys is None:
@@ -363,6 +374,102 @@ def climate_action(state_value: Any, mode_value: Any, off_mode_name: Optional[st
     if number == 0:
         return "idle"
     return None
+
+
+def alarm_readback_commands(mapping: Any) -> List[Tuple[str, Any]]:
+    """FR49 (CC-64) — les infos qui alimentent l'unique topic d'état d'une alarme.
+
+    Active (ALARM_ENABLE_STATE), Statut (ALARM_STATE), Immédiat (logicalId ``immediatState``
+    du plugin alarm) et Mode (ALARM_MODE) : un changement de l'une d'elles recalcule l'état
+    (``alarm_state``) et le publie sur le même ``state_topic``.
+    """
+    commands = getattr(mapping, "commands", None) or {}
+    channels: List[Tuple[str, Any]] = []
+    for key in ALARM_READBACK_KEYS:
+        cmd = commands.get(key)
+        if is_info_command(cmd):
+            channels.append((CHANNEL_STATE, cmd))
+    return channels
+
+
+_ALARM_TRUE_VALUES = frozenset({"1", "true", "on"})
+_ALARM_FALSE_VALUES = frozenset({"0", "false", "off"})
+
+
+def _alarm_flag(value: Any) -> Optional[bool]:
+    """Info binaire d'alarme : vrai / faux / None (illisible ou jamais lue, jamais deviné)."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in _ALARM_TRUE_VALUES:
+        return True
+    if text in _ALARM_FALSE_VALUES:
+        return False
+    try:
+        number = float(text.replace(",", "."))
+    except ValueError:
+        return None
+    if number == 1:
+        return True
+    if number == 0:
+        return False
+    return None
+
+
+def normalize_alarm_mode_label(value: Any) -> Optional[str]:
+    """Libellé de mode comparable : casse ignorée, espaces normalisés ; vide -> None."""
+    if value is None or isinstance(value, bool):
+        return None
+    text = " ".join(str(value).split()).casefold()
+    return text or None
+
+
+def alarm_state(
+    status: Any,
+    enable: Any,
+    immediate: Any,
+    mode: Any,
+    mode_labels: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
+    """FR49 (CC-64) — état HA d'une alarme Jeedom ; None quand rien d'honnête ne peut être dit.
+
+    Ordre fixe :
+    1. Statut (ALARM_STATE) = 1 -> ``triggered`` ;
+    2. Actif (ALARM_ENABLE_STATE) jamais lu / illisible -> None (``unknown`` dans HA) ;
+       Actif = 0 -> ``disarmed`` ;
+    3. Immédiat (logicalId ``immediatState``) = 1 -> ``pending`` (délai d'entrée) ;
+    4. libellé du Mode comparé (casse et espaces normalisés) aux libellés des clés
+       Homebridge : ``SetModePresent`` -> ``armed_home``, ``SetModeAbsent`` -> ``armed_away``,
+       ``SetModeNuit`` -> ``armed_night`` ;
+    5. mode inconnu ou configuration absente -> ``armed_away`` (comme Homebridge / HomeKit).
+    Le délai de sortie n'a pas de signal : ``arming`` n'est jamais publié.
+    """
+    if _alarm_flag(status) is True:
+        return "triggered"
+    active = _alarm_flag(enable)
+    if active is None:
+        return None
+    if active is False:
+        return "disarmed"
+    if _alarm_flag(immediate) is True:
+        return "pending"
+    normalized = normalize_alarm_mode_label(mode)
+    labels = mode_labels or {}
+    if normalized is not None:
+        for _key, ha_state, _role, _feature, _payload in MODE_SLOTS:
+            if normalize_alarm_mode_label(labels.get(ha_state)) == normalized:
+                return ha_state
+    return HA_ARMED_AWAY
+
+
+ALARM_INFO_KEYS = {
+    "status": ALARM_STATE,
+    "enable": ALARM_ENABLE_STATE,
+    "immediate": ALARM_IMMEDIATE_STATE,
+    "mode": ALARM_MODE,
+}
 
 
 def has_reliable_channel(ha_type: Any, mapping: Any, channel: str) -> bool:

@@ -24,8 +24,10 @@ honor: a streamed type flips to real-state confirmation only when the entity has
 a real readback info command (reliability is evaluated per channel); otherwise it
 keeps its optimistic / stateless path (no false readback — AC#6).
 Story 24.15 adds ``climate``: setpoint, current temperature, mode, preset and action
-channels (``sync.readback.climate_readback_commands``). ``alarm_control_panel`` is not
-streamed yet (FR49).
+channels (``sync.readback.climate_readback_commands``).
+FR49 (CC-64) adds ``alarm_control_panel``: Statut, Actif, Immédiat and Mode feed the single
+``…/alarm/state`` topic; any change of one of them recomputes the HA state with the last
+known value of the others (``sync.readback.alarm_state``).
 """
 
 from __future__ import annotations
@@ -60,6 +62,8 @@ from sync.readback import (  # Story 24.15
     climate_number,
     climate_preset,
 )
+from sync.readback import ALARM_INFO_KEYS, alarm_state  # FR49 (CC-64)
+from mapping.alarm_control_panel import alarm_mode_labels  # FR49 (CC-64)
 from mapping.select import normalize_option_value  # story/select-mode
 from mapping.climate import (  # Story 24.15
     CHANNEL_ACTION,
@@ -98,6 +102,10 @@ _STREAMED_TYPES = _STREAMED_TYPES + _CLIMATE_ACTIONABLE
 _SELECT_ACTIONABLE = ("select",)
 _ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _SELECT_ACTIONABLE
 _STREAMED_TYPES = _STREAMED_TYPES + _SELECT_ACTIONABLE
+# FR49 (CC-64): alarm_control_panel state from Statut / Actif / Immédiat / Mode.
+_ALARM_ACTIONABLE = ("alarm_control_panel",)
+_ACTIONABLE_STREAMED = _ACTIONABLE_STREAMED + _ALARM_ACTIONABLE
+_STREAMED_TYPES = _STREAMED_TYPES + _ALARM_ACTIONABLE
 # Payload that resets a Home Assistant MQTT select to « unknown » (never an invented option).
 SELECT_UNKNOWN_PAYLOAD = "None"
 
@@ -116,6 +124,7 @@ _READBACK_KEYS = {
     "valve": STATE_KEYS["valve"],
     "lock": STATE_KEYS["lock"],
     "climate": CLIMATE_READBACK_KEYS,  # Story 24.15
+    "alarm_control_panel": tuple(ALARM_INFO_KEYS.values()),  # FR49 (CC-64)
 }
 
 # Strict shape of the retained channel topics this module may empty (never anything else).
@@ -400,6 +409,20 @@ class StateSynchronizer:
             no_value_reason_code="initial_state_no_click_value",
         )
 
+    async def republish_alarm_states(self, decision: PublicationDecision) -> int:
+        """FR49 / CC-08 — republish the alarm state at HA birth and broker reconnection.
+
+        Same gate as the initial publication (discovery actually published), restricted to
+        ``alarm_control_panel`` candidates; values are the last Jeedom event of each info,
+        else its value at the last sync (never invented). Returns the count published.
+        """
+        published, _failed = await self._publish_initial_states_loop(
+            decision,
+            lambda eq_id, binding: self._last_known_value(eq_id, binding.cmd),
+            only_types=_ALARM_ACTIONABLE,
+        )
+        return published
+
     def reconcile_fresh_read(
         self,
         decision: PublicationDecision,
@@ -449,6 +472,7 @@ class StateSynchronizer:
         value_resolver: Any,
         failure_reason_code: Optional[str] = None,
         no_value_reason_code: Optional[str] = None,
+        only_types: Optional[Tuple[str, ...]] = None,
     ) -> Tuple[int, int]:
         """Shared candidate loop for `publish_initial_states` / `publish_click_states`.
 
@@ -468,6 +492,8 @@ class StateSynchronizer:
         published = 0
         failed = 0
         for candidate in self._iter_streamed_candidates(mapping):
+            if only_types is not None and getattr(candidate, "ha_entity_type", None) not in only_types:
+                continue
             # P1-bis fix (ClaudeBox review round 2, PR #174): see list_state_targets.
             cand_decision = (
                 decision
@@ -848,6 +874,10 @@ class StateSynchronizer:
                                   open otherwise — Q3); ``position``: integer 0-100.
         Returns None when there is no usable value (leave HA as-is, never fabricate).
         """
+        if mapping.ha_entity_type == "alarm_control_panel":
+            # FR49 (CC-64): the state depends on four infos; the others are read through
+            # ``peer`` (same source as the value being published).
+            return self._translate_alarm_value(mapping, value, cmd, peer)
         if value is None:
             return None
         text = str(value).strip()
@@ -985,6 +1015,29 @@ class StateSynchronizer:
             state_value = text
             mode_value = read_peer(mode_cmd) if mode_cmd is not None else None
         return climate_action(state_value, mode_value, off_name)
+
+    def _translate_alarm_value(self, mapping: MappingResult, value: Any, cmd: Any, peer: Any) -> Optional[str]:
+        """FR49 (CC-64) — recompute the alarm state from its four infos (``alarm_state``)."""
+        if value is None:
+            return None
+        commands = mapping.commands or {}
+        read_peer = peer if callable(peer) else (
+            lambda peer_cmd: self._last_known_value(mapping.jeedom_eq_id, peer_cmd)
+        )
+        event_cmd_id = self._coerce_cmd_id(cmd)
+        values: Dict[str, Any] = {}
+        for role, key in ALARM_INFO_KEYS.items():
+            info_cmd = commands.get(key)
+            if info_cmd is None:
+                values[role] = None
+            elif event_cmd_id is not None and self._coerce_cmd_id(info_cmd) == event_cmd_id:
+                values[role] = value
+            else:
+                values[role] = read_peer(info_cmd)
+        return alarm_state(
+            values["status"], values["enable"], values["immediate"], values["mode"],
+            alarm_mode_labels(mapping),
+        )
 
     def _last_known_value(self, eq_id: Any, cmd: Any) -> Any:
         """Story 24.15 — last Jeedom event of ``cmd``, else its topology value (never invented)."""
