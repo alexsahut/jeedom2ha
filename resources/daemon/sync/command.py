@@ -27,9 +27,13 @@ from mapping.alarm_control_panel import (  # FR49 (CC-64)
     alarm_disarm_command,
     alarm_enable_command,  # Story 12.5
     alarm_mode_labels,  # Story 12.5
+    ALARM_PLUGIN,  # Story 12.5 (revue m1)
     is_mode_command,  # Story 12.5
 )
 from sync.readback import _alarm_flag, normalize_alarm_mode_label  # Story 12.5
+
+# Story 12.5 (revue m1) — logicalId de l'info « Statut » du plugin alarm (comme ``immediatState``).
+ALARM_STATUS_LOGICAL_ID = "state"
 from sync import alarm_code as _alarm_code  # FR49 (CC-64) — limite d'essais (ALARM_LOCKOUT)
 from sync.alarm_code import alarm_code_configured, alarm_code_matches, alarm_code_unreadable  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
@@ -955,28 +959,79 @@ class CommandSynchronizer:
     async def _alarm_arm_refusal(self, mapping: MappingResult) -> Optional[str]:
         """Story 12.5 — motif de refus d'un armement, ou None quand il peut partir.
 
-        Lecture fraîche de Statut (``ALARM_STATE``) puis d'Immédiat (logicalId ``immediatState``) :
-        - Statut = 1 : ``alarm_arm_refused_triggered`` ; Immédiat = 1 : ``alarm_arm_refused_pending`` ;
+        Lecture fraîche de Statut (``ALARM_STATE``) et d'Immédiat (logicalId ``immediatState``), en
+        parallèle (revue m3 : délai maximal = un délai de requête du démon, 2 s par défaut, au lieu
+        de deux) ; résultats évalués dans l'ordre Statut puis Immédiat, donc identiques à une
+        lecture l'une après l'autre :
+        - Statut = 1 : ``alarm_arm_refused_triggered`` (prioritaire) ; Immédiat = 1 :
+          ``alarm_arm_refused_pending`` ;
+        - valeur vide (info jamais écrite, par exemple un virtuel) : ``alarm_arm_refused_state_empty``
+          (revue I-a : le refus se répète tant que l'info n'a pas de valeur) ;
         - lecture en échec, valeur null ou illisible : ``alarm_arm_refused_state_unreadable``. Le
           refus est le choix sûr : armer une alarme dont on ne sait pas si elle est déclenchée
-          pourrait annuler un déclenchement sans code ; l'utilisateur peut réessayer.
-        Une info absente de l'équipement (virtuel sans Statut, toute alarme hors plugin alarm sans
-        Immédiat) n'est pas lue : rien à vérifier, ce n'est pas une lecture en échec.
+          pourrait annuler un déclenchement sans code ; l'utilisateur peut réessayer ;
+        - plugin alarm sans info Statut identifiable (ni generic type ``ALARM_STATE``, ni logicalId
+          ``state``) : ``alarm_arm_refused_no_status_info`` (revue m1 : un generic type retiré ne
+          contourne pas ce contrôle).
+        Une info absente d'une alarme hors plugin alarm (virtuel sans Statut ni Immédiat) n'est pas
+        lue : rien à vérifier, ce n'est pas une lecture en échec. Il reste une fenêtre inévitable
+        entre cette lecture et l'envoi de l'ordre (revue m2) : un déclenchement survenu entre les
+        deux n'est pas vu.
         """
         commands = mapping.commands or {}
-        for key, reason in (
-            ("ALARM_STATE", "alarm_arm_refused_triggered"),
-            ("ALARM_IMMEDIATE_STATE", "alarm_arm_refused_pending"),
-        ):
-            cmd_id = self._coerce_int(getattr(commands.get(key), "id", None))
-            if cmd_id is None:
-                continue
-            ok, raw = await self._fresh_alarm_read(cmd_id)
+        status_id = self._coerce_int(getattr(commands.get("ALARM_STATE"), "id", None))
+        immediate_id = self._coerce_int(getattr(commands.get("ALARM_IMMEDIATE_STATE"), "id", None))
+        if self._is_alarm_plugin(mapping):
+            if status_id is None:
+                status_id = self._alarm_plugin_status_id(mapping)
+            if status_id is None:
+                return "alarm_arm_refused_no_status_info"
+        checks = [
+            (cmd_id, reason)
+            for cmd_id, reason in (
+                (status_id, "alarm_arm_refused_triggered"),
+                (immediate_id, "alarm_arm_refused_pending"),
+            )
+            if cmd_id is not None
+        ]
+        if not checks:
+            return None
+        reads = await asyncio.gather(*(self._fresh_alarm_read(cmd_id) for cmd_id, _reason in checks))
+        for (_cmd_id, reason), (ok, raw) in zip(checks, reads):
+            if ok and raw is not None and not isinstance(raw, bool) and str(raw).strip() == "":
+                return "alarm_arm_refused_state_empty"
             flag = _alarm_flag(raw) if ok else None
             if flag is None:
                 return "alarm_arm_refused_state_unreadable"
             if flag is True:
                 return reason
+        return None
+
+    def _topology_eq(self, mapping: MappingResult) -> Any:
+        topology = self._app.get("topology") if hasattr(self._app, "get") else None
+        eq_logics = getattr(topology, "eq_logics", None)
+        if not isinstance(eq_logics, Mapping):
+            return None
+        return eq_logics.get(getattr(mapping, "jeedom_eq_id", None))
+
+    def _is_alarm_plugin(self, mapping: MappingResult) -> bool:
+        """Revue m1 — équipement du plugin alarm : type lu dans la topologie, ou info Immédiat retenue
+        (le mapper ne la retient que pour ce plugin)."""
+        eq = self._topology_eq(mapping)
+        if eq is not None and str(getattr(eq, "eq_type_name", "") or "") == ALARM_PLUGIN:
+            return True
+        return "ALARM_IMMEDIATE_STATE" in (mapping.commands or {})
+
+    def _alarm_plugin_status_id(self, mapping: MappingResult) -> Optional[int]:
+        """Revue m1 — Statut du plugin alarm retrouvé par son logicalId ``state`` (info binaire)."""
+        eq = self._topology_eq(mapping)
+        for cmd in getattr(eq, "cmds", None) or []:
+            if (
+                getattr(cmd, "logical_id", None) == ALARM_STATUS_LOGICAL_ID
+                and str(getattr(cmd, "type", "") or "").lower() == "info"
+                and "binary" in str(getattr(cmd, "sub_type", "") or "").lower()
+            ):
+                return self._coerce_int(getattr(cmd, "id", None))
         return None
 
     def _republish_alarm_state(self, mapping: MappingResult) -> None:
@@ -1027,7 +1082,17 @@ class CommandSynchronizer:
         target_name = normalize_alarm_mode_label(getattr(target_cmd, "name", None))
         mode_cmd_id = self._coerce_int(getattr(commands.get("ALARM_MODE"), "id", None))
         enable_cmd_id = self._coerce_int(getattr(commands.get("ALARM_ENABLE_STATE"), "id", None))
-        if wanted is None or target_name != wanted or mode_cmd_id is None or enable_cmd_id is None:
+        if wanted is not None and target_name != wanted:
+            # Revue m4 — repli I1 : libellé de la clé et nom de la commande visée ne concordent pas.
+            self._log_cmd(
+                logging.INFO,
+                eq_id=eq_id,
+                topic=topic,
+                reason_code="alarm_same_mode_config_mismatch",
+                action="translate_command",
+            )
+            return translation
+        if wanted is None or mode_cmd_id is None or enable_cmd_id is None:
             return translation
 
         ok, mode_value = await self._fresh_alarm_read(mode_cmd_id)

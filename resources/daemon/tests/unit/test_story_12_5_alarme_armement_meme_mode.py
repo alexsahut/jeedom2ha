@@ -25,7 +25,7 @@ from models.topology import JeedomCmd
 from sync import state as state_module
 from .test_story_12_4_alarme_etat_mode import (
     ARMED, ENABLE, EQ, IMMEDIATE, MODE, MODE_A, MODE_B, MODE_C, STATUS, VIRTUAL,
-    _Bridge, _alarm_eq, _cmd_sync, _map, _state_sync, _virtual_eq,
+    _Bridge, _alarm_eq, _cmd_sync, _map, _snapshot, _state_sync, _virtual_eq,
 )
 
 TOPIC = f"jeedom2ha/{EQ}/alarm/set"
@@ -172,12 +172,25 @@ async def test_same_mode_disarmed_without_enable_command_sends_the_mode_command_
     ({MODE_C: "Mode Total", MODE_A: "Mode Jour", MODE_B: "Mode Nuit"}, "clé Présent sur la commande d'un autre mode"),
     ({MODE_C: "Cmd sans rapport", MODE_A: "Mode Total", MODE_B: "Mode Nuit"}, "nom de commande sans rapport"),
 ])
-async def test_inconsistent_homebridge_configuration_keeps_the_12_4_behaviour(names, why):
+async def test_inconsistent_homebridge_configuration_keeps_the_12_4_behaviour(names, why, caplog):
     """Revue I1 — le libellé de SetModePresent (« Mode Jour ») n'est pas le nom de la commande visée."""
     sync, _bridge = _sync_with_reads({MODE: "Mode Jour", ENABLE: "0"}, eq=_named_eq(names=names))
-    assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True, why
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True, why
     sync._execute_exec_cmd.assert_awaited_once_with(MODE_C, {})
     assert _mode_calls(sync) == []  # incohérence vue avant toute lecture du mode
+    # revue m4 : repli signalé en INFO, sans libellé ni nom de commande
+    mismatch = [r for r in caplog.records if "alarm_same_mode_config_mismatch" in r.getMessage()]
+    assert len(mismatch) == 1 and mismatch[0].levelno == logging.INFO
+    assert "Jour" not in caplog.text and "Total" not in caplog.text and "rapport" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_consistent_configuration_logs_no_mismatch(caplog):
+    sync, _bridge = _sync_with_reads({MODE: "mode nuit", ENABLE: "0"})
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_HOME") is True
+    assert "alarm_same_mode_config_mismatch" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -299,6 +312,116 @@ async def test_status_read_exception_refuses():
     sync._read_info_value = AsyncMock(side_effect=RuntimeError("boom"))
     assert await sync.handle_command_message(TOPIC, "ARM_HOME") is False
     sync._execute_exec_cmd.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("values", [
+    {STATUS: "", IMMEDIATE: "0"},
+    {STATUS: "0", IMMEDIATE: "   "},
+    {STATUS: "", IMMEDIATE: "1"},     # Statut évalué d'abord, comme une lecture séquentielle
+])
+async def test_an_empty_status_or_immediate_has_its_own_refusal(values, caplog):
+    """Revue I-a — info jamais écrite (vide) : refus distinct, pas « illisible »."""
+    sync, _state_bridge = _refusal_sync(values)
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert "alarm_arm_refused_state_empty" in caplog.text
+    assert "alarm_arm_refused_state_unreadable" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_a_virtual_never_written_is_refused_as_empty(caplog):
+    sync, _bridge = _cmd_sync(_map(_virtual_eq()))
+    sync._read_info_value = _reader({72001: ""})
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_AWAY") is False
+    assert "alarm_arm_refused_state_empty" in caplog.text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("values,reason", [
+    ({STATUS: "1", IMMEDIATE: "1"}, "alarm_arm_refused_triggered"),        # priorité au déclenchement
+    ({IMMEDIATE: "1"}, "alarm_arm_refused_state_unreadable"),              # Statut en échec d'abord
+    ({STATUS: "0", IMMEDIATE: "1"}, "alarm_arm_refused_pending"),
+])
+async def test_parallel_reads_give_the_sequential_result(values, reason, caplog):
+    sync, _state_bridge = _refusal_sync(values)
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_HOME") is False
+    assert reason in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_status_and_immediate_are_read_in_parallel():
+    """Revue m3 — les deux lectures sont en vol en même temps (délai maximal : une seule requête)."""
+    sync, _bridge = _cmd_sync(_map(_named_eq()))
+    in_flight, peak = [0], [0]
+
+    async def read(cmd_id):
+        in_flight[0] += 1
+        peak[0] = max(peak[0], in_flight[0])
+        await asyncio.sleep(0.05)
+        in_flight[0] -= 1
+        return True, SAFE.get(cmd_id, "x")
+
+    sync._read_info_value = read
+    await sync.handle_command_message(TOPIC, "ARM_AWAY")
+    assert peak[0] == 2
+
+
+def _alarm_plugin_eq_without_status_generic_type(logical_id):
+    eq = _named_eq()
+    for cmd in eq.cmds:
+        if cmd.id == STATUS:
+            cmd.generic_type = None
+            cmd.logical_id = logical_id
+    return eq
+
+
+@pytest.mark.asyncio
+async def test_alarm_plugin_status_is_found_by_its_logical_id(caplog):
+    """Revue m1 — un generic type retiré sur Statut ne contourne pas AC10."""
+    eq = _alarm_plugin_eq_without_status_generic_type("state")
+    sync, _bridge = _cmd_sync(_map(eq))
+    assert "ALARM_STATE" not in sync._app["publications"][EQ].mapping_result.commands
+    sync._app["topology"] = _snapshot(eq)
+    sync._read_info_value = _reader({STATUS: "1", IMMEDIATE: "0"})
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert "alarm_arm_refused_triggered" in caplog.text
+
+    sync._read_info_value = _reader({STATUS: "0", IMMEDIATE: "0", MODE: "mode nuit", ENABLE: "0"})
+    assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(MODE_A, {})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_topology", [True, False])
+async def test_alarm_plugin_without_identifiable_status_refuses_arming(with_topology, caplog):
+    eq = _alarm_plugin_eq_without_status_generic_type("autre")
+    sync, _bridge = _cmd_sync(_map(eq))
+    if with_topology:
+        sync._app["topology"] = _snapshot(eq)
+    sync._read_info_value = _reader({STATUS: "0", IMMEDIATE: "0"})
+    with caplog.at_level(logging.INFO):
+        assert await sync.handle_command_message(TOPIC, "ARM_AWAY") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    assert sync._read_info_value.calls == []
+    assert "alarm_arm_refused_no_status_info" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_virtual_without_status_info_is_not_refused():
+    """Hors plugin alarm, une info absente n'est pas lue et ne bloque pas (comportement de la passe 2)."""
+    eq = _virtual_eq()
+    eq.cmds = [c for c in eq.cmds if c.id != 72001]
+    sync, _bridge = _cmd_sync(_map(eq))
+    sync._app["topology"] = _snapshot(eq)
+    sync._read_info_value = _reader({})
+    assert await sync.handle_command_message(f"jeedom2ha/{VIRTUAL}/alarm/set", "ARM_AWAY") is True
+    assert sync._read_info_value.calls == []
 
 
 @pytest.mark.asyncio
