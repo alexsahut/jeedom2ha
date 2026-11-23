@@ -539,7 +539,8 @@ class jeedom2ha extends eqLogic {
   public static function reevaluateDecisionsIfChanged(): array {
     return jeedom2ha_reevaluation_tick(array(
       'fingerprint' => function () {
-        return self::readDecisionFingerprint();
+        // Story 24.18 — composite et états de tous les scénarios, lus ensemble (une seule lecture de la base).
+        return self::readDecisionFingerprintParts();
       },
       'stored' => function () {
         return (string) config::byKey(JEEDOM2HA_REEVALUATION_FINGERPRINT_KEY, __CLASS__, '');
@@ -557,6 +558,10 @@ class jeedom2ha extends eqLogic {
         return self::callDaemon('/action/sync', $topology, 'POST', JEEDOM2HA_REEVALUATION_SYNC_TIMEOUT_S, null,
           array('X-Jeedom2ha-Sync-Mode' => 'service'));
       },
+      // Story 24.18 — synchro légère : seule l'activation de scénarios a changé (aucun listener réaligné).
+      'light' => function (array $states) {
+        return self::callDaemon('/action/scenario_activation', array('scenarios' => $states), 'POST', 15, 1);
+      },
       'listeners' => function () {
         self::syncStateListeners();
       },
@@ -572,13 +577,22 @@ class jeedom2ha extends eqLogic {
    * (sinon NULL) : le pas reste léger même quand d'autres plugins stockent une configuration volumineuse.
    */
   public static function readDecisionFingerprint(): string {
+    // Story 24.18 — composite `v2:<structurelle>:<activation>` (une seule clé mémorisée pour les deux parties).
+    return self::readDecisionFingerprintParts()['fingerprint'];
+  }
+
+  /**
+   * Story 24.18 — empreinte en deux parties (structurelle / activation des scénarios) et états de tous les
+   * scénarios, depuis les mêmes deux requêtes que 24.14 (aucun nom lu).
+   */
+  public static function readDecisionFingerprintParts(): array {
     $eqRows = DB::Prepare(
       "SELECT `id`, `isEnable`, `eqType_name`, `object_id`, IF(`configuration` LIKE '%jeedom2ha_excluded%', `configuration`, NULL) AS `configuration` FROM `eqLogic`",
       array(), DB::FETCH_TYPE_ALL);
     $scenarioRows = class_exists('scenario')
       ? DB::Prepare('SELECT `id`, `isActive` FROM `scenario`', array(), DB::FETCH_TYPE_ALL)
       : array();
-    return jeedom2ha_decision_fingerprint(
+    return jeedom2ha_decision_fingerprint_parts(
       is_array($eqRows) ? $eqRows : array(),
       is_array($scenarioRows) ? $scenarioRows : array(),
       array(
