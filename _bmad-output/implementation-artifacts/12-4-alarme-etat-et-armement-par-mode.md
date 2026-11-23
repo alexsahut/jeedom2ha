@@ -68,6 +68,14 @@ Configuration posée par Homebridge sur l'eqLogic : `SetModePresent = "2330|<mod
    - sans code configuré : comportement sans code.
 7. **AC7 — Non-régression** : le virtuel générique (`ALARM_ENABLE` / `ALARM_DISABLE` avec `ALARM_STATE` / `ALARM_ENABLE_STATE`) continue de marcher, test à l'appui ; suites Python, Node, PHP et `flake8` vertes ; garde 25.4 tenue (lignes remplacées déclarées).
 8. **AC8 — Preuve terrain (ClaudeBox / porteur du projet, hors session cloud)** : après déploiement, l'entité alarme sort de `unknown` ; armer en présent / absent / nuit et désarmer (avec et sans code) depuis HA ; état suivi ; journal sans code.
+9. **AC9 — Corrections de revue (Codex P2 + relecture indépendante, 2026-11-23)** :
+   - **unknown** : quand l'état calculé devient inconnu (Actif illisible ou jamais lu, virtuel à `ALARM_STATE` seul revenu à 0) alors qu'un état avait été publié — ou que rien n'est connu de ce run (redémarrage) —, le démon publie en retained le payload `None`, que HA lit comme `unknown` (source citée en Dev Notes) ; une seule fois tant que l'état reste inconnu ;
+   - **code illisible** : valeur stockée mais déchiffrement en échec → warning PHP sans la valeur, indicateur `alarm_disarm_code_unreadable` envoyé au démon ; le démon refuse tout DISARM (WARNING `alarm_code_unreadable`), la discovery exige toujours le code ;
+   - **limite d'essais** : 5 codes faux pour un même équipement → verrou de 5 minutes (tout DISARM refusé, WARNING `alarm_code_locked`, jamais le code) ; remise à zéro au premier bon code ou à l'expiration ; horloge injectable ;
+   - **code numérique** : 4 à 8 chiffres, espaces de début et de fin retirés, contrôlé côté PHP (`preConfig_`, exception au message clair) et côté JS (message, champ non enregistré) ; `REMOTE_CODE` gardé (pavé numérique) ;
+   - **documentation** : le code n'est ni dans le topic retenu, ni dans la discovery, ni dans les journaux, mais HA l'envoie en clair, sans retain, sur le topic de commande au désarmement ; ACL du broker (seul HA publie sur `jeedom2ha/+/alarm/set`) et TLS recommandés ;
+   - **redémarrage requis** : après saisie ou retrait du code, la page de configuration dit que le démon doit être redémarré et ce qui vaut d'ici là (premier code : l'alarme reste désarmable sans code) ;
+   - **doublon de libellé** : deux clés Homebridge au même libellé (normalisé) → WARNING au mapping, comportement inchangé.
 
 ## UI Impact
 
@@ -101,6 +109,16 @@ Configuration posée par Homebridge sur l'eqLogic : `SetModePresent = "2330|<mod
 - [x] Task 7 — Tests (voir ci-dessous), baselines et garde 25.4
 - [x] Task 8 — Documentation utilisateur (`docs/fr_FR/index.md`), epics, sprint-status
 - [ ] Task 9 — Preuve terrain AC8 (ClaudeBox / porteur du projet, hors session cloud)
+- [x] Task 10 — Corrections de revue (AC9 ; Codex P2 + relecture indépendante, aucun P1)
+  - [x] 10.0 fusion de `origin/main` (bloc `hors-cycle-epic-h` de `sprint-status.yaml`, PR #418) : fusion sans conflit, les deux blocs gardés
+  - [x] 10.1 `sync/state.py` : `ALARM_UNKNOWN_PAYLOAD = "None"`, suivi du dernier payload publié par topic d'alarme, retour à `unknown` sur événement et à la (re)publication
+  - [x] 10.2 code illisible : `jeedom2ha_alarm_code_daemon_fields` (PHP), warning dans `deamon_start`, indicateur lu par `/action/mqtt_connect`, refus `alarm_code_unreadable` (`sync/alarm_code.py`, `sync/command.py`)
+  - [x] 10.3 limite d'essais : `AlarmDisarmLockout` (5 essais, 300 s, horloge injectable), refus `alarm_code_locked`
+  - [x] 10.4 code de 4 à 8 chiffres : `jeedom2ha_alarm_code_is_valid` / `_to_store` (exception), `j2haAlarmCodeIsValid` / `IsRejected` (JS), message dans la page
+  - [x] 10.5 `docs/fr_FR/index.md` : phrase sur le code corrigée, ACL et TLS, blocage, code illisible, redémarrage
+  - [x] 10.6 avis « redémarrage du démon requis » (`j2haAlarmCodeRestartNotice`, trois cas : premier code, changement, retrait)
+  - [x] 10.7 WARNING de doublon de libellé de mode (`mapping/alarm_control_panel.py`)
+  - [x] 10.8 tests Python, PHP et Node de ces cas ; revue `bmad-code-review` de la passe
 
 ## Tests attendus (identifiants synthétiques)
 
@@ -123,6 +141,8 @@ Configuration posée par Homebridge sur l'eqLogic : `SetModePresent = "2330|<mod
 - **Le code ne quitte jamais le démon** : stocké dans un objet dont le `repr` ne le contient pas ; aucune trace dans `_log_cmd` (qui ne journalise jamais le payload).
 - **Baselines** : la discovery de l'alarme change (plus de `value_template`, `payload_arm_night`, `supported_features`) et le mapper déclare plus de commandes ; les baselines de projection sont mises à jour **pour les seules entrées d'alarme**, le reste doit rester identique.
 - `alarm_control_panel` a été ouvert en 10.3 sous FR40/NFR10 : pas de nouvelle ouverture de `PRODUCT_SCOPE`.
+- **Payload `unknown` (AC9)** — source : Home Assistant, `homeassistant/components/mqtt/alarm_control_panel.py`, `MqttAlarm._state_message_received` : `if payload == PAYLOAD_NONE: self._attr_alarm_state = None` ; `PAYLOAD_NONE = "None"` dans `homeassistant/components/mqtt/const.py` ; un payload vide (après rendu du template) est ignoré (« Ignoring empty payload »), il ne peut donc pas servir. Lu sur `home-assistant/core` branche `dev`, commit `5616ea891a3e4b5a7051f2a7cd754b763850df75` (23/11/2026). Même fichier : `code: REMOTE_CODE` donne `CodeFormat.NUMBER` (pavé numérique).
+- **Exception de `preConfig_` (AC9, code numérique)** — cœur Jeedom (`jeedom/core`, commit `32ce257`) : `config::save` appelle `preConfig_<clé>` sans l'attraper, `config.ajax.php` (`addKey`) enregistre les clés une à une ; l'exception remonte donc en erreur AJAX affichée. Le contrôle JS empêche qu'un code refusé parte à l'enregistrement (le contrôle PHP est la défense de dernier rang).
 
 ### Dev Agent Guardrails
 
@@ -182,6 +202,14 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, 2026-11-23).
 - Baselines : seules les entrées des alarmes de corpus (eq 230 et 12000) changent (payload de discovery, commandes du mapping, `supported_features`) ; vérifié par diff. Garde 25.4 : `REPLACED_BY_12_4` (73 lignes, alarme et baselines seulement).
 - Suites : pytest 3666 passés, 37 ignorés (au dernier passage ; un échec intermittent sous charge vu deux fois sur `test_deploy_safety_rollback.py::test_daemon_is_restarted_when_version_write_fails_after_a_good_promotion`, sans lien : vert 3 fois sur 3 isolé, script de déploiement non touché) ; `flake8 resources/daemon tests` vert ; Node 1641 passés, 1 échec préexistant (`25.4 / AC8`, rouge aussi sur `main` non modifié : compare au SHA figé 4ff80cd, ignoré dans un clone superficiel) ; PHP : `test_php_alarm.php` 34/34 et les autres tests autonomes verts (3 exigent un vrai cœur Jeedom, ignorés en CI) ; `php -l` vert.
 
+- **Passe de corrections de revue (2026-11-23, AC9)** :
+  - fusion de `origin/main` sans conflit (merge, pas de rebase ni de force-push) ; `sprint-status.yaml` garde `hors-cycle-epic-h` et l'entrée 12-4 ;
+  - **unknown** : règle générale côté `StateSynchronizer` (pas dans la fonction pure `alarm_state`, qui garde `None` = « rien d'honnête ») ; sur événement, `None` est publié si le dernier payload publié du run sur ce topic n'est pas déjà `None` (donc aussi au premier événement après un redémarrage) ; à la (re)publication (sync, « Publier », naissance HA, reconnexion), une alarme sans état honnête publie `None` (un état retenu d'un run précédent peut être au broker). Le test `test_never_read_enable_publishes_nothing` devient `…_resets_ha_to_unknown_once` : comportement changé à dessein ;
+  - **code illisible** : déchiffrement en exception, `false`, non-texte ou blanc = illisible ; l'indicateur l'emporte sur un code qui arriverait quand même ; seul `true` (booléen JSON) l'active ;
+  - **limite d'essais** : seuls les codes faux comptent (code absent et armements non) ; un nouveau code (démarrage du démon) remet tout à zéro ; le bon code est refusé pendant le verrou ; état en mémoire (perdu au redémarrage du démon, qui relit aussi le code) ;
+  - **avis de redémarrage** : trois messages exacts au lieu d'un seul (premier code : désarmable sans code ; changement : l'ancien code reste demandé ; retrait : le code reste demandé), pour ne pas afficher une phrase fausse ; il disparaît après « Tester, enregistrer et redémarrer le démon » (`j2haAlarmCodeAfterSave`) ;
+  - garde 25.4 : aucune ligne de `main` figée retirée (fichiers propres à 12.4 seulement) ; `REPLACED_BY_12_4` inchangé.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/12-4-alarme-etat-et-armement-par-mode.md` (nouveau)
@@ -212,6 +240,7 @@ Claude Opus 5.5 (session Claude Code cloud déléguée, 2026-11-23).
 - `tests/unit/test_story_12_4_configuration_alarme.node.test.js` (nouveau)
 - `tests/unit/test_story_25_4_non_regression.node.test.js`
 - `tests/unit/test_story_25_9_configuration.node.test.js`
+- Passe de corrections de revue (AC9), fichiers modifiés : `core/class/jeedom2ha.class.php`, `core/php/jeedom2ha_alarm.php`, `docs/fr_FR/index.md`, `plugin_info/configuration.php`, `resources/daemon/mapping/alarm_control_panel.py`, `resources/daemon/sync/alarm_code.py`, `resources/daemon/sync/command.py`, `resources/daemon/sync/state.py`, `resources/daemon/transport/http_server.py`, `resources/daemon/tests/unit/test_story_12_4_alarme_etat_mode.py`, `tests/test_php_alarm.php`, `tests/unit/test_story_12_4_configuration_alarme.node.test.js`, ce fichier de story
 
 ## Senior Developer Review (AI)
 
@@ -244,3 +273,4 @@ Revue adverse `bmad-code-review` du 2026-11-23 (même session que le développem
 - 2026-11-23 — Dev-story (session cloud déléguée) : Tasks 1 à 8 faites (état diffusé, CC-08, armement par mode, code de désarmement, topologie, doc, tests, baselines, garde 25.4) ; `review`. Restent Task 0 et Task 9 (terrain).
 - 2026-11-23 — Story renumérotée 24.18 → 12.4 et rangée sous `pe-epic-12` (epic qui porte FR49), sur consigne du coordinateur.
 - 2026-11-23 — Code review (`bmad-code-review`) : 4 constats corrigés, 5 écartés (voir ci-dessus) ; statut `review` en attente de la preuve terrain.
+- 2026-11-23 — Corrections de revue (Codex P2 + relecture indépendante, AC9) : fusion de `origin/main`, retour à `unknown` (payload `None`), code illisible refusé, limite d'essais, code de 4 à 8 chiffres, doc (code en clair sur le topic de commande, ACL, TLS), avis de redémarrage, WARNING de doublon de libellé ; statut `review`.

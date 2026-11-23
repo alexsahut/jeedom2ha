@@ -24,7 +24,7 @@ from mapping.alarm_control_panel import (
 from models.mapping import PublicationDecision
 from models.topology import JeedomCmd, JeedomEqLogic, JeedomObject, TopologySnapshot
 from sync import alarm_code
-from sync.alarm_code import ALARM_CODE, set_alarm_code
+from sync.alarm_code import ALARM_CODE, ALARM_LOCKOUT, AlarmDisarmLockout, set_alarm_code
 from sync.command import CommandSynchronizer, CommandTranslation
 from sync.readback import alarm_readback_commands, alarm_state, normalize_alarm_mode_label
 from sync.state import StateSynchronizer
@@ -51,8 +51,12 @@ CODE = "8213-sentinelle"
 def _no_code():
     """Le code vit dans le démon (objet global) : chaque test part sans code et le rend sans code."""
     ALARM_CODE.clear()
+    ALARM_LOCKOUT.reset()
+    clock = ALARM_LOCKOUT.clock
     yield
     ALARM_CODE.clear()
+    ALARM_LOCKOUT.reset()
+    ALARM_LOCKOUT.clock = clock
 
 
 def _cmd(cmd_id, generic_type, type_="action", sub_type="other", value=None, logical_id=None):
@@ -289,11 +293,13 @@ async def test_the_other_infos_are_read_from_their_last_event():
 
 
 @pytest.mark.asyncio
-async def test_never_read_enable_publishes_nothing():
+async def test_never_read_enable_invents_nothing_and_resets_ha_to_unknown_once():
+    """Revue Codex de 12.4 : Actif jamais lu -> aucun état inventé ; HA est ramené à ``unknown``
+    (payload ``None``, un état retenu d'un run précédent peut être au broker), une seule fois."""
     sync, bridge, decision = _state_sync(_map(_alarm_eq(enable=None)))
-    assert await sync.publish_initial_states(decision) == 0
-    assert await sync.handle_state_message(EQ, MODE, "Mode Jour") is False
-    assert bridge.published == []
+    assert await sync.publish_initial_states(decision) == 1
+    assert await sync.handle_state_message(EQ, MODE, "Mode Jour") is False   # déjà inconnu : rien
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", "None", 1, True)]
 
 
 def test_the_four_infos_are_registered_as_state_listeners():
@@ -618,3 +624,243 @@ async def test_generic_virtual_alarm_still_works():
 def test_alarm_supported_features_helper_is_the_single_source():
     mapping = _map(_virtual_eq())
     assert alarm_supported_features(mapping.commands) == mapping.reason_details["supported_features"]
+
+
+# --- Revue Codex de 12.4 : retour à ``unknown`` ---------------------------------------------------
+# Source : Home Assistant, homeassistant/components/mqtt/alarm_control_panel.py, _state_message_received :
+# ``if payload == PAYLOAD_NONE: self._attr_alarm_state = None`` avec PAYLOAD_NONE = "None"
+# (homeassistant/components/mqtt/const.py) ; un payload vide est ignoré.
+
+def _status_only_virtual(status="1"):
+    return JeedomEqLogic(
+        id=VIRTUAL, name="Alarme virtuelle", object_id=1, eq_type_name="virtual",
+        cmds=[_cmd(72001, "ALARM_STATE", "info", "binary", status),
+              _cmd(72003, "ALARM_ENABLE"), _cmd(72004, "ALARM_DISABLE")],
+    )
+
+
+def test_unknown_payload_is_the_one_home_assistant_reads_as_unknown():
+    from sync.state import ALARM_UNKNOWN_PAYLOAD
+    assert ALARM_UNKNOWN_PAYLOAD == "None"
+
+
+@pytest.mark.asyncio
+async def test_status_only_virtual_going_back_to_0_resets_ha_to_unknown():
+    """Le cas Codex P2 : un virtuel à ALARM_STATE seul passe de 1 à 0 -> HA ne reste pas sur ``triggered``."""
+    sync, bridge, decision = _state_sync(_map(_status_only_virtual(status="1")))
+    assert await sync.publish_initial_states(decision) == 1
+    assert await sync.handle_state_message(VIRTUAL, 72001, "0") is True
+    assert await sync.handle_state_message(VIRTUAL, 72001, "0") is False   # déjà inconnu : pas de doublon
+    assert await sync.handle_state_message(VIRTUAL, 72001, "1") is True
+    topic = f"jeedom2ha/{VIRTUAL}/alarm/state"
+    assert bridge.published == [(topic, "triggered", 1, True), (topic, "None", 1, True), (topic, "triggered", 1, True)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("unreadable", [None, "", "abc", "2"])
+async def test_enable_becoming_unreadable_resets_ha_to_unknown(unreadable):
+    sync, bridge, _d = _state_sync(_map(_alarm_eq(enable="1", mode="mode nuit")))
+    await sync.handle_state_message(EQ, MODE, "mode nuit")
+    await sync.handle_state_message(EQ, ENABLE, unreadable)
+    await sync.handle_state_message(EQ, ENABLE, "0")
+    assert [p[1] for p in bridge.published] == ["armed_night", "None", "disarmed"]
+    assert all(p[3] is True for p in bridge.published)   # retained, comme les autres états
+
+
+@pytest.mark.asyncio
+async def test_still_unknown_after_a_restart_resets_ha_at_the_first_event():
+    """Après un redémarrage, rien n'est connu de ce run : le premier calcul inconnu publie ``None``."""
+    sync, bridge, _d = _state_sync(_map(_alarm_eq(enable=None)))
+    assert await sync.handle_state_message(EQ, STATUS, "0") is True
+    assert bridge.published == [(f"jeedom2ha/{EQ}/alarm/state", "None", 1, True)]
+
+
+@pytest.mark.asyncio
+async def test_republication_of_an_unknown_alarm_publishes_unknown_too():
+    sync, bridge, decision = _state_sync(_map(_status_only_virtual(status="0")))
+    assert await sync.republish_alarm_states(decision) == 1
+    published, failed = await sync.publish_click_states(decision, {72001: "0"}, fresh_since=0.0)
+    assert (published, failed) == (1, 0)
+    assert [p[1] for p in bridge.published] == ["None", "None"]
+
+
+@pytest.mark.asyncio
+async def test_other_types_never_get_the_unknown_payload():
+    sync, bridge, _d = _state_sync(_map(_alarm_eq()))
+    mapping = MagicMock(ha_entity_type="sensor")
+    assert sync._alarm_needs_unknown(mapping, "jeedom2ha/1/state") is False
+
+
+# --- Revue de 12.4 : code configuré mais illisible ------------------------------------------------
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [_coded("DISARM", CODE), _coded("DISARM", "1234"), "DISARM", _coded("DISARM", "")])
+async def test_unreadable_code_refuses_every_disarm_with_a_warning(caplog, payload):
+    set_alarm_code(None, unreadable=True)
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", payload) is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    warnings = [r for r in caplog.records
+                if r.levelno == logging.WARNING and "reason_code=alarm_code_unreadable" in r.getMessage()]
+    assert len(warnings) == 1
+    assert CODE not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_unreadable_code_keeps_arming_free():
+    set_alarm_code(None, unreadable=True)
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_AWAY") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(MODE_A, {})
+
+
+def test_unreadable_code_keeps_the_discovery_requiring_the_code():
+    set_alarm_code(None, unreadable=True)
+    assert alarm_code.alarm_code_configured() is True and alarm_code.alarm_code_unreadable() is True
+    assert alarm_code.alarm_code_matches("") is False and alarm_code.alarm_code_matches("1234") is False
+    payload = _discovery(_alarm_eq())
+    assert payload["code"] == "REMOTE_CODE" and payload["code_disarm_required"] is True
+    # Un indicateur « illisible » l'emporte sur un code qui arriverait quand même.
+    set_alarm_code(CODE, unreadable=True)
+    assert alarm_code.alarm_code_matches(CODE) is False
+
+
+async def test_the_unreadable_flag_arrives_in_the_local_body(cli, app, caplog):
+    with caplog.at_level(logging.DEBUG):
+        params, _r, _b = await _connect(cli, app, {"alarm_disarm_code_unreadable": True})
+    assert "alarm_disarm_code_unreadable" not in params
+    assert alarm_code.alarm_code_unreadable() is True and alarm_code.alarm_code_configured() is True
+    assert any(r.levelno == logging.WARNING and "illisible" in r.getMessage() for r in caplog.records)
+    # Seul ``true`` compte ; un démon relancé sans l'indicateur repart sans code.
+    await _connect(cli, app, {"alarm_disarm_code_unreadable": "yes"})
+    assert alarm_code.alarm_code_configured() is False
+
+
+# --- Revue de 12.4 : limite d'essais ----------------------------------------------------------------
+
+class _Clock:
+    def __init__(self):
+        self.now = 1000.0
+
+    def __call__(self):
+        return self.now
+
+
+async def _disarm(sync, code, eq=EQ):
+    return await sync.handle_command_message(f"jeedom2ha/{eq}/alarm/set", _coded("DISARM", code))
+
+
+@pytest.mark.asyncio
+async def test_five_wrong_codes_lock_the_disarm_for_five_minutes(caplog):
+    clock = _Clock()
+    ALARM_LOCKOUT.clock = clock
+    set_alarm_code("4321")
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    with caplog.at_level(logging.DEBUG):
+        for _ in range(5):
+            assert await _disarm(sync, "0000") is False
+        assert await _disarm(sync, "4321") is False          # verrouillé : même le bon code est refusé
+        clock.now += 299.0
+        assert await _disarm(sync, "4321") is False
+    sync._execute_exec_cmd.assert_not_awaited()
+    locked = [r for r in caplog.records if r.levelno == logging.WARNING and "reason_code=alarm_code_locked" in r.getMessage()]
+    assert len(locked) == 2
+    assert any(r.levelno == logging.WARNING and "verrouillé" in r.getMessage() for r in caplog.records)
+    assert "4321" not in caplog.text and "0000" not in caplog.text
+    clock.now += 1.0                                        # 300 s : le verrou expire
+    assert await _disarm(sync, "4321") is True
+    sync._execute_exec_cmd.assert_awaited_once_with(RELEASED, {})
+
+
+@pytest.mark.asyncio
+async def test_lockout_expiry_resets_the_counter():
+    clock = _Clock()
+    ALARM_LOCKOUT.clock = clock
+    set_alarm_code("4321")
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    for _ in range(5):
+        await _disarm(sync, "0000")
+    clock.now += 300.0
+    for _ in range(4):                                      # compteur reparti de zéro : 4 essais faux de plus
+        assert await _disarm(sync, "0000") is False
+    assert await _disarm(sync, "4321") is True
+
+
+@pytest.mark.asyncio
+async def test_a_good_code_resets_the_counter():
+    ALARM_LOCKOUT.clock = _Clock()
+    set_alarm_code("4321")
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    for _ in range(4):
+        await _disarm(sync, "0000")
+    assert await _disarm(sync, "4321") is True
+    for _ in range(4):
+        assert await _disarm(sync, "0000") is False
+    assert await _disarm(sync, "4321") is True             # jamais 5 faux d'affilée : jamais verrouillé
+    assert sync._execute_exec_cmd.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_the_lockout_is_per_equipment():
+    ALARM_LOCKOUT.clock = _Clock()
+    set_alarm_code("4321")
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    for _ in range(5):
+        await _disarm(sync, "0000")
+    other, _b = _cmd_sync(_map(_virtual_eq()))
+    assert await _disarm(other, "4321", eq=VIRTUAL) is True
+    assert await _disarm(sync, "4321") is False
+
+
+@pytest.mark.asyncio
+async def test_missing_codes_and_armings_do_not_count_as_failures():
+    ALARM_LOCKOUT.clock = _Clock()
+    set_alarm_code("4321")
+    sync, _bridge = _cmd_sync(_map(_alarm_eq()))
+    for _ in range(6):
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "DISARM") is False
+        assert await sync.handle_command_message(f"jeedom2ha/{EQ}/alarm/set", "ARM_AWAY") is True
+    assert await _disarm(sync, "4321") is True
+
+
+def test_lockout_unit_with_an_injected_clock():
+    clock = _Clock()
+    lockout = AlarmDisarmLockout(max_failures=5, lock_seconds=300, clock=clock)
+    assert [lockout.record_failure(1) for _ in range(5)] == [False, False, False, False, True]
+    assert lockout.is_locked(1) and not lockout.is_locked(2)
+    clock.now += 300
+    assert not lockout.is_locked(1)
+    assert lockout.record_failure(1) is False
+
+
+def test_a_new_code_clears_the_lockout():
+    ALARM_LOCKOUT.clock = _Clock()
+    for _ in range(5):
+        ALARM_LOCKOUT.record_failure(EQ)
+    assert ALARM_LOCKOUT.is_locked(EQ)
+    set_alarm_code("1357")
+    assert not ALARM_LOCKOUT.is_locked(EQ)
+
+
+# --- Revue de 12.4 : deux clés Homebridge au même libellé -------------------------------------------
+
+def test_duplicate_mode_labels_warn_without_changing_the_behaviour(caplog):
+    config = {"SetModePresent": f"{MODE_C}|Mode Jour", "SetModeAbsent": f"{MODE_A}|  mode JOUR ",
+              "SetModeNuit": f"{MODE_B}|mode nuit"}
+    with caplog.at_level(logging.WARNING, logger="mapping.alarm_control_panel"):
+        mapping = _map(_alarm_eq(config=config))
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1
+    message = warnings[0].getMessage()
+    assert "SetModePresent" in message and "SetModeAbsent" in message and "SetModeNuit" not in message
+    assert "Mode Jour" not in message                       # libellés jamais écrits
+    # Comportement inchangé : les trois armements, état du premier dans l'ordre Présent, Absent, Nuit.
+    assert mapping.reason_details["supported_features"] == ["arm_home", "arm_away", "arm_night"]
+    assert alarm_state("0", "1", "0", "mode jour", {"armed_home": "Mode Jour", "armed_away": "mode JOUR"}) == "armed_home"
+
+
+def test_distinct_mode_labels_do_not_warn(caplog):
+    with caplog.at_level(logging.WARNING, logger="mapping.alarm_control_panel"):
+        _map(_alarm_eq())
+    assert [r for r in caplog.records if r.levelno == logging.WARNING] == []

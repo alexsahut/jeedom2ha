@@ -199,13 +199,16 @@ include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha');
 <form class="form-horizontal" id="form_j2haAlarmCode">
   <fieldset>
     <legend><i class="fas fa-shield-alt"></i> {{Alarme}}
-      <sup><button type="button" class="j2ha-info j2ha-v3-info" id="i_alarmDisarmCode" data-j2ha-tip="{{Avec un code, Home Assistant le demande pour désarmer l'alarme ; l'armement reste libre. Sans code, désarmer n'en demande pas. Le code est enregistré chiffré et le démon ne le lit qu'à son démarrage : redémarrez le démon après l'avoir changé.}}" aria-label="{{Aide}} : {{Code de désarmement}}" aria-expanded="false" data-j2ha-doc="alarmes"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
+      <sup><button type="button" class="j2ha-info j2ha-v3-info" id="i_alarmDisarmCode" data-j2ha-tip="{{Avec un code (4 à 8 chiffres), Home Assistant le demande pour désarmer l'alarme ; l'armement reste libre. Sans code, désarmer n'en demande pas. Le code est enregistré chiffré et le démon ne le lit qu'à son démarrage : redémarrez le démon après l'avoir enregistré ou retiré.}}" aria-label="{{Aide}} : {{Code de désarmement}}" aria-expanded="false" data-j2ha-doc="alarmes"><i class="fas fa-info-circle" aria-hidden="true"></i></button></sup>
     </legend>
     <div class="form-group">
       <label class="col-md-4 control-label" for="in_alarmDisarmCode">{{Code de désarmement}}</label>
       <div class="col-md-4">
         <input type="password" class="form-control" data-l1key="alarmDisarmCode" id="in_alarmDisarmCode"
-               autocomplete="new-password" placeholder="{{Laisser vide pour conserver l'actuel}}"/>
+               autocomplete="new-password" inputmode="numeric" maxlength="16" placeholder="{{4 à 8 chiffres — vide pour conserver l'actuel}}"/>
+        <small id="span_alarmDisarmCodeInvalid" class="text-warning" style="display:none;">
+          <i class="fas fa-exclamation-triangle"></i> {{Code refusé : 4 à 8 chiffres (0 à 9), sans lettre ni symbole. Il ne sera pas enregistré.}}
+        </small>
         <small id="span_alarmDisarmCodeStatus" class="text-success"<?php echo $j2haAlarmCodeSet ? '' : ' style="display:none;"'; ?>>
           <i class="fas fa-lock"></i> {{Code déjà configuré}}
         </small>
@@ -215,6 +218,20 @@ include_file('desktop', 'jeedom2ha_infotip', 'js', 'jeedom2ha');
       <label class="col-md-4 control-label" for="cb_alarmDisarmCodeClear">{{Retirer le code}}</label>
       <div class="col-md-4">
         <input type="checkbox" class="configKey" data-l1key="alarmDisarmCodeClear" id="cb_alarmDisarmCodeClear"/>
+      </div>
+    </div>
+    <!-- Revue de 12.4 : le démon ne lit le code qu'à son démarrage (corps de /action/mqtt_connect). -->
+    <div class="form-group" id="div_alarmDisarmCodeRestart" style="display:none;">
+      <div class="col-md-offset-4 col-md-8">
+        <span class="text-warning" data-j2ha-alarm-restart="first" style="display:none;">
+          <i class="fas fa-redo"></i> <strong>{{Redémarrage du démon requis.}}</strong> {{Après l'enregistrement, redémarrez le démon : le code ne s'applique qu'à son démarrage. Sans redémarrage, l'alarme reste désarmable sans code.}}
+        </span>
+        <span class="text-warning" data-j2ha-alarm-restart="change" style="display:none;">
+          <i class="fas fa-redo"></i> <strong>{{Redémarrage du démon requis.}}</strong> {{Après l'enregistrement, redémarrez le démon : le nouveau code ne s'applique qu'à son démarrage. Sans redémarrage, l'ancien code reste demandé.}}
+        </span>
+        <span class="text-warning" data-j2ha-alarm-restart="clear" style="display:none;">
+          <i class="fas fa-redo"></i> <strong>{{Redémarrage du démon requis.}}</strong> {{Après l'enregistrement, redémarrez le démon : le retrait du code ne s'applique qu'à son démarrage. Sans redémarrage, le code reste demandé pour désarmer.}}
+        </span>
       </div>
     </div>
   </fieldset>
@@ -306,10 +323,32 @@ function j2haNormalizeMqttConfiguration(configuration) {
 /* j2ha-mqtt-test-messages:end */
 
 /* j2ha-alarm-code:begin */
-// FR49 (CC-64) — le champ du code n'est enregistré (classe configKey) que s'il est saisi et que « Retirer le code » n'est pas coché :
-// une saisie vide garde le code actuel, comme le mot de passe MQTT. Le code n'est jamais affiché, ni écrit dans la console.
+// FR49 (CC-64) — le champ du code n'est enregistré (classe configKey) que s'il est saisi, valable et que « Retirer le code »
+// n'est pas coché : une saisie vide garde le code actuel, comme le mot de passe MQTT. Le code n'est jamais affiché, ni écrit
+// dans la console. Revue de 12.4 : 4 à 8 chiffres, espaces de début et de fin retirés (même règle que le PHP).
+function j2haAlarmCodeText(value) {
+  return String(value === undefined || value === null ? '' : value).trim();
+}
+function j2haAlarmCodeIsValid(value) {
+  return /^[0-9]{4,8}$/.test(j2haAlarmCodeText(value));
+}
 function j2haAlarmCodeIsSaved(value, clearChecked) {
-  return !clearChecked && String(value === undefined || value === null ? '' : value).trim() !== '';
+  return !clearChecked && j2haAlarmCodeIsValid(value);
+}
+// Saisie non vide mais refusée (message affiché, rien n'est enregistré).
+function j2haAlarmCodeIsRejected(value, clearChecked) {
+  return !clearChecked && j2haAlarmCodeText(value) !== '' && !j2haAlarmCodeIsValid(value);
+}
+// Avis « redémarrage du démon requis » d'un changement en attente : 'first' (premier code), 'change' (nouveau code),
+// 'clear' (retrait), '' (aucun changement à enregistrer).
+function j2haAlarmCodeRestartNotice(value, clearChecked, codeAlreadySet) {
+  if (clearChecked) {
+    return codeAlreadySet ? 'clear' : '';
+  }
+  if (!j2haAlarmCodeIsValid(value)) {
+    return '';
+  }
+  return codeAlreadySet ? 'change' : 'first';
 }
 /* j2ha-alarm-code:end */
 
@@ -520,10 +559,11 @@ function j2haRunGuidedConnection(skipTest) {
         $('#in_mqttPassword').val('').removeClass('configKey');
         $('#span_mqttPasswordStatus').show();
       }
-      // Story 12.4 — de même pour le code de désarmement de l'alarme, enregistré avec les autres réglages.
-      if ($('#in_alarmDisarmCode').val() !== '') {
-        $('#in_alarmDisarmCode').val('').removeClass('configKey');
-        $('#span_alarmDisarmCodeStatus, #div_alarmDisarmCodeClear').show();
+      // Story 12.4 — de même pour le code de désarmement de l'alarme, enregistré avec les autres réglages (s'il est valable :
+      // un code refusé n'est pas enregistré et reste affiché avec son message). Le démon redémarre juste après : l'avis
+      // « redémarrage requis » disparaît.
+      if (typeof window.j2haAlarmCodeAfterSave === 'function') {
+        window.j2haAlarmCodeAfterSave();
       }
       restart();
     }, function(reason) {
@@ -621,6 +661,7 @@ $(function() {
   });
 
   // ---- FR49 (CC-64) : code de désarmement de l'alarme ----
+  var j2haAlarmCodeAlreadySet = <?php echo $j2haAlarmCodeSet ? 'true' : 'false'; ?>;
   function j2haSyncAlarmCodeField() {
     var clear = $('#cb_alarmDisarmCodeClear').is(':checked');
     var $code = $('#in_alarmDisarmCode');
@@ -628,7 +669,28 @@ $(function() {
       $code.val('');
     }
     $code.prop('disabled', clear).toggleClass('configKey', j2haAlarmCodeIsSaved($code.val(), clear));
+    $('#span_alarmDisarmCodeInvalid').toggle(j2haAlarmCodeIsRejected($code.val(), clear));
+    // Revue de 12.4 : le démon ne lit le code qu'à son démarrage ; l'avis dit quoi faire et ce qui vaut d'ici là.
+    var notice = j2haAlarmCodeRestartNotice($code.val(), clear, j2haAlarmCodeAlreadySet);
+    $('[data-j2ha-alarm-restart]').each(function() {
+      $(this).toggle($(this).attr('data-j2ha-alarm-restart') === notice);
+    });
+    $('#div_alarmDisarmCodeRestart').toggle(notice !== '');
   }
+  // Après « Tester, enregistrer et redémarrer le démon » : le code enregistré quitte le formulaire, le retrait est acquis.
+  window.j2haAlarmCodeAfterSave = function() {
+    var $code = $('#in_alarmDisarmCode');
+    if ($code.hasClass('configKey')) {
+      $code.val('').removeClass('configKey');
+      j2haAlarmCodeAlreadySet = true;
+      $('#span_alarmDisarmCodeStatus, #div_alarmDisarmCodeClear').show();
+    } else if ($('#cb_alarmDisarmCodeClear').is(':checked')) {
+      $('#cb_alarmDisarmCodeClear').prop('checked', false);
+      j2haAlarmCodeAlreadySet = false;
+      $('#span_alarmDisarmCodeStatus, #div_alarmDisarmCodeClear').hide();
+    }
+    j2haSyncAlarmCodeField();
+  };
   $('#in_alarmDisarmCode').on('input keyup change', j2haSyncAlarmCodeField);
   $('#cb_alarmDisarmCodeClear').on('change', j2haSyncAlarmCodeField);
 

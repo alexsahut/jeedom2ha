@@ -1885,8 +1885,14 @@ async def _handle_mqtt_connect(request: web.Request) -> web.Response:
     # le secret local), jamais en ligne de commande. Il est retiré des réglages du broker, gardé
     # en mémoire seulement (sync.alarm_code), jamais journalisé. Absent ou vide : pas de code.
     params = dict(params)
-    set_alarm_code(params.pop("alarm_disarm_code", None))
-    _LOGGER.info("[ALARM] Code de désarmement %s", "configuré" if alarm_code_configured() else "non configuré")
+    # Revue de 12.4 : « code configuré mais illisible » (déchiffrement en échec côté PHP) ->
+    # la discovery exige toujours le code et tout DISARM venant de HA est refusé.
+    code_unreadable = params.pop("alarm_disarm_code_unreadable", False) is True
+    set_alarm_code(params.pop("alarm_disarm_code", None), unreadable=code_unreadable)
+    if code_unreadable:
+        _LOGGER.warning("[ALARM] Code de désarmement configuré mais illisible : tout désarmement depuis HA sera refusé")
+    else:
+        _LOGGER.info("[ALARM] Code de désarmement %s", "configuré" if alarm_code_configured() else "non configuré")
     host = params.get("host", "")
     if not host:
         return web.json_response({

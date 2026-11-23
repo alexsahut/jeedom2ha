@@ -525,7 +525,7 @@ Un équipement Jeedom qui porte l'état d'une alarme (`ALARM_ENABLE_STATE` ou `A
 | tout autre mode, ou aucune clé HomeKit | **armée (absent)** `armed_away`, comme HomeKit |
 
 - Le libellé du mode est comparé sans tenir compte des majuscules ni des espaces en trop.
-- Tant que « Actif » n'a jamais été lu, l'état reste **inconnu** : rien n'est inventé. Le délai de sortie n'a pas de signal dans Jeedom : l'état « armement en cours » n'est jamais affiché.
+- Tant que « Actif » n'a jamais été lu, ou s'il devient illisible, l'état est **inconnu** (`unknown`) : rien n'est inventé, et un état affiché auparavant est effacé. De même pour un virtuel qui n'a que « Statut » : déclenchée quand il vaut 1, inconnue sinon. Le délai de sortie n'a pas de signal dans Jeedom : l'état « armement en cours » n'est jamais affiché.
 - L'état est publié à la relecture de Jeedom, à chaque changement de l'une de ces quatre informations, au retour de Home Assistant et à la reconnexion au broker.
 
 **Armer et désarmer.** Les modes proposés sont ceux que vous avez associés à HomeKit dans le plugin Homebridge (clés « Présent », « Absent » et « Nuit » de l'équipement d'alarme, au format « numéro de commande | libellé »). Le plugin les lit sans jamais les modifier.
@@ -537,10 +537,14 @@ Un équipement Jeedom qui porte l'état d'une alarme (`ALARM_ENABLE_STATE` ou `A
 
 **Code de désarmement (facultatif).** Dans la [configuration](#configuration), bloc « Alarme », le champ **« Code de désarmement »** :
 
+- le code compte **4 à 8 chiffres** (pavé numérique dans Home Assistant) ; les espaces au début et à la fin sont retirés. Tout autre code est refusé avec un message, et le code déjà enregistré ne change pas ;
 - avec un code, Home Assistant le demande pour **désarmer** ; l'armement reste libre. Un code faux ou absent est refusé, et le journal du démon le dit, sans jamais écrire le code ;
-- le code est enregistré chiffré, n'est jamais réaffiché (« Code déjà configuré » le dit) et n'apparaît ni dans les journaux, ni dans les messages MQTT, ni dans Home Assistant (qui ne sait que « un code est demandé ») ;
+- **5 codes faux** de suite pour une même alarme bloquent son désarmement depuis Home Assistant pendant **5 minutes** (même avec le bon code) ; le compteur repart de zéro au premier bon code ou à la fin du blocage ;
+- le code est enregistré chiffré et n'est jamais réaffiché (« Code déjà configuré » le dit). Il n'apparaît ni dans les journaux, ni dans la configuration publiée vers Home Assistant (la discovery ne dit que « un code est demandé »), ni dans l'état retenu de l'alarme. **En revanche, au moment du désarmement, Home Assistant envoie le code saisi en clair, sans retain, sur le topic de commande** `jeedom2ha/<équipement>/alarm/set` : un client qui écoute ce topic sur le broker peut le lire ;
+- protégez donc le broker : **des ACL** pour que seul Home Assistant puisse publier sur `jeedom2ha/+/alarm/set` (et que les autres clients ne puissent pas s'y abonner), et **TLS** pour chiffrer les échanges avec le broker ;
+- si le code enregistré ne peut plus être déchiffré, le démon refuse tout désarmement depuis Home Assistant (Home Assistant continue de demander un code) et le journal du plugin le signale : ressaisissez le code ;
 - champ vide à l'enregistrement : le code actuel est conservé ; **« Retirer le code »** l'efface ;
-- le démon ne lit le code **qu'à son démarrage** : redémarrez-le après l'avoir changé ou retiré.
+- le démon ne lit le code **qu'à son démarrage** : **redémarrez-le** après avoir enregistré ou retiré le code (la page de configuration le rappelle). Tant qu'il n'a pas redémarré, l'ancien réglage s'applique : après un premier code, l'alarme reste désarmable sans code.
 
 - Identifiant de l'entité : `alarm_control_panel.jeedom2ha_<équipement>` (inchangé).
 

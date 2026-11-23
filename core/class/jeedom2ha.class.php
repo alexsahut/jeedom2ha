@@ -67,7 +67,8 @@ class jeedom2ha extends eqLogic {
 
   /**
    * FR49 (CC-64) — appelé par le cœur (config::save) avant d'enregistrer le code de désarmement :
-   * le code est stocké chiffré ; une saisie vide garde le code actuel.
+   * le code (4 à 8 chiffres, espaces de début et de fin retirés) est stocké chiffré ; une saisie vide
+   * garde le code actuel ; un autre code est refusé (exception au message clair, affichée par le cœur).
    */
   public static function preConfig_alarmDisarmCode($_value) {
     return jeedom2ha_alarm_code_to_store($_value, config::byKey(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__, ''), function ($code) {
@@ -295,12 +296,15 @@ class jeedom2ha extends eqLogic {
       );
       // FR49 (CC-64) — code de désarmement de l'alarme : dans ce corps HTTP local (secret local), jamais
       // en ligne de commande ni dans un journal ; absent quand aucun code n'est configuré.
-      $alarmCode = jeedom2ha_alarm_code_for_daemon(config::byKey(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__, ''), function ($stored) {
+      // Revue de 12.4 : code enregistré mais illisible -> indicateur seul (jamais de valeur), le démon
+      // refuse alors tout désarmement venant de HA et la discovery exige toujours le code.
+      $alarmFields = jeedom2ha_alarm_code_daemon_fields(config::byKey(JEEDOM2HA_ALARM_CODE_KEY, __CLASS__, ''), function ($stored) {
         return utils::decrypt($stored);
       });
-      if ($alarmCode !== '') {
-        $mqttConfig['alarm_disarm_code'] = $alarmCode;
+      if (!empty($alarmFields['alarm_disarm_code_unreadable'])) {
+        log::add(__CLASS__, 'warning', '[ALARM] Code de désarmement enregistré mais illisible (déchiffrement en échec) : tout désarmement depuis Home Assistant sera refusé. Ressaisissez le code dans la configuration du plugin.');
       }
+      $mqttConfig = array_merge($mqttConfig, $alarmFields);
       log::add(__CLASS__, 'info', '[MQTT] Connexion MQTT initiée vers ' . $mqttHost . ':' . $mqttConfig['port'] . ' (user=' . ($mqttConfig['user'] !== '' ? $mqttConfig['user'] : 'anonymous') . ' tls=' . ($mqttConfig['tls'] ? 'true' : 'false') . ')');
       $result = self::callDaemon('/action/mqtt_connect', $mqttConfig, 'POST');
       if ($result === null || !isset($result['status']) || $result['status'] !== 'ok') {

@@ -17,10 +17,13 @@ Aucun identifiant ni libellé de la maison n'est écrit ici : tout vient de la t
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from models.mapping import AlarmCapabilities, MappingResult
 from models.topology import JeedomCmd, JeedomEqLogic, TopologySnapshot
+
+_LOGGER = logging.getLogger(__name__)
 
 ALARM_STATE = "ALARM_STATE"
 ALARM_ENABLE_STATE = "ALARM_ENABLE_STATE"
@@ -94,6 +97,32 @@ def parse_mode_config_value(raw: Any) -> Optional[Tuple[int, str]]:
     if cmd_id <= 0:
         return None
     return cmd_id, label
+
+
+def _comparable_label(label: str) -> str:
+    """Même normalisation que ``sync.readback.normalize_alarm_mode_label`` (casse, espaces)."""
+    return " ".join(label.split()).casefold()
+
+
+def _warn_duplicate_mode_labels(eq_id: Any, config: Mapping[str, Any], mode_labels: Mapping[str, str]) -> None:
+    """Revue de 12.4 — deux clés Homebridge au même libellé de mode : WARNING, comportement inchangé.
+
+    L'état se lit par libellé : le premier mode dans l'ordre Présent, Absent, Nuit l'emporte
+    (``sync.readback.alarm_state``). Les libellés ne sont pas écrits dans le journal.
+    """
+    keys_by_label: Dict[str, List[str]] = {}
+    for key, ha_state, _role, _feature, _payload in MODE_SLOTS:
+        label = mode_labels.get(ha_state)
+        if label is None:
+            continue
+        keys_by_label.setdefault(_comparable_label(label), []).append(key)
+    for keys in keys_by_label.values():
+        if len(keys) > 1:
+            _LOGGER.warning(
+                "[MAPPING] eq_id=%s : alarme, les clés Homebridge %s portent le même libellé de mode ; "
+                "l'état affiché sera celui de %s (premier dans l'ordre Présent, Absent, Nuit)",
+                eq_id, ", ".join(keys), keys[0],
+            )
 
 
 def is_mode_command(cmd: Any) -> bool:
@@ -215,6 +244,7 @@ class AlarmControlPanelMapper:
         }
         if mode_labels:
             reason_details["alarm_mode_labels"] = mode_labels
+            _warn_duplicate_mode_labels(eq_id, config, mode_labels)
 
         return MappingResult(
             ha_entity_type="alarm_control_panel",

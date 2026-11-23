@@ -134,9 +134,28 @@ $dec = function ($v) { return strrev(substr($v, 4, -1)); };
 check('saisie : stockée chiffrée', jeedom2ha_alarm_code_to_store('4321', 'OLD', $enc) === 'ENC(1234)');
 check('saisie vide : le code actuel est gardé', jeedom2ha_alarm_code_to_store('', 'OLD', $enc) === 'OLD');
 check('saisie blanche : le code actuel est gardé', jeedom2ha_alarm_code_to_store('   ', 'OLD', $enc) === 'OLD');
-check('démon : code déchiffré', jeedom2ha_alarm_code_for_daemon('ENC(1234)', $dec) === '4321');
-check('démon : rien de stocké -> chaîne vide', jeedom2ha_alarm_code_for_daemon('', $dec) === '');
-check('démon : déchiffrement en erreur -> chaîne vide', jeedom2ha_alarm_code_for_daemon('x', function ($v) { throw new Exception('x'); }) === '');
+// Revue de 12.4 : 4 à 8 chiffres, espaces de début et de fin retirés ; tout autre code est refusé.
+check('saisie : espaces de début et de fin retirés avant chiffrement', jeedom2ha_alarm_code_to_store("  4321\t", 'OLD', $enc) === 'ENC(1234)');
+check('saisie : 8 chiffres acceptés', jeedom2ha_alarm_code_to_store('12345678', 'OLD', $enc) === 'ENC(87654321)');
+check('saisie : entier accepté', jeedom2ha_alarm_code_to_store(13579, 'OLD', $enc) === 'ENC(97531)');
+foreach (array('123', '123456789', '12a4', '12 34', '-1234', '1234.5', '١٢٣٤', "1234\n5", 'abcd', '+1234') as $bad) {
+    $message = null;
+    $stored = 'inchangé';
+    try {
+        $stored = jeedom2ha_alarm_code_to_store($bad, 'OLD', $enc);
+    } catch (InvalidArgumentException $e) {
+        $message = $e->getMessage();
+    }
+    check('saisie refusée (' . strlen($bad) . ' octets) : exception, rien d\'enregistré', $message !== null && $stored === 'inchangé');
+    check('… message clair (4 à 8 chiffres) sans la valeur saisie', $message !== null && strpos($message, '4 à 8 chiffres') !== false && strpos($message, $bad) === false);
+}
+check('validation : 4 à 8 chiffres', jeedom2ha_alarm_code_is_valid(' 0000 ') && jeedom2ha_alarm_code_is_valid('00000000') && !jeedom2ha_alarm_code_is_valid('000') && !jeedom2ha_alarm_code_is_valid(null) && !jeedom2ha_alarm_code_is_valid(array('1234')));
+check('démon : code lisible -> alarm_disarm_code', jeedom2ha_alarm_code_daemon_fields('ENC(1234)', $dec) === array('alarm_disarm_code' => '4321'));
+check('démon : rien de stocké -> aucun champ', jeedom2ha_alarm_code_daemon_fields('', $dec) === array() && jeedom2ha_alarm_code_daemon_fields(null, $dec) === array());
+$unreadable = array('alarm_disarm_code_unreadable' => true);
+check('démon : déchiffrement en erreur -> indicateur « illisible » seul', jeedom2ha_alarm_code_daemon_fields('ENC(9999)', function ($v) { throw new Exception('x'); }) === $unreadable);
+check('démon : déchiffrement rendu false -> indicateur « illisible » seul', jeedom2ha_alarm_code_daemon_fields('ENC(9999)', function ($v) { return false; }) === $unreadable);
+check('démon : déchiffrement rendu vide -> indicateur « illisible » seul', jeedom2ha_alarm_code_daemon_fields('ENC(9999)', function ($v) { return '  '; }) === $unreadable);
 check('case « Retirer » : seulement 1 / « 1 » / true', jeedom2ha_alarm_code_clear_requested('1') && jeedom2ha_alarm_code_clear_requested(1) && !jeedom2ha_alarm_code_clear_requested('0') && !jeedom2ha_alarm_code_clear_requested(''));
 $functions = code_only(file_get_contents($root . '/core/php/jeedom2ha_alarm.php'));
 foreach (array('config::', 'log::', 'core.inc.php', 'setConfiguration', '->save(') as $forbidden) {
@@ -177,6 +196,13 @@ $GLOBALS['j2ha_logs'] = array();
 check('saisie : la valeur enregistrée est chiffrée', jeedom2ha::preConfig_alarmDisarmCode('2468') === 'ENC(8642)');
 $GLOBALS['j2ha_config']['jeedom2ha::alarmDisarmCode'] = 'ENC(8642)';
 check('saisie vide : le code enregistré reste', jeedom2ha::preConfig_alarmDisarmCode('') === 'ENC(8642)');
+$refused = null;
+try {
+    jeedom2ha::preConfig_alarmDisarmCode('24a8');
+} catch (InvalidArgumentException $e) {
+    $refused = $e->getMessage();
+}
+check('saisie non numérique : refusée par le hook (le cœur affiche le message), code enregistré inchangé', $refused !== null && $GLOBALS['j2ha_config']['jeedom2ha::alarmDisarmCode'] === 'ENC(8642)');
 check('case non cochée : rien n\'est retiré', jeedom2ha::preConfig_alarmDisarmCodeClear('0') === '0' && isset($GLOBALS['j2ha_config']['jeedom2ha::alarmDisarmCode']));
 check('case cochée : le code est retiré et la case se décoche', jeedom2ha::preConfig_alarmDisarmCodeClear('1') === '0' && !isset($GLOBALS['j2ha_config']['jeedom2ha::alarmDisarmCode']));
 check('aucun journal ne contient le code', count(array_filter($GLOBALS['j2ha_logs'], function ($l) { return strpos($l, '2468') !== false || strpos($l, '8642') !== false; })) === 0);
@@ -185,14 +211,15 @@ echo "Code de désarmement — transmis au démon dans le corps HTTP local, jama
 $start = strpos($classSource, 'public static function deamon_start()');
 $end = strpos($classSource, 'public static function isDaemonMqttReady');
 $daemonStart = code_only('<?php ' . substr($classSource, $start, $end - $start));
-check('le code part dans $mqttConfig (corps de /action/mqtt_connect)', strpos($daemonStart, "\$mqttConfig['alarm_disarm_code'] = \$alarmCode;") !== false);
-check('… seulement s\'il est configuré', strpos($daemonStart, "if (\$alarmCode !== '') {") !== false);
-check('… et après la construction de la ligne de commande du démon', strpos($daemonStart, '$alarmCode') > strrpos($daemonStart, '$cmd .='));
+check('le code (ou l\'indicateur « illisible ») part dans $mqttConfig (corps de /action/mqtt_connect)', strpos($daemonStart, '$mqttConfig = array_merge($mqttConfig, $alarmFields);') !== false);
+check('… champs rendus par jeedom2ha_alarm_code_daemon_fields', strpos($daemonStart, '$alarmFields = jeedom2ha_alarm_code_daemon_fields(') !== false);
+check('… et après la construction de la ligne de commande du démon', strpos($daemonStart, '$alarmFields') > strrpos($daemonStart, '$cmd .='));
+check('code illisible : un warning est journalisé', preg_match("/if \\(!empty\\(\\\$alarmFields\\['alarm_disarm_code_unreadable'\\]\\)\\) \\{\\s*log::add\\(__CLASS__, 'warning', '\\[ALARM\\] Code de désarmement enregistré mais illisible[^'$]*'\\);/", $daemonStart) === 1);
 preg_match_all('/\$cmd \.= [^;]*;/', $daemonStart, $cmdLines);
 check('la ligne de commande ne cite jamais le code', count($cmdLines[0]) > 0 && count(array_filter($cmdLines[0], function ($l) { return stripos($l, 'alarm') !== false; })) === 0);
 check('le fichier de secrets du démon ne contient pas le code', strpos(substr($daemonStart, 0, strpos($daemonStart, '$cmd = ')), 'alarm') === false);
 preg_match_all('/log::add\([^;]*;/', $daemonStart, $logLines);
-check('aucun log::add ne cite le code', count(array_filter($logLines[0], function ($l) { return stripos($l, 'alarmCode') !== false || stripos($l, 'alarm_disarm_code') !== false; })) === 0);
+check('aucun log::add ne cite le code', count(array_filter($logLines[0], function ($l) { return stripos($l, 'alarmCode') !== false || stripos($l, 'alarmFields') !== false || stripos($l, 'alarm_disarm_code') !== false; })) === 0);
 
 echo "\n{$passed} réussis, {$failed} échoués\n";
 exit($failed === 0 ? 0 : 1);

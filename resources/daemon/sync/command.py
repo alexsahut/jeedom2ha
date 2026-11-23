@@ -26,7 +26,8 @@ from mapping.alarm_control_panel import (  # FR49 (CC-64)
     alarm_arm_targets,
     alarm_disarm_command,
 )
-from sync.alarm_code import alarm_code_configured, alarm_code_matches  # FR49 (CC-64)
+from sync import alarm_code as _alarm_code  # FR49 (CC-64) — limite d'essais (ALARM_LOCKOUT)
+from sync.alarm_code import alarm_code_configured, alarm_code_matches, alarm_code_unreadable  # FR49 (CC-64)
 from mapping.climate import (  # Story 24.15
     CHANNEL_MODE as CLIMATE_CHANNEL_MODE,
     CHANNEL_SETPOINT as CLIMATE_CHANNEL_SETPOINT,
@@ -60,7 +61,9 @@ _CLIMATE_FAMILIES = ("climate_setpoint", "climate_mode", "climate_preset")
 # FR49 (CC-64) — alarm orders: jeedom2ha/{eq_id}/alarm/set (topic declared by the discovery).
 _ALARM_SET_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/alarm/set$")
 # FR49 (CC-64) — refusals of the disarm code: WARNING, never the code itself.
-_ALARM_CODE_REFUSALS = ("alarm_code_missing", "alarm_code_invalid")
+_ALARM_CODE_REFUSALS = (
+    "alarm_code_missing", "alarm_code_invalid", "alarm_code_unreadable", "alarm_code_locked",
+)
 _SCENARIO_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/scenario_(?P<scenario_id>\d+)/cmd$")
 # Story 24.12 — equipment button (ButtonMapper / FallbackMapper): jeedom2ha/{eq_id}/cmd.
 _BUTTON_CMD_TOPIC_RE = re.compile(r"^jeedom2ha/(?P<eq_id>\d+)/cmd$")
@@ -868,10 +871,20 @@ class CommandSynchronizer:
         commands = mapping.commands or {}
         if action == ALARM_PAYLOAD_DISARM:
             if alarm_code_configured():
+                # Revue de 12.4 : un code enregistré mais illisible refuse tout désarmement ;
+                # après 5 codes faux, l'équipement est verrouillé 5 minutes.
+                if alarm_code_unreadable():
+                    return None, "alarm_code_unreadable"
+                lockout = _alarm_code.ALARM_LOCKOUT
+                eq_key = getattr(mapping, "jeedom_eq_id", None)
+                if lockout.is_locked(eq_key):
+                    return None, "alarm_code_locked"
                 if code is None or code == "":
                     return None, "alarm_code_missing"
                 if not alarm_code_matches(code):
+                    lockout.record_failure(eq_key)
                     return None, "alarm_code_invalid"
+                lockout.record_success(eq_key)
             cmd = alarm_disarm_command(commands)
             family = "alarm_disarm"
         elif action in ALARM_ARM_PAYLOADS:

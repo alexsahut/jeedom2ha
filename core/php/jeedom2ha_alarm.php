@@ -7,7 +7,7 @@
  * - export en LECTURE SEULE des clés de mode posées par Homebridge sur l'eqLogic d'une alarme
  *   (`SetModePresent`, `SetModeAbsent`, `SetModeNuit`, format « id|libellé ») : aucune écriture
  *   côté Jeedom ;
- * - code de désarmement saisi dans la configuration du plugin : stocké chiffré, transmis au
+ * - code de désarmement saisi dans la configuration du plugin (4 à 8 chiffres) : stocké chiffré, transmis au
  *   démon dans le corps HTTP local de /action/mqtt_connect (jamais en ligne de commande, jamais
  *   dans un journal).
  */
@@ -20,6 +20,13 @@ if (!defined('JEEDOM2HA_ALARM_CODE_KEY')) {
 }
 if (!defined('JEEDOM2HA_ALARM_CODE_CLEAR_KEY')) {
   define('JEEDOM2HA_ALARM_CODE_CLEAR_KEY', 'alarmDisarmCodeClear');
+}
+// Revue de 12.4 : code numérique de 4 à 8 chiffres (pavé numérique de HA, `code: REMOTE_CODE`).
+if (!defined('JEEDOM2HA_ALARM_CODE_PATTERN')) {
+  define('JEEDOM2HA_ALARM_CODE_PATTERN', '/^[0-9]{4,8}$/');
+}
+if (!defined('JEEDOM2HA_ALARM_CODE_INVALID_MESSAGE')) {
+  define('JEEDOM2HA_ALARM_CODE_INVALID_MESSAGE', 'Code de désarmement refusé : il doit compter 4 à 8 chiffres (0 à 9), sans lettre ni symbole. Le code enregistré n\'a pas changé.');
 }
 
 /**
@@ -52,28 +59,57 @@ function jeedom2ha_alarm_mode_config(array $_cmdGenericTypes, callable $_config)
   return $out;
 }
 
-/** Code à transmettre au démon : le code déchiffré, ou '' s'il n'y en a pas (jamais journalisé). */
-function jeedom2ha_alarm_code_for_daemon($_stored, callable $_decrypt): string {
+/**
+ * Champs à ajouter au corps de /action/mqtt_connect (jamais journalisés) :
+ * - aucun code enregistré : tableau vide (comportement sans code) ;
+ * - code lisible : `alarm_disarm_code` ;
+ * - code enregistré mais illisible (déchiffrement en échec, en erreur ou vide) :
+ *   `alarm_disarm_code_unreadable` = true, sans aucune valeur — le démon exige alors toujours
+ *   le code dans la discovery et refuse tout désarmement venant de HA.
+ */
+function jeedom2ha_alarm_code_daemon_fields($_stored, callable $_decrypt): array {
   if (!is_string($_stored) || $_stored === '') {
-    return '';
+    return array();
   }
   try {
     $code = $_decrypt($_stored);
   } catch (Throwable $e) {
-    return '';
+    $code = null;
   }
-  return (is_string($code) && trim($code) !== '') ? $code : '';
+  if (is_string($code) && trim($code) !== '') {
+    return array('alarm_disarm_code' => $code);
+  }
+  return array('alarm_disarm_code_unreadable' => true);
+}
+
+/** Code saisi, espaces de début et de fin retirés ('' si ce n'est pas un texte ou un entier). */
+function jeedom2ha_alarm_code_normalize($_value): string {
+  if (is_int($_value)) {
+    return (string) $_value;
+  }
+  return is_string($_value) ? trim($_value) : '';
+}
+
+/** Le code saisi (normalisé) compte 4 à 8 chiffres, et rien d'autre. */
+function jeedom2ha_alarm_code_is_valid($_value): bool {
+  return preg_match(JEEDOM2HA_ALARM_CODE_PATTERN, jeedom2ha_alarm_code_normalize($_value)) === 1;
 }
 
 /**
- * Valeur à enregistrer quand l'utilisateur saisit un code : le code chiffré ; une saisie vide ou
- * blanche garde le code déjà enregistré (`$_current`), comme le mot de passe MQTT.
+ * Valeur à enregistrer quand l'utilisateur saisit un code : le code (espaces de début et de fin
+ * retirés) chiffré ; une saisie vide ou blanche garde le code déjà enregistré (`$_current`), comme
+ * le mot de passe MQTT. Un code qui ne compte pas 4 à 8 chiffres est refusé : exception au message
+ * clair (sans la valeur saisie), que le cœur affiche, et le code enregistré ne change pas.
  */
 function jeedom2ha_alarm_code_to_store($_value, $_current, callable $_encrypt): string {
-  if (!is_string($_value) || trim($_value) === '') {
+  $code = jeedom2ha_alarm_code_normalize($_value);
+  if ($code === '') {
     return is_string($_current) ? $_current : '';
   }
-  return (string) $_encrypt($_value);
+  if (!jeedom2ha_alarm_code_is_valid($code)) {
+    throw new InvalidArgumentException(JEEDOM2HA_ALARM_CODE_INVALID_MESSAGE);
+  }
+  return (string) $_encrypt($code);
 }
 
 /** La case « Retirer le code » est cochée. */
