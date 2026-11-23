@@ -1,5 +1,5 @@
 # generated: 2026-03-22 10:33:12 CET
-# last_updated: 2026-11-13
+# last_updated: 2026-11-23
 # project: jeedom2ha
 # project_key: NOKEY
 # tracking_system: file-system
@@ -262,6 +262,7 @@ development_status:
   12-3-realignement-documentaire-post-epics-11-12: done  # code-review PASS 2026-06-24 — AC1-AC6 satisfaits, 1 finding LOW mécanique corrigé
   12-4-alarme-etat-et-armement-par-mode: review  # 2026-11-23 create-story + dev-story (session cloud deleguee) : FR49 / CC-64, regles 1 a 7 du porteur du projet du 23/11 (etat diffuse, armement par mode SetModePresent/Absent/Nuit, code de desarmement facultatif) ; code-review faite ; reste Task 0 et preuve terrain AC8 a ClaudeBox
   12-5-alarme-armement-meme-mode: review  # 2026-11-23 create-story + dev-story + code-review (session cloud deleguee) ; reste Task 0 et preuve terrain AC9 a ClaudeBox : correctif FR49 apres essai demo de 12.4 — armer quand le mode demande est deja le mode courant (ecart 1, bloquant) ; plus d'ancien mode affiche a l'armement (ecart 2)
+  12-6-state-listeners-recalage-par-difference: review  # 2026-11-23 create-story + dev-story + code-review (session cloud deleguee) ; reste Task 0 et preuve terrain (Task 5) a ClaudeBox / agent prod : correctif CC-45 « Listener non trouvé » en prod — recaler les listeners stateListener par difference au lieu de tout supprimer / recreer a chaque resynchro ; enquete sur les ~26 resynchros par jour dans la story
   pe-epic-11-retrospective: done  # rétro 2026-06-22 matérialisée par Story 12.3
   pe-epic-12-retrospective: done  # rétro 2026-06-22 matérialisée par Story 12.3
 
