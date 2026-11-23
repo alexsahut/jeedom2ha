@@ -3,6 +3,7 @@
 
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { lstat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { assertNoOverrideOn, compareWitness, countWindow, takeWitness } from './lib/box-witness.mjs';
@@ -268,22 +269,63 @@ export async function captureFinallyFailure(state, operation) {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
+function isOutside(root, target) {
+  const relative = path.relative(root, target);
+  return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+}
+
+/** Chemin réel du plus proche ancêtre existant (liens symboliques suivis). */
+async function realpathOfNearest(target) {
+  let current = target;
+  for (;;) {
+    try {
+      return await realpath(current);
+    } catch (error) {
+      const parent = path.dirname(current);
+      if (error?.code !== 'ENOENT' || parent === current) throw error;
+      current = parent;
+    }
+  }
+}
+
+/**
+ * Échec visible avant la fermeture de la page : exception levée, erreur console (ac3_3) ou requête
+ * bloquée (ac3_1). Les écarts du témoin box et des journaux ne sont connus qu'après fermeture.
+ */
+export function failureVisibleBeforeSeal({ failure, consoleErrors, journal }) {
+  return Boolean(failure) || (consoleErrors?.length ?? 0) > 0 || Boolean(journal?.failed);
+}
+
 /**
  * Capture pleine page `failure.png` d'un gate en échec, seulement si `JEEDOM2HA_GATE_SCREENSHOT_DIR` est défini.
- * La page montre la configuration réelle : un dossier situé dans le dépôt est refusé. La capture ne fait jamais
- * échouer le gate et ne remplace pas le premier échec.
+ * La page montre la configuration réelle : un dossier situé dans le dépôt, y compris à travers un lien symbolique,
+ * est refusé, ainsi qu'un `failure.png` existant qui est un lien symbolique. La capture ne fait jamais échouer le
+ * gate et ne remplace pas le premier échec.
  */
 export async function captureFailureScreenshot(page, { dir = process.env.JEEDOM2HA_GATE_SCREENSHOT_DIR, repoRoot = REPO_ROOT } = {}) {
   if (!dir || !page) return null;
   const target = path.resolve(dir);
-  const relative = path.relative(repoRoot, target);
-  const outside = relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
-  if (!outside) {
-    console.error('capture-echec-ignoree: dossier-dans-le-depot');
-    return null;
-  }
   const file = path.join(target, 'failure.png');
   try {
+    const realRoot = await realpath(repoRoot);
+    // Contrôle avant mkdir : aucun dossier n'est créé dans le dépôt.
+    if (!isOutside(repoRoot, target) || !isOutside(realRoot, await realpathOfNearest(target))) {
+      console.error('capture-echec-ignoree: dossier-dans-le-depot');
+      return null;
+    }
+    await mkdir(target, { recursive: true });
+    if (!isOutside(realRoot, await realpath(target))) {
+      console.error('capture-echec-ignoree: dossier-dans-le-depot');
+      return null;
+    }
+    const existing = await lstat(file).catch((error) => {
+      if (error?.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (existing?.isSymbolicLink()) {
+      console.error('capture-echec-ignoree: lien-symbolique');
+      return null;
+    }
     await page.screenshot({ path: file, fullPage: true, timeout: 15_000 });
     return file;
   } catch {
@@ -606,9 +648,9 @@ async function main() {
     assertOpenPagesAllowed(context, ctx, journal);
   } catch (error) {
     failure = error instanceof Error ? error : new Error(String(error));
-    // Avant sealContext/closePages : la page est encore affichée.
-    await captureFailureScreenshot(failurePage);
   } finally {
+    // Point d'appel unique, avant sealContext/closePages : la page est encore affichée.
+    if (failureVisibleBeforeSeal({ failure, consoleErrors, journal })) await captureFailureScreenshot(failurePage);
     const finalization = { failure };
     // CC-43 (reprise G43b) : neutraliser les pages (navigation vers about:blank,
     // réseau encore ouvert) avant de couper le réseau du contexte, avant de
